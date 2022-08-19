@@ -1,0 +1,10 @@
+﻿{
+  "profiles": {
+    "Run.bat": {
+      "commandName": "Executable",
+      "executablePath": "cmd.exe",
+      "commandLineArgs": "/c Run.bat",
+      "workingDirectory": "../"
+    }
+  }
+}

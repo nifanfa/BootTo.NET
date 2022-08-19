@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <MSBuildAllProjects Condition="'$(MSBuildVersion)' == '' Or '$(MSBuildVersion)' &lt; '16.0'">$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>03406847-825a-4359-8159-e1769bee543f</SharedGUID>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>uefi_cs</Import_RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)efi.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efiapi.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)eficompiler.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)eficon.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)eficonex.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efidebug.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efidef.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efidevp.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efierr.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efifs.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efigpt.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efiip.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efilib.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efilink.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efinet.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efipart.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efipciio.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efipoint.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efiprot.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efipxebc.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efirtlib.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efiser.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efisetjmp.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efishell.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efishellintf.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efistdarg.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efitcp.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efiudp.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efiui.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efi_nii.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efi_pxe.cs" />
+  </ItemGroup>
+</Project>

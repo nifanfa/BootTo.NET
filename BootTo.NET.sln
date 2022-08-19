@@ -1,0 +1,40 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.2.32526.322
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ConsoleApp1", "ConsoleApp1\ConsoleApp1.csproj", "{86AF0AE0-BF6E-4532-8E9E-7F6D8B7DE644}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "解决方案项", "解决方案项", "{F53AC2EB-6875-4964-AA83-915BB7862F1B}"
+	ProjectSection(SolutionItems) = preProject
+		Run.bat = Run.bat
+	EndProjectSection
+EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "CoreLib", "CoreLib\CoreLib.shproj", "{09702D3B-0A10-4653-9C75-12989E41B246}"
+EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "uefi-cs", "uefi-cs\uefi-cs.shproj", "{03406847-825A-4359-8159-E1769BEE543F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{86AF0AE0-BF6E-4532-8E9E-7F6D8B7DE644}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{86AF0AE0-BF6E-4532-8E9E-7F6D8B7DE644}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{86AF0AE0-BF6E-4532-8E9E-7F6D8B7DE644}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{86AF0AE0-BF6E-4532-8E9E-7F6D8B7DE644}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {18B9E75A-70E1-49A9-9624-1DB382AB2720}
+	EndGlobalSection
+	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		uefi-cs\uefi-cs.projitems*{03406847-825a-4359-8159-e1769bee543f}*SharedItemsImports = 13
+		CoreLib\CoreLib.projitems*{09702d3b-0a10-4653-9c75-12989e41b246}*SharedItemsImports = 13
+		CoreLib\CoreLib.projitems*{86af0ae0-bf6e-4532-8e9e-7f6d8b7de644}*SharedItemsImports = 5
+		uefi-cs\uefi-cs.projitems*{86af0ae0-bf6e-4532-8e9e-7f6d8b7de644}*SharedItemsImports = 5
+	EndGlobalSection
+EndGlobal

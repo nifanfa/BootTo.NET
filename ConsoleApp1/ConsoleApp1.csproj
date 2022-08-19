@@ -1,0 +1,53 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	  
+    <NoStdLib>true</NoStdLib>
+    <NoConfig>true</NoConfig>
+    <RuntimeMetadataVersion>v4.0.30319</RuntimeMetadataVersion>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+
+    <IlcSystemModule>ConsoleApp1</IlcSystemModule>
+    <EntryPointSymbol>EfiMain</EntryPointSymbol>
+
+    <LinkerSubsystem>EFI_APPLICATION</LinkerSubsystem>
+  </PropertyGroup>
+
+  <Target Name="HandleBuild" AfterTargets="AfterBuild" Condition="'$(BuildingInsideVisualStudio)' == 'true'">
+	  <Exec WorkingDirectory="$(MSBuildProjectDirectory)" Command="dotnet publish -r win-x64"></Exec>
+  </Target>
+
+  <Target Name="CopyEFI" AfterTargets="Publish">
+	  <Copy SourceFiles="$(MSBuildProjectDirectory)\$(NativeOutputPath)$(TargetName)$(NativeBinaryExt)" DestinationFiles="$(MSBuildProjectDirectory)\..\Drive\EFI\BOOT\BOOTX64.efi"></Copy>
+  </Target>
+
+  <ItemGroup>
+    <Content Include="Properties\launchSettings.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.DotNet.ILCompiler" Version="7.0.0-preview.2.22152.2" />
+  </ItemGroup>
+
+	<!-- The project file pretends this is .NET, but it's not .NET. Remove all assembly references the .NET SDK added. -->
+	<Target Name="CustomizeReferences" BeforeTargets="BeforeCompile" AfterTargets="FindReferenceAssembliesForReferences">
+		<ItemGroup>
+			<ReferencePathWithRefAssemblies Remove="@(ReferencePathWithRefAssemblies)" Condition="%(Filename) != 'CoreLib'" />
+			<ReferencePath Remove="@(ReferencePath)" />
+		</ItemGroup>
+	</Target>
+
+  <!-- The AOT compiler would want to mirror these as AppContext switches. Prevent that. -->
+  <Target Name="RemoveHostConfigurationOptions" BeforeTargets="WriteIlcRspFileForCompilation" DependsOnTargets="PrepareForILLink">
+    <ItemGroup>
+      <RuntimeHostConfigurationOption Remove="@(RuntimeHostConfigurationOption)" />
+    </ItemGroup>
+  </Target>
+  <Import Project="..\CoreLib\CoreLib.projitems" Label="Shared" />
+  <Import Project="..\uefi-cs\uefi-cs.projitems" Label="Shared" />
+
+</Project>
