@@ -21,8 +21,6 @@ public unsafe partial class efi
         efi._RT = (IntPtr)systemTable->RuntimeServices;
         efi.gImageHandle = imageHandle;
 
-        InitializeGuid();
-
         EFI_LOADED_IMAGE_PROTOCOL* loadedimage = null;
         gBS->HandleProtocol(gImageHandle, EFI_LOADED_IMAGE_PROTOCOL_GUID, (void**)&loadedimage);
         long ImageBase = (long)loadedimage->ImageBase;
@@ -35,6 +33,8 @@ public unsafe partial class efi
             if (*(ulong*)sections[i].Name == 0x73656C75646F6D2E) moduleSec = (IntPtr)(ImageBase + sections[i].VirtualAddress);
         }
         StartupCodeHelpers.InitializeModules(moduleSec);
+
+        InitializeGuid();
     }
 
     public static EFI_GUID EFI_GLOBAL_VARIABLE;
