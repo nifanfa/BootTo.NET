@@ -1,3 +1,21 @@
+/*++
+
+Copyright (c) 1998  Intel Corporation
+
+Module Name:
+
+    efipart.h
+    
+Abstract:   
+    Info about disk partitions and Master Boot Records
+
+
+
+
+Revision History
+
+--*/
+
 using System.Runtime.InteropServices;
 
 [StructLayout(LayoutKind.Sequential)]

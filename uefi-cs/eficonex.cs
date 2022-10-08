@@ -1,3 +1,17 @@
+/*++
+
+Copyright (c) 2020 Kagurazaka Kotori <kagurazakakotori@gmail.com>
+
+Module Name:
+
+    eficonex.h
+
+Abstract:
+
+    EFI console extension protocols
+
+--*/
+
 using System.Runtime.InteropServices;
 
 [StructLayout(LayoutKind.Sequential)]

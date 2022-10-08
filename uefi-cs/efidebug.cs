@@ -1,3 +1,21 @@
+/*++
+
+Copyright (c) 1998  Intel Corporation
+
+Module Name:
+
+    efidebug.h
+
+Abstract:
+
+    EFI library debug functions
+
+
+
+Revision History
+
+--*/
+
 using System.Runtime.InteropServices;
 
 

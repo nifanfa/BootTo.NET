@@ -1,3 +1,21 @@
+/*++
+
+Copyright (c) 1998  Intel Corporation
+
+Module Name:
+
+    efifs.h
+
+Abstract:
+
+    EFI File System structures
+
+
+
+Revision History
+
+--*/
+
 using System.Runtime.InteropServices;
 
 [StructLayout(LayoutKind.Sequential)]

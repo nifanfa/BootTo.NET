@@ -1,3 +1,21 @@
+/*++
+
+Copyright (c) 1998  Intel Corporation
+
+Module Name:
+
+    eficon.h
+
+Abstract:
+
+    EFI console protocols
+
+
+
+Revision History
+
+--*/
+
 using System.Runtime.InteropServices;
 
 [StructLayout(LayoutKind.Sequential)]

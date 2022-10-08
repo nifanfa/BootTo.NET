@@ -1,3 +1,22 @@
+/*++
+
+Copyright (c) 1998  Intel Corporation
+
+Module Name:
+
+    efiapi.h
+
+Abstract:
+
+    Global EFI runtime & boot service interfaces
+
+
+
+
+Revision History
+
+--*/
+
 using System.Runtime.InteropServices;
 
 public partial class efi

@@ -1,3 +1,21 @@
+/*++
+
+Copyright (c) 1998  Intel Corporation
+
+Module Name:
+
+    link.h (renamed efilink.h to avoid conflicts)
+
+Abstract:
+
+    EFI link list macro's
+
+
+
+Revision History
+
+--*/
+
 using System.Runtime.InteropServices;
 
 [StructLayout(LayoutKind.Sequential)]

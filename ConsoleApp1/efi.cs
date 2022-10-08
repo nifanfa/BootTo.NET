@@ -21,6 +21,7 @@ public unsafe partial class efi
         efi._RT = (IntPtr)systemTable->RuntimeServices;
         efi.gImageHandle = imageHandle;
 
+        //C# startup
         EFI_LOADED_IMAGE_PROTOCOL* loadedimage = null;
         gBS->HandleProtocol(gImageHandle, EFI_LOADED_IMAGE_PROTOCOL_GUID, (void**)&loadedimage);
         long ImageBase = (long)loadedimage->ImageBase;

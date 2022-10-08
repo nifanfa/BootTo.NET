@@ -1,3 +1,18 @@
+/*++
+Copyright (c) Intel  1999
+
+Module name:
+    efi_pxe.h
+
+32/64-bit PXE specification:
+    alpha-4, 99-Dec-17
+
+Abstract:
+    This header file contains all of the PXE type definitions,
+    structure prototypes, global variables and constants that
+    are needed for porting PXE to EFI.
+--*/
+
 using System.Runtime.InteropServices;
 
 [StructLayout(LayoutKind.Sequential)]

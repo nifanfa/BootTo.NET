@@ -1,3 +1,22 @@
+/*++
+
+Copyright (c) 1998  Intel Corporation
+
+Module Name:
+
+    efidef.h
+
+Abstract:
+
+    EFI definitions
+
+
+
+
+Revision History
+
+--*/
+
 using System.Runtime.InteropServices;
 
 [StructLayout(LayoutKind.Sequential)]

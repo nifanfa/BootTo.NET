@@ -1,3 +1,19 @@
+/*++
+Copyright (c) 2000  Intel Corporation
+
+Module name:
+    efi_nii.h
+
+Abstract:
+
+Revision history:
+    2000-Feb-18 M(f)J   GUID updated.
+                Structure order changed for machine word alignment.
+                Added StringId[4] to structure.
+
+    2000-Feb-14 M(f)J   Genesis.
+--*/
+
 using System.Runtime.InteropServices;
 
 [StructLayout(LayoutKind.Sequential)]

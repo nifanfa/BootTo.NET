@@ -1,3 +1,20 @@
+/*++
+
+Copyright (c) 1998  Intel Corporation
+
+Module Name:
+
+    EfiGpt.h
+    
+Abstract:
+    Include file for EFI partitioning scheme
+
+
+
+Revision History
+
+--*/
+
 using System.Runtime.InteropServices;
 
 [StructLayout(LayoutKind.Sequential)]

@@ -1,3 +1,8 @@
+/*++
+Copyright (c) 2013  Intel Corporation
+
+--*/
+
 using System.Runtime.InteropServices;
 
 [StructLayout(LayoutKind.Sequential)]

@@ -1,3 +1,15 @@
+/*++
+Copyright (c) 1999  Intel Corporation
+
+Module Name:
+    efinet.h
+
+Abstract:
+    EFI Simple Network protocol
+
+Revision History
+--*/
+
 using System.Runtime.InteropServices;
 
 [StructLayout(LayoutKind.Sequential)]

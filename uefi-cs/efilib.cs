@@ -1,3 +1,21 @@
+/*++
+
+Copyright (c) 2000  Intel Corporation
+
+Module Name:
+
+    efilib.h
+
+Abstract:
+
+    EFI library functions
+
+
+
+Revision History
+
+--*/
+
 using System.Runtime.InteropServices;
 
 [StructLayout(LayoutKind.Sequential)]

@@ -1,3 +1,22 @@
+/*++
+
+Copyright (c) 1998  Intel Corporation
+
+Module Name:
+
+    efierr.h
+
+Abstract:
+
+    EFI error codes
+
+
+
+
+Revision History
+
+--*/
+
 public partial class efi
 {
     public const ulong EFI_SUCCESS = 0;

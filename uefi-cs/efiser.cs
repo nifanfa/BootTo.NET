@@ -1,3 +1,19 @@
+/*++
+
+Copyright (c) 1998  Intel Corporation
+
+Module Name:
+
+    efiser.h
+
+Abstract:
+
+    EFI serial protocol
+
+Revision History
+
+--*/
+
 using System.Runtime.InteropServices;
 
 public enum EFI_PARITY_TYPE
