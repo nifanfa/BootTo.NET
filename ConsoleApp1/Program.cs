@@ -21,6 +21,9 @@ unsafe class Program
 
         Console.Clear();
         Console.WriteLine("Hello world from \"BootTo.NET project\"!");
+        Console.WriteLine("Press any key to continue...");
+
+        Console.ReadKey();
 
 #if false
         #region File Test
