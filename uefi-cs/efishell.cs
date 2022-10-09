@@ -4,7 +4,10 @@ using System.Runtime.InteropServices;
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct SHELL_FILE_HANDLE
 {
-    public void* Value;
+    void* Value;
+
+    public static implicit operator SHELL_FILE_HANDLE(void* value) => new SHELL_FILE_HANDLE() { Value = value };
+    public static implicit operator void*(SHELL_FILE_HANDLE value) => value.Value;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -21,7 +24,10 @@ public unsafe struct EFI_SHELL_FILE_INFO
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_SHELL_DEVICE_NAME_FLAGS
 {
-    public uint Value;
+    uint Value;
+
+    public static implicit operator EFI_SHELL_DEVICE_NAME_FLAGS(uint value) => new EFI_SHELL_DEVICE_NAME_FLAGS() { Value = value };
+    public static implicit operator uint(EFI_SHELL_DEVICE_NAME_FLAGS value) => value.Value;
 }
 
 [StructLayout(LayoutKind.Sequential)]

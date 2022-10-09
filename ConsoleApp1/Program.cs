@@ -57,7 +57,7 @@ unsafe class Program
         Console.WriteLine("Press any key to continue...");
         Console.ReadKey();
         Console.Clear();
-        uint* fb = (uint*)gop->Mode->FrameBufferBase.Value;
+        uint* fb = (uint*)gop->Mode->FrameBufferBase;
         for (uint w = 0; w < gop->Mode->Info->HorizontalResolution; w++)
         {
             for (uint h = 0; h < gop->Mode->Info->VerticalResolution; h++)

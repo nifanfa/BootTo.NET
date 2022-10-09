@@ -32,7 +32,10 @@ public unsafe struct EFI_IP_ADDRESS
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_PXE_BASE_CODE_UDP_PORT
 {
-    public ushort Value;
+    ushort Value;
+
+    public static implicit operator EFI_PXE_BASE_CODE_UDP_PORT(ushort value) => new EFI_PXE_BASE_CODE_UDP_PORT() { Value = value };
+    public static implicit operator ushort(EFI_PXE_BASE_CODE_UDP_PORT value) => value.Value;
 }
 
 [StructLayout(LayoutKind.Sequential)]

@@ -18,31 +18,46 @@ using System.Runtime.InteropServices;
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct PXE_OPCODE
 {
-    public ushort Value;
+    ushort Value;
+
+    public static implicit operator PXE_OPCODE(ushort value) => new PXE_OPCODE() { Value = value };
+    public static implicit operator ushort(PXE_OPCODE value) => value.Value;
 }
 
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct PXE_OPFLAGS
 {
-    public ushort Value;
+    ushort Value;
+
+    public static implicit operator PXE_OPFLAGS(ushort value) => new PXE_OPFLAGS() { Value = value };
+    public static implicit operator ushort(PXE_OPFLAGS value) => value.Value;
 }
 
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct PXE_STATCODE
 {
-    public ushort Value;
+    ushort Value;
+
+    public static implicit operator PXE_STATCODE(ushort value) => new PXE_STATCODE() { Value = value };
+    public static implicit operator ushort(PXE_STATCODE value) => value.Value;
 }
 
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct PXE_STATFLAGS
 {
-    public ushort Value;
+    ushort Value;
+
+    public static implicit operator PXE_STATFLAGS(ushort value) => new PXE_STATFLAGS() { Value = value };
+    public static implicit operator ushort(PXE_STATFLAGS value) => value.Value;
 }
 
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct PXE_CONTROL
 {
-    public ushort Value;
+    ushort Value;
+
+    public static implicit operator PXE_CONTROL(ushort value) => new PXE_CONTROL() { Value = value };
+    public static implicit operator ushort(PXE_CONTROL value) => value.Value;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -66,13 +81,19 @@ public unsafe struct PXE_IPV6
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct PXE_MEDIA_PROTOCOL
 {
-    public ushort Value;
+    ushort Value;
+
+    public static implicit operator PXE_MEDIA_PROTOCOL(ushort value) => new PXE_MEDIA_PROTOCOL() { Value = value };
+    public static implicit operator ushort(PXE_MEDIA_PROTOCOL value) => value.Value;
 }
 
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct PXE_FRAME_TYPE
 {
-    public byte Value;
+    byte Value;
+
+    public static implicit operator PXE_FRAME_TYPE(byte value) => new PXE_FRAME_TYPE() { Value = value };
+    public static implicit operator byte(PXE_FRAME_TYPE value) => value.Value;
 }
 
 [StructLayout(LayoutKind.Sequential)]

@@ -22,7 +22,10 @@ using System.Runtime.InteropServices;
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_EXCEPTION_TYPE
 {
-    public long Value;
+    long Value;
+
+    public static implicit operator EFI_EXCEPTION_TYPE(long value) => new EFI_EXCEPTION_TYPE() { Value = value };
+    public static implicit operator long(EFI_EXCEPTION_TYPE value) => value.Value;
 }
 
 [StructLayout(LayoutKind.Sequential)]

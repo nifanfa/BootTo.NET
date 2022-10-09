@@ -17,7 +17,10 @@ using System.Runtime.InteropServices;
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_KEY_TOGGLE_STATE
 {
-    public byte Value;
+    byte Value;
+
+    public static implicit operator EFI_KEY_TOGGLE_STATE(byte value) => new EFI_KEY_TOGGLE_STATE() { Value = value };
+    public static implicit operator byte(EFI_KEY_TOGGLE_STATE value) => value.Value;
 }
 
 [StructLayout(LayoutKind.Sequential)]

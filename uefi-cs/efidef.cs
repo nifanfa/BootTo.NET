@@ -22,36 +22,46 @@ using System.Runtime.InteropServices;
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_STATUS
 {
+    ulong Value;
+
     public static implicit operator ulong(EFI_STATUS sts) => sts.Value;
     public static implicit operator EFI_STATUS(ulong value) => new EFI_STATUS() { Value = value };
-
-    public ulong Value;
 }
 
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_LBA
 {
-    public ulong Value;
+    ulong Value;
+
+    public static implicit operator EFI_LBA(ulong value) => new EFI_LBA() { Value = value };
+    public static implicit operator ulong(EFI_LBA value) => value.Value;
 }
 
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_TPL
 {
-    public static implicit operator EFI_TPL(ulong value) => new EFI_TPL() { Value = value }; 
+    ulong Value;
 
-    public ulong Value;
+    public static implicit operator EFI_TPL(ulong value) => new EFI_TPL() { Value = value };
+    public static implicit operator ulong(EFI_TPL value) => value.Value;
 }
 
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_HANDLE
 {
-    public void* Value;
+    void* Value;
+
+    public static implicit operator EFI_HANDLE(void* value) => new EFI_HANDLE() { Value = value };
+    public static implicit operator void*(EFI_HANDLE value) => value.Value;
 }
 
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_EVENT
 {
-    public void* Value;
+    void* Value;
+
+    public static implicit operator EFI_EVENT(void* value) => new EFI_EVENT() { Value = value };
+    public static implicit operator void*(EFI_EVENT value) => value.Value;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -168,13 +178,19 @@ public enum EFI_MEMORY_TYPE
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_PHYSICAL_ADDRESS
 {
-    public ulong Value;
+    ulong Value;
+
+    public static implicit operator EFI_PHYSICAL_ADDRESS(void* value) => new EFI_PHYSICAL_ADDRESS() { Value = (ulong)value };
+    public static implicit operator void*(EFI_PHYSICAL_ADDRESS value) => (void*)value.Value;
 }
 
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_VIRTUAL_ADDRESS
 {
-    public ulong Value;
+    ulong Value;
+
+    public static implicit operator EFI_VIRTUAL_ADDRESS(void* value) => new EFI_VIRTUAL_ADDRESS() { Value = (ulong)value };
+    public static implicit operator void*(EFI_VIRTUAL_ADDRESS value) => (void*)value.Value;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -191,5 +207,8 @@ public unsafe struct EFI_MEMORY_DESCRIPTOR
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct ISO_639_2
 {
-    public byte Value;
+    byte Value;
+
+    public static implicit operator ISO_639_2(byte value) => new ISO_639_2() { Value = value };
+    public static implicit operator byte(ISO_639_2 value) => value.Value;
 }
