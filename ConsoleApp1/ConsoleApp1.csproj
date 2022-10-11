@@ -20,11 +20,21 @@
   <Target Name="HandleBuild" AfterTargets="AfterBuild" Condition="'$(BuildingInsideVisualStudio)' == 'true'">
 	  <Exec WorkingDirectory="$(MSBuildProjectDirectory)" Command="dotnet publish -r win-x64"></Exec>
   </Target>
+	
+  <Target Name="CheckAdmin" BeforeTargets="BeforeCompile">
+	  <Message Text="               _             _           _____              " Importance="High" />
+	  <Message Text="     /\       | |           (_)         |  __ \             " Importance="High" />
+	  <Message Text="    /  \    __| | _ __ ___   _  _ __    | |__) | ___   __ _ " Importance="High" />
+	  <Message Text="   / /\ \  / _` || '_ ` _ \ | || '_ \   |  _  / / _ \ / _` |" Importance="High" />
+	  <Message Text="  / ____ \| (_| || | | | | || || | | |  | | \ \|  __/| (_| |" Importance="High" />
+	  <Message Text=" /_/    \_\\__,_||_| |_| |_||_||_| |_|  |_|  \_\\___| \__, |" Importance="High" />
+	  <Message Text="                                                         |_|" Importance="High" />
+	  <Message Text="You must run Visual Studio as administrator! Because creating vhd requires admin rights" Importance="High" />
+	  <Exec Command="net session >nul 2>&amp;1" ></Exec>
+  </Target>
 
   <Target Name="CopyEFI" AfterTargets="Publish">
 	  <Copy SourceFiles="$(MSBuildProjectDirectory)\$(NativeOutputPath)$(TargetName)$(NativeBinaryExt)" DestinationFiles="$(MSBuildProjectDirectory)\..\Drive\EFI\BOOT\BOOTX64.efi"></Copy>
-	  <Message Text="You must run Visual Studio as administrator! Because creating vhd requires admin rights" Importance="High" />
-	  <Exec Command="net session >nul 2>&amp;1"></Exec>
 	  <PropertyGroup>
 		  <VHDFilePath>$(MSBuildProjectDirectory)\$(NativeOutputPath)$(TargetName).vhd</VHDFilePath>
 		  <AttachVHDLines>
