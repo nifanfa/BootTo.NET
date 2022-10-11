@@ -1,9 +1,9 @@
 ﻿{
   "profiles": {
-    "Run.bat": {
+    "VMware": {
       "commandName": "Executable",
-      "executablePath": "cmd.exe",
-      "commandLineArgs": "/c Run.bat",
+      "executablePath": "AdminRequirer.exe",
+      "commandLineArgs": "dotnet publish -r win-x64 -c Debug ConsoleApp1",
       "workingDirectory": "../"
     }
   }

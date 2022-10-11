@@ -17,11 +17,7 @@
     <LinkerSubsystem>EFI_APPLICATION</LinkerSubsystem>
   </PropertyGroup>
 
-  <Target Name="HandleBuild" AfterTargets="AfterBuild" Condition="'$(BuildingInsideVisualStudio)' == 'true'">
-	  <Exec WorkingDirectory="$(MSBuildProjectDirectory)" Command="dotnet publish -r win-x64"></Exec>
-  </Target>
-	
-  <Target Name="CheckAdmin" BeforeTargets="BeforeCompile">
+  <Target Name="CheckAdmin" AfterTargets="Publish">
 	  <Message Text="               _             _           _____              " Importance="High" />
 	  <Message Text="     /\       | |           (_)         |  __ \             " Importance="High" />
 	  <Message Text="    /  \    __| | _ __ ___   _  _ __    | |__) | ___   __ _ " Importance="High" />
@@ -29,12 +25,11 @@
 	  <Message Text="  / ____ \| (_| || | | | | || || | | |  | | \ \|  __/| (_| |" Importance="High" />
 	  <Message Text=" /_/    \_\\__,_||_| |_| |_||_||_| |_|  |_|  \_\\___| \__, |" Importance="High" />
 	  <Message Text="                                                         |_|" Importance="High" />
-	  <Message Text="You must run Visual Studio as administrator! Because creating vhd requires admin rights" Importance="High" />
-	  <Exec Command="net session >nul 2>&amp;1" ></Exec>
+	  <Warning Text="You must run Visual Studio as administrator! Because creating vhd requires admin rights" />
+	  <Exec Command="net session &gt;nul 2&gt;&amp;1"></Exec>
   </Target>
 
-  <Target Name="CopyEFI" AfterTargets="Publish">
-	  <Copy SourceFiles="$(MSBuildProjectDirectory)\$(NativeOutputPath)$(TargetName)$(NativeBinaryExt)" DestinationFiles="$(MSBuildProjectDirectory)\..\Drive\EFI\BOOT\BOOTX64.efi"></Copy>
+  <Target Name="CreateVHD" AfterTargets="CopyEFI">
 	  <PropertyGroup>
 		  <VHDFilePath>$(MSBuildProjectDirectory)\$(NativeOutputPath)$(TargetName).vhd</VHDFilePath>
 		  <AttachVHDLines>
@@ -60,6 +55,17 @@
 	  <WriteLinesToFile File="$(MSBuildProjectDirectory)\$(NativeOutputPath)temp.txt" Overwrite="true" Lines="$(DetachVHDLines)" />
 	  <Exec Command="diskpart /s &quot;$(MSBuildProjectDirectory)\$(NativeOutputPath)temp.txt&quot;" />
 	  <Message Text="Created VHDX at $(VHDFilePath)." Importance="High" />
+  </Target>
+
+  <Target Name="CopyEFI" AfterTargets="CheckAdmin">
+	  <Copy SourceFiles="$(MSBuildProjectDirectory)\$(NativeOutputPath)$(TargetName)$(NativeBinaryExt)" DestinationFiles="$(MSBuildProjectDirectory)\..\Drive\EFI\BOOT\BOOTX64.efi"></Copy>
+  </Target>
+
+  <Target Name="RunVMware" AfterTargets="CreateVHD">
+	  <Error Text="Please install VMWare Player in order to Run BootTo.NET!" Condition="!Exists('C:\Program Files (x86)\VMware\VMware Player\vmplayer.exe')And!Exists('C:\Program Files (x86)\VMware\VMware Workstation\vmplayer.exe')"></Error>
+
+	  <Exec Condition="Exists('C:\Program Files (x86)\VMware\VMware Workstation\vmplayer.exe')" Command="&quot;C:\Program Files (x86)\VMware\VMware Workstation\vmplayer.exe&quot; &quot;$(MSBuildProjectDirectory)\..\Virtual Machines\BootTo.NET\BootTo.NET.vmx"></Exec>
+	  <Exec Condition="Exists('C:\Program Files (x86)\VMware\VMware Player\vmplayer.exe')And!Exists('C:\Program Files (x86)\VMware\VMware Workstation\vmplayer.exe')" Command="&quot;C:\Program Files (x86)\VMware\VMware Player\vmplayer.exe&quot; &quot;$(MSBuildProjectDirectory)\..\Virtual Machines\BootTo.NET\BootTo.NET.vmx"></Exec>
   </Target>
 
   <ItemGroup>

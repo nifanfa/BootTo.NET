@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<Foundry>
+<VM>
+<VMId type="string">52 b3 76 70 df 86 de df-78 26 e6 66 61 fa 6b 88</VMId>
+<ClientMetaData>
+<clientMetaDataAttributes/>
+<HistoryEventList/></ClientMetaData>
+<vmxPathName type="string">BootTo.NET.vmx</vmxPathName></VM></Foundry>
