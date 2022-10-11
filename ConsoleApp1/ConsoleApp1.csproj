@@ -23,8 +23,8 @@
 
   <Target Name="CopyEFI" AfterTargets="Publish">
 	  <Copy SourceFiles="$(MSBuildProjectDirectory)\$(NativeOutputPath)$(TargetName)$(NativeBinaryExt)" DestinationFiles="$(MSBuildProjectDirectory)\..\Drive\EFI\BOOT\BOOTX64.efi"></Copy>
-
-	  <!--
+	  <Message Text="You must run Visual Studio as administrator! Because creating vhd requires admin rights" Importance="High" />
+	  <Exec Command="net session >nul 2>&amp;1"></Exec>
 	  <PropertyGroup>
 		  <VHDFilePath>$(MSBuildProjectDirectory)\$(NativeOutputPath)$(TargetName).vhd</VHDFilePath>
 		  <AttachVHDLines>
@@ -50,7 +50,6 @@
 	  <WriteLinesToFile File="$(MSBuildProjectDirectory)\$(NativeOutputPath)temp.txt" Overwrite="true" Lines="$(DetachVHDLines)" />
 	  <Exec Command="diskpart /s &quot;$(MSBuildProjectDirectory)\$(NativeOutputPath)temp.txt&quot;" />
 	  <Message Text="Created VHDX at $(VHDFilePath)." Importance="High" />
-	  -->
   </Target>
 
   <ItemGroup>
