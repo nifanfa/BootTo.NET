@@ -23,6 +23,34 @@
 
   <Target Name="CopyEFI" AfterTargets="Publish">
 	  <Copy SourceFiles="$(MSBuildProjectDirectory)\$(NativeOutputPath)$(TargetName)$(NativeBinaryExt)" DestinationFiles="$(MSBuildProjectDirectory)\..\Drive\EFI\BOOT\BOOTX64.efi"></Copy>
+
+	  <!--
+	  <PropertyGroup>
+		  <VHDFilePath>$(MSBuildProjectDirectory)\$(NativeOutputPath)$(TargetName).vhd</VHDFilePath>
+		  <AttachVHDLines>
+			  create vdisk file="$(VHDFilePath)" maximum=500
+			  select vdisk file="$(VHDFilePath)"
+			  attach vdisk
+			  convert gpt
+			  create partition efi size=100
+			  format quick fs=fat32 label="System"
+			  assign letter=Z
+		  </AttachVHDLines>
+		  <DetachVHDLines>
+			  select vdisk file="$(VHDFilePath)"
+			  select partition 2
+			  remove letter=Z
+			  detach vdisk
+		  </DetachVHDLines>
+	  </PropertyGroup>
+	  <Delete Files="$(VHDFilePath)" />
+	  <WriteLinesToFile File="$(MSBuildProjectDirectory)\$(NativeOutputPath)temp.txt" Overwrite="true" Lines="$(AttachVHDLines)" />
+	  <Exec Command="diskpart /s &quot;$(MSBuildProjectDirectory)\$(NativeOutputPath)temp.txt&quot;" />
+	  <Exec Command="xcopy.exe  &quot;$(MSBuildProjectDirectory)\..\Drive\&quot; &quot;Z:\&quot; /e" />
+	  <WriteLinesToFile File="$(MSBuildProjectDirectory)\$(NativeOutputPath)temp.txt" Overwrite="true" Lines="$(DetachVHDLines)" />
+	  <Exec Command="diskpart /s &quot;$(MSBuildProjectDirectory)\$(NativeOutputPath)temp.txt&quot;" />
+	  <Message Text="Created VHDX at $(VHDFilePath)." Importance="High" />
+	  -->
   </Target>
 
   <ItemGroup>
