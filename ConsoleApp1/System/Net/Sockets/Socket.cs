@@ -40,7 +40,7 @@ namespace System.Net.Sockets
 
             sts = gBS->LocateHandleBuffer(
                 EFI_LOCATE_SEARCH_TYPE.ByProtocol,
-                EFI_TCP4_SERVICE_BINDING_PROTOCOL,
+                (EFI_GUID*)EFI_TCP4_SERVICE_BINDING_PROTOCOL,
                 null,
                 &numdevices,
                 &devices
@@ -59,7 +59,7 @@ namespace System.Net.Sockets
 
             gBS->OpenProtocol(
                 dev,
-                EFI_TCP4_SERVICE_BINDING_PROTOCOL,
+                (EFI_GUID*)EFI_TCP4_SERVICE_BINDING_PROTOCOL,
                 (void**)&bs,
                 gImageHandle,
                 default,
@@ -73,7 +73,7 @@ namespace System.Net.Sockets
             fixed (EFI_TCP4** pcli = &tcp)
                 gBS->OpenProtocol(
                     tcphandle,
-                    EFI_TCP4_PROTOCOL,
+                    (EFI_GUID*)EFI_TCP4_PROTOCOL,
                     (void**)pcli,
                     gImageHandle,
                     default,

@@ -67,7 +67,7 @@ public unsafe struct EFI_EVENT
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_GUID
 {
-    public static implicit operator EFI_GUID*(EFI_GUID guid) => &guid;
+    public static explicit operator EFI_GUID*(EFI_GUID guid) => &guid;
 
     public uint Data1;
     public ushort Data2;

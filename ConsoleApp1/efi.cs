@@ -25,7 +25,7 @@ public unsafe partial class efi
 
         //C# startup
         EFI_LOADED_IMAGE_PROTOCOL* loadedimage = null;
-        gBS->HandleProtocol(gImageHandle, EFI_LOADED_IMAGE_PROTOCOL_GUID, (void**)&loadedimage);
+        gBS->HandleProtocol(gImageHandle, (EFI_GUID*)EFI_LOADED_IMAGE_PROTOCOL_GUID, (void**)&loadedimage);
         long ImageBase = (long)loadedimage->ImageBase;
         DOSHeader* doshdr = (DOSHeader*)ImageBase;
         NtHeaders64* nthdr = (NtHeaders64*)(ImageBase + doshdr->e_lfanew);

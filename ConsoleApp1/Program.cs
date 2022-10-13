@@ -39,7 +39,7 @@ unsafe class Program
 #if true
         #region GOP Test
         EFI_GRAPHICS_OUTPUT_PROTOCOL* gop;
-        gBS->LocateProtocol(EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID, null, (void**)&gop);
+        gBS->LocateProtocol((EFI_GUID*)EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID, null, (void**)&gop);
         uint numModes = gop->Mode->MaxMode;
         ulong sizeofMode = 0;
         for (uint u = 0; u < numModes; u++)

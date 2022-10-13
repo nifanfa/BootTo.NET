@@ -6,8 +6,8 @@
         {
             EFI_LOADED_IMAGE_PROTOCOL* loadedimage = null;
             EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* simplefilesystem = null;
-            gBS->HandleProtocol(gImageHandle, EFI_LOADED_IMAGE_PROTOCOL_GUID, (void**)&loadedimage);
-            gBS->HandleProtocol(loadedimage->DeviceHandle, EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID, (void**)&simplefilesystem);
+            gBS->HandleProtocol(gImageHandle, (EFI_GUID*)EFI_LOADED_IMAGE_PROTOCOL_GUID, (void**)&loadedimage);
+            gBS->HandleProtocol(loadedimage->DeviceHandle, (EFI_GUID*)EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID, (void**)&simplefilesystem);
             EFI_FILE_HANDLE* vol = null;
             simplefilesystem->OpenVolume(simplefilesystem, &vol);
             EFI_FILE_HANDLE* file = null;
@@ -15,7 +15,7 @@
                 vol->Open(vol, &file, ptr, EFI_FILE_MODE_READ, 0);
             EFI_FILE_INFO info = new EFI_FILE_INFO();
             ulong fileinfosize = (ulong)sizeof(EFI_FILE_INFO);
-            file->GetInfo(file, EFI_FILE_INFO_ID, &fileinfosize, &info);
+            file->GetInfo(file, (EFI_GUID*)EFI_FILE_INFO_ID, &fileinfosize, &info);
             byte[] buffer = new byte[info.FileSize];
             fixed (byte* pbuf = buffer)
                 file->Read(file, &info.FileSize, pbuf);
@@ -29,8 +29,8 @@
             File.Delete(path);
             EFI_LOADED_IMAGE_PROTOCOL* loadedimage = null;
             EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* simplefilesystem = null;
-            gBS->HandleProtocol(gImageHandle, EFI_LOADED_IMAGE_PROTOCOL_GUID, (void**)&loadedimage);
-            gBS->HandleProtocol(loadedimage->DeviceHandle, EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID, (void**)&simplefilesystem);
+            gBS->HandleProtocol(gImageHandle, (EFI_GUID*)EFI_LOADED_IMAGE_PROTOCOL_GUID, (void**)&loadedimage);
+            gBS->HandleProtocol(loadedimage->DeviceHandle, (EFI_GUID*)EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID, (void**)&simplefilesystem);
             EFI_FILE_HANDLE* vol = null;
             simplefilesystem->OpenVolume(simplefilesystem, &vol);
             EFI_FILE_HANDLE* file = null;
@@ -49,8 +49,8 @@
         {
             EFI_LOADED_IMAGE_PROTOCOL* loadedimage = null;
             EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* simplefilesystem = null;
-            gBS->HandleProtocol(gImageHandle, EFI_LOADED_IMAGE_DEVICE_PATH_PROTOCOL_GUID, (void**)&loadedimage);
-            gBS->HandleProtocol(loadedimage->DeviceHandle, EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID, (void**)&simplefilesystem);
+            gBS->HandleProtocol(gImageHandle, (EFI_GUID*)EFI_LOADED_IMAGE_DEVICE_PATH_PROTOCOL_GUID, (void**)&loadedimage);
+            gBS->HandleProtocol(loadedimage->DeviceHandle, (EFI_GUID*)EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID, (void**)&simplefilesystem);
             EFI_FILE_HANDLE* vol = null;
             simplefilesystem->OpenVolume(simplefilesystem, &vol);
             EFI_FILE_HANDLE* file = null;
