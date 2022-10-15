@@ -30,7 +30,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)System\Boolean.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)System\Byte.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)System\Char.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)System\Console.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)System\Convert.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)System\Delegate.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)System\Double.cs" />
