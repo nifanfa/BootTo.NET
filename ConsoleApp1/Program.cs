@@ -25,6 +25,48 @@ unsafe class Program
 
         Console.ReadKey();
 
+#if true
+        #region Cursor
+        EFI_SIMPLE_POINTER_PROTOCOL* pointer;
+        gBS->LocateProtocol((EFI_GUID*)EFI_SIMPLE_POINTER_PROTOCOL_GUID, null, (void**)&pointer);
+        GetFB(out var fb, out var width, out var height);
+        EFI_SIMPLE_POINTER_STATE sts;
+        pointer->Mode->ResolutionX = width;
+        pointer->Mode->ResolutionY = height;
+        float Precision = 100;
+        for (; ; )
+        {
+            pointer->GetState(pointer, &sts);
+            int AxisX = (int)((sts.RelativeMovementX / 65536f) * Precision);
+            int AxisY = (int)((sts.RelativeMovementY / 65536f) * Precision);
+            fb[width * (height / 2 + AxisY) + (width / 2 + AxisX)] = 0xFFFF0000;
+        }
+
+        void SetPixel(int x,int y,uint color)
+        {
+            Clamp(x, 0, (int)width);
+            Clamp(y, 0, (int)height);
+            fb[width * y + x] = color;
+        }
+
+        int Clamp(int value, int min, int max)
+        {
+            if (value < min) return min;
+            if (value > max) return max;
+            return value;
+        }
+
+        void GetFB(out uint* fb,out uint width,out uint height)
+        {
+            EFI_GRAPHICS_OUTPUT_PROTOCOL* gop;
+            gBS->LocateProtocol((EFI_GUID*)EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID, null, (void**)&gop);
+            fb = (uint*)gop->Mode->FrameBufferBase;
+            width = gop->Mode->Info->HorizontalResolution;
+            height = gop->Mode->Info->VerticalResolution;
+        }
+        #endregion
+#endif
+
 #if false
         #region File Test
         byte[] buffer = File.ReadAllBytes("Test.txt");
@@ -36,7 +78,7 @@ unsafe class Program
         #endregion
 #endif
 
-#if true
+#if false
         #region GOP Test
         EFI_GRAPHICS_OUTPUT_PROTOCOL* gop;
         gBS->LocateProtocol((EFI_GUID*)EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID, null, (void**)&gop);
