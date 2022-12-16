@@ -27,19 +27,64 @@ unsafe class Program
 
 #if true
         #region Cursor
+        int[] cursor = new int[]
+            {
+                1,0,0,0,0,0,0,0,0,0,0,0,
+                1,1,0,0,0,0,0,0,0,0,0,0,
+                1,2,1,0,0,0,0,0,0,0,0,0,
+                1,2,2,1,0,0,0,0,0,0,0,0,
+                1,2,2,2,1,0,0,0,0,0,0,0,
+                1,2,2,2,2,1,0,0,0,0,0,0,
+                1,2,2,2,2,2,1,0,0,0,0,0,
+                1,2,2,2,2,2,2,1,0,0,0,0,
+                1,2,2,2,2,2,2,2,1,0,0,0,
+                1,2,2,2,2,2,2,2,2,1,0,0,
+                1,2,2,2,2,2,2,2,2,2,1,0,
+                1,2,2,2,2,2,2,2,2,2,2,1,
+                1,2,2,2,2,2,2,1,1,1,1,1,
+                1,2,2,2,1,2,2,1,0,0,0,0,
+                1,2,2,1,0,1,2,2,1,0,0,0,
+                1,2,1,0,0,1,2,2,1,0,0,0,
+                1,1,0,0,0,0,1,2,2,1,0,0,
+                0,0,0,0,0,0,1,2,2,1,0,0,
+                0,0,0,0,0,0,0,1,1,0,0,0
+            };
+
         EFI_SIMPLE_POINTER_PROTOCOL* pointer;
         gBS->LocateProtocol((EFI_GUID*)EFI_SIMPLE_POINTER_PROTOCOL_GUID, null, (void**)&pointer);
         GetFB(out var fb, out var width, out var height);
         EFI_SIMPLE_POINTER_STATE sts;
         pointer->Mode->ResolutionX = width;
         pointer->Mode->ResolutionY = height;
-        float Precision = 100;
+        float MouseSpeed = 200;
+
+        int CursorX = 0;
+        int CursorY = 0;
+
         for (; ; )
         {
             pointer->GetState(pointer, &sts);
-            int AxisX = (int)((sts.RelativeMovementX / 65536f) * Precision);
-            int AxisY = (int)((sts.RelativeMovementY / 65536f) * Precision);
-            fb[width * (height / 2 + AxisY) + (width / 2 + AxisX)] = 0xFFFF0000;
+            CursorX = Clamp(CursorX + (int)((sts.RelativeMovementX / 65536f) * MouseSpeed), 0, (int)width);
+            CursorY = Clamp(CursorY + (int)((sts.RelativeMovementY / 65536f) * MouseSpeed), 0, (int)height);
+            DrawCursor(fb,CursorX, CursorY);
+        }
+
+        void DrawCursor(uint* fb, int x, int y)
+        {
+            for (int h = 0; h < 19; h++)
+            {
+                for (int w = 0; w < 12; w++)
+                {
+                    if (cursor[h * 12 + w] == 1)
+                    {
+                        SetPixel(w + x, h + y, 0);
+                    }
+                    if (cursor[h * 12 + w] == 2)
+                    {
+                        SetPixel(w + x, h + y, 0xFFFFFFFF);
+                    }
+                }
+            }
         }
 
         void SetPixel(int x,int y,uint color)
