@@ -7,10 +7,6 @@ unsafe class Program
 {
     static void Main() { }
 
-    //QEMU corrupts BOOTX64.efi, which is probably why it doesn't work on real hardware, please notice!
-    //If you want to running this on real hardware, please press ctrl+b to rebuild this repo and copy
-    //files from Disk folder to your usb drive, of course you have to format your usb drive to fat32 and
-    //use GUID partition table first
     [System.Runtime.RuntimeExport("EfiMain")]
     static EFI_STATUS EfiMain(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* systemTable)
     {
