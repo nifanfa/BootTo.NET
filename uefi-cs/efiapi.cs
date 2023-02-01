@@ -19,27 +19,6 @@ Revision History
 
 using System.Runtime.InteropServices;
 
-public partial class efi
-{
-    public const uint EVT_TIMER = 0x80000000;
-    public const uint EVT_RUNTIME = 0x40000000;
-    public const uint EVT_RUNTIME_CONTEXT = 0x20000000;
-
-    public const uint EVT_NOTIFY_WAIT = 0x00000100;
-    public const uint EVT_NOTIFY_SIGNAL = 0x00000200;
-
-    public const uint EVT_SIGNAL_EXIT_BOOT_SERVICES = 0x00000201;
-    public const uint EVT_SIGNAL_VIRTUAL_ADDRESS_CHANGE = 0x60000202;
-
-    public const uint EVT_EFI_SIGNAL_MASK = 0x000000FF;
-    public const uint EVT_EFI_SIGNAL_MAX = 4;
-
-    public const uint TPL_APPLICATION = 4;
-    public const uint TPL_CALLBACK = 8;
-    public const uint TPL_NOTIFY = 16;
-    public const uint TPL_HIGH_LEVEL = 31;
-}
-
 public enum EFI_TIMER_DELAY
 {
     TimerCancel,
@@ -84,16 +63,6 @@ public unsafe struct EFI_LOADED_IMAGE
 
 }
 */
-
-public partial class efi
-{
-    public const uint EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL = 0x00000001;
-    public const uint EFI_OPEN_PROTOCOL_GET_PROTOCOL = 0x00000002;
-    public const uint EFI_OPEN_PROTOCOL_TEST_PROTOCOL = 0x00000004;
-    public const uint EFI_OPEN_PROTOCOL_BY_CHILD_CONTROLLER = 0x00000008;
-    public const uint EFI_OPEN_PROTOCOL_BY_DRIVER = 0x00000010;
-    public const uint EFI_OPEN_PROTOCOL_EXCLUSIVE = 0x00000020;
-}
 
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_OPEN_PROTOCOL_INFORMATION_ENTRY

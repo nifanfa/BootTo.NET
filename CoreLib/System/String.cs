@@ -81,7 +81,7 @@ namespace System
 
             fixed (char* c = &s._firstChar)
             {
-                memcpy((byte*)c, (byte*)start, (ulong)length * sizeof(char));
+                InternalCalls.memcpy((byte*)c, (byte*)start, (ulong)length * sizeof(char));
                 c[length] = '\0';
             }
 

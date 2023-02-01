@@ -140,7 +140,7 @@ namespace System.Runtime
             {
                 fixed (byte* pFields = &result.GetRawData())
                 fixed (byte* pData = &dataAdjustedForNullable)
-                    efi.memcpy(pFields, pData, pEEType->ValueTypeSize);
+                    InternalCalls.memcpy(pFields, pData, pEEType->ValueTypeSize);
             }
 
             return result;
@@ -266,7 +266,7 @@ namespace System.Runtime
 
                 // Set HasValue to false and clear the value (in case there were GC references we wish to stop reporting).
                 fixed (byte* pdata = &data)
-                    efi.memset(pdata, 0, pUnboxToEEType->ValueTypeSize);
+                    InternalCalls.memset(pdata, 0, pUnboxToEEType->ValueTypeSize);
                 /*
                 InternalCalls.RhpInitMultibyte(
                     ref data,
@@ -308,7 +308,7 @@ namespace System.Runtime
                 // Copy the boxed fields into the new location.
                 fixed (byte* pData = &data)
                 fixed (byte* pFields = &fields)
-                    efi.memcpy(pData, pFields, pEEType->ValueTypeSize);
+                    InternalCalls.memcpy(pData, pFields, pEEType->ValueTypeSize);
             }
         }
 

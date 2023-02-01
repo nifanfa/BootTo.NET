@@ -51,7 +51,7 @@ namespace Internal.Runtime.CompilerHelpers
                         IntPtr pPreInitDataAddr = *(pBlock + 1);
                         fixed (byte* p = &obj.GetRawData())
                         {
-                            memcpy(p, (byte*)pPreInitDataAddr, obj.GetRawDataSize());
+                            InternalCalls.memcpy(p, (byte*)pPreInitDataAddr, obj.GetRawDataSize());
                         }
                     }
 

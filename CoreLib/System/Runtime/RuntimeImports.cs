@@ -46,7 +46,7 @@ namespace System.Runtime
         {
             fixed (byte* pdst = &dmem)
             fixed (byte* psrc = &smem)
-                efi.memcpy(pdst, psrc, size);
+                InternalCalls.memcpy(pdst, psrc, size);
         }
 
         /*

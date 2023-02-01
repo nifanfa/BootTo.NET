@@ -135,6 +135,18 @@ namespace System.Runtime
         internal static extern IntPtr RhHandleSet(IntPtr handle, object value);
         */
 
+        [RuntimeExport("memset")]
+        public static unsafe void memset(byte* ptr, byte c, ulong count)
+        {
+            for (ulong i = 0; i < count; i++) ptr[i] = c;
+        }
+
+        [RuntimeExport("memcpy")]
+        public static unsafe void memcpy(byte* dst, byte* src, ulong count)
+        {
+            for (ulong i = 0; i < count; i++) dst[i] = src[i];
+        }
+
         //
         // internal calls for allocation
         //

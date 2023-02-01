@@ -104,23 +104,6 @@ public unsafe struct EFI_SIMPLE_FILE_SYSTEM_PROTOCOL
     public readonly delegate* unmanaged<EFI_SIMPLE_FILE_SYSTEM_PROTOCOL*, EFI_FILE_HANDLE**, EFI_STATUS> OpenVolume;
 }
 
-public partial class efi
-{
-    // Open modes
-    public const ulong EFI_FILE_MODE_READ = 0x0000000000000001;
-    public const ulong EFI_FILE_MODE_WRITE = 0x0000000000000002;
-    public const ulong EFI_FILE_MODE_CREATE = 0x8000000000000000;
-
-    // File attributes
-    public const ulong EFI_FILE_READ_ONLY = 0x0000000000000001;
-    public const ulong EFI_FILE_HIDDEN = 0x0000000000000002;
-    public const ulong EFI_FILE_SYSTEM = 0x0000000000000004;
-    public const ulong EFI_FILE_RESERVIED = 0x0000000000000008;
-    public const ulong EFI_FILE_DIRECTORY = 0x0000000000000010;
-    public const ulong EFI_FILE_ARCHIVE = 0x0000000000000020;
-    public const ulong EFI_FILE_VALID_ATTR = 0x0000000000000037;
-}
-
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_FILE_IO_TOKEN
 {
