@@ -16,7 +16,15 @@ unsafe class Program
         gBS->SetWatchdogTimer(0, 0, 0, null);
 
         Console.Clear();
-        Console.WriteLine("Hello world from \"BootTo.NET project\"!");
+        Console.WriteLine("Welcome to: ");
+        gST->ConOut->SetAttribute(gST->ConOut, EFI_BACKGROUND_BLACK | EFI_LIGHTGREEN);
+        Console.WriteLine("  ____              _ _______     _   _ ______ _______ ");
+        Console.WriteLine(" |  _ \\            | |__   __|   | \\ | |  ____|__   __| ");
+        Console.WriteLine(" | |_) | ___   ___ | |_ | | ___  |  \\| | |__     | | ");
+        Console.WriteLine(" |  _ < / _ \\ / _ \\| __|| |/ _ \\ | . ` |  __|    | | ");
+        Console.WriteLine(" | |_) | (_) | (_) | |_ | | (_) || |\\  | |____   | | ");
+        Console.WriteLine(" |____/ \\___/ \\___/ \\__||_|\\___(_)_| \\_|______|  |_| ");
+        gST->ConOut->SetAttribute(gST->ConOut,EFI_BACKGROUND_BLACK | EFI_LIGHTGRAY);
         Console.WriteLine("Press any key to continue...");
 
         Console.ReadKey();
