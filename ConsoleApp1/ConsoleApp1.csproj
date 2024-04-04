@@ -17,6 +17,9 @@
     <LinkerSubsystem>EFI_APPLICATION</LinkerSubsystem>
   </PropertyGroup>
 
+  <Target Name="PrepareForILLink">
+  </Target>
+
   <Target Name="CheckAdmin" AfterTargets="Publish">
 	  <Message Text="               _             _           _____              " Importance="High" />
 	  <Message Text="     /\       | |           (_)         |  __ \             " Importance="High" />
