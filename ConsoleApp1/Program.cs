@@ -16,7 +16,7 @@ unsafe class Program
         gBS->SetWatchdogTimer(0, 0, 0, null);
 
         Console.Clear();
-        Console.WriteLine("Welcome to: ");
+        Console.WriteLine("Welcome to the: ");
         gST->ConOut->SetAttribute(gST->ConOut, EFI_BACKGROUND_BLACK | EFI_LIGHTGREEN);
         Console.WriteLine("  ____              _ _______     _   _ ______ _______ ");
         Console.WriteLine(" |  _ \\            | |__   __|   | \\ | |  ____|__   __| ");
