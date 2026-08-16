@@ -74,7 +74,7 @@ namespace System
             return !(value1 == value2);
         }
 
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override int GetHashCode()
         {
             return (int)_value->HashCode;
@@ -459,7 +459,7 @@ namespace System
         */
 
         [Intrinsic]
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static extern EETypePtr EETypePtrOf<T>();
             /*
         {

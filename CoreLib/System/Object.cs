@@ -105,8 +105,7 @@ namespace System
 
         public virtual void Dispose()
         {
-            var obj = this;
-            gBS->FreePool((void*)Unsafe.As<object, IntPtr>(ref obj));
+            GC.SuppressFinalize(this);
         }
     }
 }

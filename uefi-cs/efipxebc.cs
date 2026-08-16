@@ -285,6 +285,6 @@ public enum EFI_PXE_BASE_CODE_CALLBACK_STATUS
 public unsafe struct EFI_PXE_BASE_CODE_CALLBACK_PROTOCOL
 {
     public ulong Revision;
-    public readonly delegate* unmanaged<EFI_PXE_BASE_CODE_CALLBACK_PROTOCOL*, EFI_PXE_BASE_CODE_FUNCTION, bool, uint, EFI_PXE_BASE_CODE_PACKET*, EFI_STATUS> Callback;
+    public readonly delegate* unmanaged<EFI_PXE_BASE_CODE_CALLBACK_PROTOCOL*, EFI_PXE_BASE_CODE_FUNCTION, bool, uint, EFI_PXE_BASE_CODE_PACKET*, EFI_PXE_BASE_CODE_CALLBACK_STATUS> Callback;
 }
 

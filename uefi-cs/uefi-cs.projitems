@@ -23,6 +23,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)efiip.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)efilib.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)efilink.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)efimp.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)efinet.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)efipart.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)efipciio.cs" />

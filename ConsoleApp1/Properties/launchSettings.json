@@ -1,9 +1,9 @@
 ﻿{
   "profiles": {
-    "VMware": {
+    "QEMU": {
       "commandName": "Executable",
-      "executablePath": "AdminRequirer.exe",
-      "commandLineArgs": "dotnet publish -r win-x64 -c Debug ConsoleApp1 -p:EmitLegacyAssetsFileItems=true",
+      "executablePath": "dotnet",
+      "commandLineArgs": "publish --tl:off -r win-x64 -c Debug ConsoleApp1",
       "workingDirectory": "../"
     }
   }

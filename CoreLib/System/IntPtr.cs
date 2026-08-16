@@ -6,6 +6,8 @@
 //using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
+
 //using System.Runtime.Serialization;
 //using System.Runtime.Versioning;
 using Internal.Runtime.CompilerServices;
@@ -33,13 +35,13 @@ namespace System
         [Intrinsic]
         public static readonly IntPtr Zero;
 
-        //[NonVersionable]
+        [NonVersionable]
         public unsafe IntPtr(int value)
         {
             _value = (void*)value;
         }
 
-        //[NonVersionable]
+        [NonVersionable]
         public unsafe IntPtr(long value)
         {
 #if TARGET_64BIT
@@ -50,7 +52,7 @@ namespace System
         }
 
         //[CLSCompliant(false)]
-        //[NonVersionable]
+        [NonVersionable]
         public unsafe IntPtr(void* value)
         {
             _value = value;
@@ -90,7 +92,7 @@ namespace System
 #endif
         }
 
-        //[NonVersionable]
+        [NonVersionable]
         public unsafe int ToInt32()
         {
 #if TARGET_64BIT
@@ -101,29 +103,29 @@ namespace System
 #endif
         }
 
-        //[NonVersionable]
+        [NonVersionable]
         public unsafe long ToInt64() =>
             (nint)_value;
 
-        //[NonVersionable]
+        [NonVersionable]
         public static unsafe explicit operator IntPtr(int value) =>
             new IntPtr(value);
 
-        //[NonVersionable]
+        [NonVersionable]
         public static unsafe explicit operator IntPtr(long value) =>
             new IntPtr(value);
 
         //[CLSCompliant(false)]
-        //[NonVersionable]
+        [NonVersionable]
         public static unsafe explicit operator IntPtr(void* value) =>
             new IntPtr(value);
 
         //[CLSCompliant(false)]
-        //[NonVersionable]
+        [NonVersionable]
         public static unsafe explicit operator void*(IntPtr value) =>
             value._value;
 
-        //[NonVersionable]
+        [NonVersionable]
         public static unsafe explicit operator int(IntPtr value)
         {
 #if TARGET_64BIT
@@ -134,54 +136,54 @@ namespace System
 #endif
         }
 
-        //[NonVersionable]
+        [NonVersionable]
         public static unsafe explicit operator long(IntPtr value) =>
             (nint)value._value;
 
-        //[NonVersionable]
+        [NonVersionable]
         public static unsafe bool operator ==(IntPtr value1, IntPtr value2) =>
             value1._value == value2._value;
 
-        //[NonVersionable]
+        [NonVersionable]
         public static unsafe bool operator !=(IntPtr value1, IntPtr value2) =>
             value1._value != value2._value;
 
-        //[NonVersionable]
+        [NonVersionable]
         public static IntPtr Add(IntPtr pointer, int offset) =>
             pointer + offset;
 
-        //[NonVersionable]
+        [NonVersionable]
         public static unsafe IntPtr operator +(IntPtr pointer, int offset) =>
             new IntPtr((nint)pointer._value + offset);
 
-        //[NonVersionable]
+        [NonVersionable]
         public static IntPtr Subtract(IntPtr pointer, int offset) =>
             pointer - offset;
 
-        //[NonVersionable]
+        [NonVersionable]
         public static unsafe IntPtr operator -(IntPtr pointer, int offset) =>
             new IntPtr((nint)pointer._value - offset);
 
         public static int Size
         {
-            //[NonVersionable]
+            [NonVersionable]
             get => sizeof(nint);
         }
 
         //[CLSCompliant(false)]
-        //[NonVersionable]
+        [NonVersionable]
         public unsafe void* ToPointer() => _value;
 
         /*
         public static IntPtr MaxValue
         {
-            //[NonVersionable]
+            [NonVersionable]
             get => (IntPtr)nint.MaxValue;
         }
 
         public static IntPtr MinValue
         {
-            //[NonVersionable]
+            [NonVersionable]
             get => (IntPtr)nint.MinValue;
         }
         */
@@ -207,7 +209,7 @@ namespace System
 
         //public unsafe int CompareTo(IntPtr value) => ((nint)_value).CompareTo((nint)value);
 
-        //[NonVersionable]
+        [NonVersionable]
         public unsafe bool Equals(IntPtr other) => (nint)_value == (nint)other;
 
         /*

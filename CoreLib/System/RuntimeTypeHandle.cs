@@ -43,7 +43,7 @@ namespace System
             return this.ToEETypePtr().GetHashCode();
         }
 
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(RuntimeTypeHandle handle)
         {
             if (_value == handle._value)
@@ -109,7 +109,7 @@ namespace System
         }
         */
 
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal EETypePtr ToEETypePtr()
         {
             return new EETypePtr(_value);

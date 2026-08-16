@@ -3,8 +3,10 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <EmitLegacyAssetsFileItems>true</EmitLegacyAssetsFileItems>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-	  
+
     <NoStdLib>true</NoStdLib>
     <NoConfig>true</NoConfig>
     <RuntimeMetadataVersion>v4.0.30319</RuntimeMetadataVersion>
@@ -15,85 +17,65 @@
     <EntryPointSymbol>EfiMain</EntryPointSymbol>
 
     <LinkerSubsystem>EFI_APPLICATION</LinkerSubsystem>
+
+    <QemuDirectory Condition="'$(QemuDirectory)' == ''">$(MSBuildProjectDirectory)\..\qemu</QemuDirectory>
+    <QemuExecutable>$(QemuDirectory)\qemu-system-x86_64.exe</QemuExecutable>
+    <QemuImageExecutable>$(QemuDirectory)\qemu-img.exe</QemuImageExecutable>
+    <QemuFirmwareDirectory>$(QemuDirectory)\firmware</QemuFirmwareDirectory>
+    <QemuFirmware>$(QemuFirmwareDirectory)\edk2-x86_64-code.fd</QemuFirmware>
+    <QemuVariablesTemplate>$(QemuFirmwareDirectory)\edk2-i386-vars.fd</QemuVariablesTemplate>
+    <QemuDriveDirectory>$(MSBuildProjectDirectory)\..\Drive</QemuDriveDirectory>
+    <UsbMouseDriver>$(QemuDriveDirectory)\EFI\Drivers\UsbMouseDxe.efi</UsbMouseDriver>
   </PropertyGroup>
 
   <Target Name="PrepareForILLink">
   </Target>
-
-  <Target Name="CheckAdmin" AfterTargets="Publish">
-	  <Message Text="               _             _           _____              " Importance="High" />
-	  <Message Text="     /\       | |           (_)         |  __ \             " Importance="High" />
-	  <Message Text="    /  \    __| | _ __ ___   _  _ __    | |__) | ___   __ _ " Importance="High" />
-	  <Message Text="   / /\ \  / _` || '_ ` _ \ | || '_ \   |  _  / / _ \ / _` |" Importance="High" />
-	  <Message Text="  / ____ \| (_| || | | | | || || | | |  | | \ \|  __/| (_| |" Importance="High" />
-	  <Message Text=" /_/    \_\\__,_||_| |_| |_||_||_| |_|  |_|  \_\\___| \__, |" Importance="High" />
-	  <Message Text="                                                         |_|" Importance="High" />
-	  <Warning Text="You must run Visual Studio as administrator! Because creating vhd requires admin rights" />
-  </Target>
-
-  <Target Name="CreateVHD" AfterTargets="CopyEFI">
-	  <PropertyGroup>
-		  <VHDFilePath>$(MSBuildProjectDirectory)\$(NativeOutputPath)$(TargetName).vhd</VHDFilePath>
-		  <AttachVHDLines>
-			  create vdisk file="$(VHDFilePath)" maximum=500
-			  select vdisk file="$(VHDFilePath)"
-			  attach vdisk
-			  convert gpt
-			  create partition efi size=100
-			  format quick fs=fat32 label="System"
-			  assign letter=Z
-		  </AttachVHDLines>
-		  <DetachVHDLines>
-			  select vdisk file="$(VHDFilePath)"
-			  select partition 2
-			  remove letter=Z
-			  detach vdisk
-		  </DetachVHDLines>
-	  </PropertyGroup>
-	  <Delete Files="$(VHDFilePath)" />
-	  <WriteLinesToFile File="$(MSBuildProjectDirectory)\$(NativeOutputPath)temp.txt" Overwrite="true" Lines="$(AttachVHDLines)" />
-	  <Exec Command="diskpart /s &quot;$(MSBuildProjectDirectory)\$(NativeOutputPath)temp.txt&quot;" />
-	  <Exec Command="xcopy.exe  &quot;$(MSBuildProjectDirectory)\..\Drive&quot; &quot;Z:\&quot; /e" />
-	  <WriteLinesToFile File="$(MSBuildProjectDirectory)\$(NativeOutputPath)temp.txt" Overwrite="true" Lines="$(DetachVHDLines)" />
-	  <Exec Command="diskpart /s &quot;$(MSBuildProjectDirectory)\$(NativeOutputPath)temp.txt&quot;" />
-	  <Message Text="Created VHDX at $(VHDFilePath)." Importance="High" />
-  </Target>
-
-  <Target Name="CopyEFI" AfterTargets="CheckAdmin">
-	  <Copy SourceFiles="$(MSBuildProjectDirectory)\$(NativeOutputPath)$(TargetName)$(NativeBinaryExt)" DestinationFiles="$(MSBuildProjectDirectory)\..\Drive\EFI\BOOT\BOOTX64.efi"></Copy>
-  </Target>
-
-  <Target Name="RunVMware" AfterTargets="CreateVHD">
-	  <Error Text="Please install VMWare Player in order to Run BootTo.NET!" Condition="!Exists('C:\Program Files (x86)\VMware\VMware Player\vmplayer.exe')And!Exists('C:\Program Files (x86)\VMware\VMware Workstation\vmplayer.exe')"></Error>
-
-	  <Exec Condition="Exists('C:\Program Files (x86)\VMware\VMware Workstation\vmplayer.exe')" Command="&quot;C:\Program Files (x86)\VMware\VMware Workstation\vmplayer.exe&quot; &quot;$(MSBuildProjectDirectory)\..\Virtual Machines\BootTo.NET\BootTo.NET.vmx"></Exec>
-	  <Exec Condition="Exists('C:\Program Files (x86)\VMware\VMware Player\vmplayer.exe')And!Exists('C:\Program Files (x86)\VMware\VMware Workstation\vmplayer.exe')" Command="&quot;C:\Program Files (x86)\VMware\VMware Player\vmplayer.exe&quot; &quot;$(MSBuildProjectDirectory)\..\Virtual Machines\BootTo.NET\BootTo.NET.vmx"></Exec>
-  </Target>
-
+  
   <ItemGroup>
-    <Content Include="Properties\launchSettings.json" />
+    <NativeLibrary Include="..\x64\Debug\NativeLib.lib" />
   </ItemGroup>
+
+  <Target Name="CopyEFI" AfterTargets="Publish">
+    <Error Text="UsbMouseDxe.efi was not found at $(UsbMouseDriver). Copy the x64 driver to this path before publishing." Condition="!Exists('$(UsbMouseDriver)')" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\$(NativeOutputPath)$(TargetName)$(NativeBinaryExt)" DestinationFiles="$(QemuDriveDirectory)\EFI\BOOT\BOOTX64.efi" />
+  </Target>
+
+  <Target Name="CreateVHD" AfterTargets="CopyEFI" Condition="'$(CreateVHD)' != 'false'">
+    <PropertyGroup>
+      <VhdFilePath Condition="'$(VhdFilePath)' == ''">$(MSBuildProjectDirectory)\$(NativeOutputPath)$(TargetName).vhd</VhdFilePath>
+    </PropertyGroup>
+    <Error Text="Bundled qemu-img was not found at $(QemuImageExecutable)." Condition="!Exists('$(QemuImageExecutable)')" />
+    <Message Text="Creating VHD: $(VhdFilePath)" Importance="High" />
+    <Delete Files="$(VhdFilePath)" />
+    <Exec Command="&quot;$(QemuImageExecutable)&quot; convert -f raw -O vpc &quot;fat:$(QemuDriveDirectory)&quot; &quot;$(VhdFilePath)&quot;" />
+    <Message Text="VHD output: $(VhdFilePath)" Importance="High" />
+  </Target>
+
+  <Target Name="RunQemu" AfterTargets="CreateVHD" Condition="'$(RunQemu)' != 'false' and '$(CreateVHD)' != 'false'">
+    <PropertyGroup>
+      <QemuVariablesFile Condition="'$(QemuVariablesFile)' == ''">$(MSBuildProjectDirectory)\$(NativeOutputPath)$(TargetName).vars.fd</QemuVariablesFile>
+    </PropertyGroup>
+    <Error Text="Bundled QEMU was not found at $(QemuExecutable)." Condition="!Exists('$(QemuExecutable)')" />
+    <Error Text="Bundled x64 UEFI firmware was not found at $(QemuFirmware)." Condition="!Exists('$(QemuFirmware)')" />
+    <Error Text="Bundled x86 UEFI variables template was not found at $(QemuVariablesTemplate)." Condition="!Exists('$(QemuVariablesTemplate)')" />
+    <Copy SourceFiles="$(QemuVariablesTemplate)" DestinationFiles="$(QemuVariablesFile)" Condition="!Exists('$(QemuVariablesFile)')" />
+    <Exec Command="&quot;$(QemuExecutable)&quot; -L &quot;$(QemuFirmwareDirectory)&quot; -name BootTo.NET -machine q35,i8042=off -smp 2 -m 1024M -display sdl -vga std -device qemu-xhci,id=xhci -device usb-kbd,bus=xhci.0 -device usb-mouse,bus=xhci.0 -object rng-builtin,id=rng0 -device virtio-rng-pci,rng=rng0 -drive &quot;if=pflash,format=raw,unit=0,readonly=on,file=$(QemuFirmware)&quot; -drive &quot;if=pflash,format=raw,unit=1,file=$(QemuVariablesFile)&quot; -drive &quot;file=$(VhdFilePath),format=vpc,media=disk&quot; -boot order=c,menu=on -netdev user,id=net0 -device e1000,netdev=net0,romfile=efi-e1000.rom -no-reboot" />
+  </Target>
 
   <!--Warning: This package is modified(/packages). Using official one may cause it fail to compile!-->
   <ItemGroup>
     <PackageReference Include="Microsoft.DotNet.ILCompiler" Version="7.0.0-alpha.1.22074.1" />
   </ItemGroup>
 
-	<!-- The project file pretends this is .NET, but it's not .NET. Remove all assembly references the .NET SDK added. -->
-	<Target Name="CustomizeReferences" BeforeTargets="BeforeCompile" AfterTargets="FindReferenceAssembliesForReferences">
-		<ItemGroup>
-			<ReferencePathWithRefAssemblies Remove="@(ReferencePathWithRefAssemblies)" Condition="%(Filename) != 'CoreLib'" />
-			<ReferencePath Remove="@(ReferencePath)" />
-		</ItemGroup>
-	</Target>
+  <Import Project="..\uefi-cs\uefi-cs.projitems" Label="Shared" />
+  <Import Project="..\CoreLib\CoreLib.projitems" Label="Shared" />
 
-  <!-- The AOT compiler would want to mirror these as AppContext switches. Prevent that. -->
-  <Target Name="RemoveHostConfigurationOptions" BeforeTargets="WriteIlcRspFileForCompilation" DependsOnTargets="PrepareForILLink">
+  <!--CustomizeReferences-->
+  <Target Name="CustomizeReferences" BeforeTargets="BeforeCompile" AfterTargets="FindReferenceAssembliesForReferences">
     <ItemGroup>
-      <RuntimeHostConfigurationOption Remove="@(RuntimeHostConfigurationOption)" />
+      <ReferencePathWithRefAssemblies Remove="@(ReferencePathWithRefAssemblies)" Condition="%(Filename) != 'Corlib'" />
+      <ReferencePath Remove="@(ReferencePath)" />
     </ItemGroup>
   </Target>
-  <Import Project="..\CoreLib\CoreLib.projitems" Label="Shared" />
-  <Import Project="..\uefi-cs\uefi-cs.projitems" Label="Shared" />
 
 </Project>

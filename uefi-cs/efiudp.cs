@@ -68,8 +68,16 @@ public unsafe struct EFI_UDP4_COMPLETION_TOKEN
     public EFI_EVENT Event;
     public EFI_STATUS Status;
     void* Packet;
-    public EFI_UDP4_RECEIVE_DATA* Packet_RxData => (EFI_UDP4_RECEIVE_DATA*)Packet;
-    public EFI_UDP4_TRANSMIT_DATA* Packet_TxData => (EFI_UDP4_TRANSMIT_DATA*)Packet;
+    public EFI_UDP4_RECEIVE_DATA* Packet_RxData
+    {
+        readonly get => (EFI_UDP4_RECEIVE_DATA*)Packet;
+        set => Packet = value;
+    }
+    public EFI_UDP4_TRANSMIT_DATA* Packet_TxData
+    {
+        readonly get => (EFI_UDP4_TRANSMIT_DATA*)Packet;
+        set => Packet = value;
+    }
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -143,8 +151,16 @@ public unsafe struct EFI_UDP6_COMPLETION_TOKEN
     public EFI_EVENT Event;
     public EFI_STATUS Status;
     void* Packet;
-    public EFI_UDP6_RECEIVE_DATA* Packet_RxData => (EFI_UDP6_RECEIVE_DATA*)Packet;
-    public EFI_UDP6_TRANSMIT_DATA* Packet_TxData => (EFI_UDP6_TRANSMIT_DATA*)Packet;
+    public EFI_UDP6_RECEIVE_DATA* Packet_RxData
+    {
+        readonly get => (EFI_UDP6_RECEIVE_DATA*)Packet;
+        set => Packet = value;
+    }
+    public EFI_UDP6_TRANSMIT_DATA* Packet_TxData
+    {
+        readonly get => (EFI_UDP6_TRANSMIT_DATA*)Packet;
+        set => Packet = value;
+    }
 }
 
 [StructLayout(LayoutKind.Sequential)]

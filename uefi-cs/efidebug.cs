@@ -402,9 +402,9 @@ public unsafe struct EFI_DEBUG_IMAGE_INFO_TABLE_HEADER
 public unsafe struct EFI_DEBUG_SUPPORT_PROTOCOL
 {
     public EFI_INSTRUCTION_SET_ARCHITECTURE Isa;
-    public readonly delegate* unmanaged<EFI_DEBUG_SUPPORT_PROTOCOL*, ulong, EFI_STATUS> GetMaximumProcessorIndex;
+    public readonly delegate* unmanaged<EFI_DEBUG_SUPPORT_PROTOCOL*, ulong*, EFI_STATUS> GetMaximumProcessorIndex;
     public readonly delegate* unmanaged<EFI_DEBUG_SUPPORT_PROTOCOL*, ulong, delegate* unmanaged<EFI_SYSTEM_CONTEXT, void>, EFI_STATUS> RegisterPeriodicCallback;
-    public readonly delegate* unmanaged<EFI_DEBUG_SUPPORT_PROTOCOL*, ulong, delegate* unmanaged<EFI_EXCEPTION_TYPE, EFI_SYSTEM_CONTEXT, void>, EFI_STATUS> RegisterExceptionCallback;
-    public readonly delegate* unmanaged<EFI_DEBUG_SUPPORT_PROTOCOL*, ulong, void*, ulong, EFI_STATUS> InvalidateInionCache;
+    public readonly delegate* unmanaged<EFI_DEBUG_SUPPORT_PROTOCOL*, ulong, delegate* unmanaged<EFI_EXCEPTION_TYPE, EFI_SYSTEM_CONTEXT, void>, EFI_EXCEPTION_TYPE, EFI_STATUS> RegisterExceptionCallback;
+    public readonly delegate* unmanaged<EFI_DEBUG_SUPPORT_PROTOCOL*, ulong, void*, ulong, EFI_STATUS> InvalidateInstructionCache;
 }
 

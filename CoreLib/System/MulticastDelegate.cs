@@ -111,7 +111,7 @@ namespace System
 
         /*
         // Force inline as the true/false ternary takes it above ALWAYS_INLINE size even though the asm ends up smaller
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool operator ==(MulticastDelegate d1, MulticastDelegate d2)
         {
             // Test d2 first to allow branch elimination when inlined for null checks (== null)
@@ -128,7 +128,7 @@ namespace System
 
         /*
         // Force inline as the true/false ternary takes it above ALWAYS_INLINE size even though the asm ends up smaller
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool operator !=(MulticastDelegate d1, MulticastDelegate d2)
         {
             // Can't call the == operator as it will call object==

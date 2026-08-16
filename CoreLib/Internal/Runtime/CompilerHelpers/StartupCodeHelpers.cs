@@ -19,7 +19,10 @@ namespace Internal.Runtime.CompilerHelpers
                 for (int k = 0; k < header->NumberOfSections; k++)
                 {
                     if (sections[k].SectionId == ReadyToRunSectionType.GCStaticRegion)
+                    {
+                        GarbageCollector.RegisterStatics(sections[k].Start, sections[k].End);
                         InitializeStatics(sections[k].Start, sections[k].End);
+                    }
 
                     if (sections[k].SectionId == ReadyToRunSectionType.EagerCctor)
                         RunEagerClassConstructors(sections[k].Start, sections[k].End);
@@ -56,7 +59,7 @@ namespace Internal.Runtime.CompilerHelpers
                     }
 
                     void* ptr = null;
-                    gBS->AllocatePool(EFI_MEMORY_TYPE.EfiLoaderCode, (ulong)sizeof(IntPtr), &ptr);
+                    gBS->AllocatePool(EFI_MEMORY_TYPE.EfiLoaderData, (ulong)sizeof(IntPtr), &ptr);
                     IntPtr data = (IntPtr)ptr;
 
                     *(IntPtr*)data = Unsafe.As<object, IntPtr>(ref obj);

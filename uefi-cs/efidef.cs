@@ -172,6 +172,8 @@ public enum EFI_MEMORY_TYPE
     EfiMemoryMappedIO,
     EfiMemoryMappedIOPortSpace,
     EfiPalCode,
+    EfiPersistentMemory,
+    EfiUnacceptedMemoryType,
     EfiMaxMemoryType
 }
 

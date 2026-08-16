@@ -27,6 +27,13 @@ Revision History
 
 using System.Runtime.InteropServices;
 
+public enum UI_STRING_TYPE
+{
+    UiDeviceString,
+    UiVendorString,
+    UiMaxString
+}
+
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct UI_STRING_ENTRY
 {

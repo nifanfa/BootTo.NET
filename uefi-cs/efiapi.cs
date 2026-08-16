@@ -174,8 +174,8 @@ public unsafe struct EFI_BOOT_SERVICES
     // Task priority functions
     //
 
-    public readonly delegate* unmanaged<EFI_TPL, EFI_STATUS> RaiseTPL;
-    public readonly delegate* unmanaged<EFI_TPL, EFI_STATUS> RestoreTPL;
+    public readonly delegate* unmanaged<EFI_TPL, EFI_TPL> RaiseTPL;
+    public readonly delegate* unmanaged<EFI_TPL, void> RestoreTPL;
 
     //
     // Memory functions
@@ -261,8 +261,8 @@ public unsafe struct EFI_BOOT_SERVICES
     //
     // Misc Services
     //
-    public readonly delegate* unmanaged<void*, void*, ulong, EFI_STATUS> CopyMem;
-    public readonly delegate* unmanaged<void*, ulong, byte, EFI_STATUS> SetMem;
+    public readonly delegate* unmanaged<void*, void*, ulong, void> CopyMem;
+    public readonly delegate* unmanaged<void*, ulong, byte, void> SetMem;
     public readonly delegate* unmanaged<uint, EFI_TPL, delegate* unmanaged<EFI_EVENT, void*, void>, void*, EFI_GUID*, EFI_EVENT*, EFI_STATUS> CreateEventEx;
 }
 
@@ -296,5 +296,52 @@ public unsafe struct EFI_SYSTEM_TABLE
     public ulong NumberOfTableEntries;
     public EFI_CONFIGURATION_TABLE* ConfigurationTable;
 
+}
+
+public enum EFI_GCD_MEMORY_TYPE_T
+{
+    EFI_GCD_MEMORY_TYPE_NON_EXISTENT,
+    EFI_GCD_MEMORY_TYPE_RESERVED,
+    EFI_GCD_MEMORY_TYPE_SYSTEM_MEMORY,
+    EFI_GCD_MEMORY_TYPE_MEMORY_MAPPED_IO,
+    EFI_GCD_MEMORY_TYPE_PERSISTENT,
+    EFI_GCD_MEMORY_TYPE_MORE_RELIABLE,
+    EFI_GCD_MEMORY_TYPE_MAXIMUM
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
+public struct EFI_GCD_MEMORY_SPACE_DESCRIPTOR
+{
+    public EFI_PHYSICAL_ADDRESS BaseAddress;
+    public ulong Length;
+    public ulong Capabilities;
+    public ulong Attributes;
+    public EFI_GCD_MEMORY_TYPE_T GcdMemoryType;
+    public EFI_HANDLE ImageHandle;
+    public EFI_HANDLE DeviceHandle;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct EFI_DXE_SERVICES_TABLE
+{
+    public EFI_TABLE_HEADER Hdr;
+    public void* AddMemorySpace;
+    public void* AllocateMemorySpace;
+    public void* FreeMemorySpace;
+    public void* RemoveMemorySpace;
+    public readonly delegate* unmanaged<EFI_PHYSICAL_ADDRESS, EFI_GCD_MEMORY_SPACE_DESCRIPTOR*, EFI_STATUS> GetMemorySpaceDescriptor;
+    public readonly delegate* unmanaged<EFI_PHYSICAL_ADDRESS, ulong, ulong, EFI_STATUS> SetMemorySpaceAttributes;
+    public void* GetMemorySpaceMap;
+    public void* AddIoSpace;
+    public void* AllocateIoSpace;
+    public void* FreeIoSpace;
+    public void* RemoveIoSpace;
+    public void* GetIoSpaceDescriptor;
+    public void* GetIoSpaceMap;
+    public void* Dispatch;
+    public void* Schedule;
+    public void* Trust;
+    public void* ProcessFirmwareVolume;
+    public void* SetMemorySpaceCapabilities;
 }
 

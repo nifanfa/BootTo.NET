@@ -95,6 +95,14 @@ public unsafe struct EFI_NETWORK_STATISTICS
 
 }
 
+public enum EFI_SIMPLE_NETWORK_STATE
+{
+    EfiSimpleNetworkStopped,
+    EfiSimpleNetworkStarted,
+    EfiSimpleNetworkInitialized,
+    EfiSimpleNetworkMaxState
+}
+
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_SIMPLE_NETWORK_MODE
 {

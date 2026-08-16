@@ -16,6 +16,11 @@ Revision history:
 
 using System.Runtime.InteropServices;
 
+public enum EFI_NETWORK_INTERFACE_TYPE
+{
+    EfiNetworkInterfaceUndi = 1
+}
+
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_NETWORK_INTERFACE_IDENTIFIER_PROTOCOL
 {

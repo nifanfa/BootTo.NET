@@ -184,7 +184,7 @@ public unsafe struct EFI_FILE_INFO
     public EFI_TIME LastAccessTime;
     public EFI_TIME ModificationTime;
     public ulong Attribute;
-    public fixed char FileName[128];
+    public fixed char FileName[1];
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -208,6 +208,12 @@ public unsafe struct EFI_FILE_SYSTEM_VOLUME_LABEL
 public unsafe struct EFI_LOAD_FILE_PROTOCOL
 {
     public readonly delegate* unmanaged<EFI_LOAD_FILE_PROTOCOL*, EFI_DEVICE_PATH*, bool, ulong*, void*, EFI_STATUS> LoadFile;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct EFI_LOAD_FILE2_PROTOCOL
+{
+    public readonly delegate* unmanaged<EFI_LOAD_FILE2_PROTOCOL*, EFI_DEVICE_PATH_PROTOCOL*, bool, ulong*, void*, EFI_STATUS> LoadFile;
 }
 
 public enum EFI_IO_WIDTH
@@ -254,10 +260,63 @@ public unsafe struct EFI_DEVICE_IO_PROTOCOL
 }
 
 [StructLayout(LayoutKind.Sequential)]
+public unsafe struct EFI_MD5_HASH
+{
+    public fixed byte Value[16];
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct EFI_SHA1_HASH
+{
+    public fixed byte Value[20];
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct EFI_SHA224_HASH
+{
+    public fixed byte Value[28];
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct EFI_SHA256_HASH
+{
+    public fixed byte Value[32];
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct EFI_SHA384_HASH
+{
+    public fixed byte Value[48];
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct EFI_SHA512_HASH
+{
+    public fixed byte Value[64];
+}
+
+[StructLayout(LayoutKind.Explicit)]
+public unsafe struct EFI_HASH_OUTPUT
+{
+    [FieldOffset(0)]
+    public EFI_MD5_HASH* Md5Hash;
+    [FieldOffset(0)]
+    public EFI_SHA1_HASH* Sha1Hash;
+    [FieldOffset(0)]
+    public EFI_SHA224_HASH* Sha224Hash;
+    [FieldOffset(0)]
+    public EFI_SHA256_HASH* Sha256Hash;
+    [FieldOffset(0)]
+    public EFI_SHA384_HASH* Sha384Hash;
+    [FieldOffset(0)]
+    public EFI_SHA512_HASH* Sha512Hash;
+}
+
+[StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_HASH_PROTOCOL
 {
-    public readonly delegate* unmanaged<EFI_HASH_PROTOCOL*, EFI_GUID*, EFI_STATUS> GetHashSize;
-    public readonly delegate* unmanaged<EFI_HASH_PROTOCOL*, EFI_GUID*, bool, byte*, ulong, EFI_STATUS> Hash;
+    public readonly delegate* unmanaged<EFI_HASH_PROTOCOL*, EFI_GUID*, ulong*, EFI_STATUS> GetHashSize;
+    public readonly delegate* unmanaged<EFI_HASH_PROTOCOL*, EFI_GUID*, bool, byte*, ulong, EFI_HASH_OUTPUT*, EFI_STATUS> Hash;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -265,14 +324,14 @@ public unsafe struct EFI_UNICODE_COLLATION_PROTOCOL
 {
 
     // general
-    public readonly delegate* unmanaged<EFI_UNICODE_COLLATION_PROTOCOL*, char*, char*, EFI_STATUS> StriColl;
-    public readonly delegate* unmanaged<EFI_UNICODE_COLLATION_PROTOCOL*, char*, char*, EFI_STATUS> MetaiMatch;
-    public readonly delegate* unmanaged<EFI_UNICODE_COLLATION_PROTOCOL*, char*, EFI_STATUS> StrLwr;
-    public readonly delegate* unmanaged<EFI_UNICODE_COLLATION_PROTOCOL*, char*, EFI_STATUS> StrUpr;
+    public readonly delegate* unmanaged<EFI_UNICODE_COLLATION_PROTOCOL*, char*, char*, long> StriColl;
+    public readonly delegate* unmanaged<EFI_UNICODE_COLLATION_PROTOCOL*, char*, char*, bool> MetaiMatch;
+    public readonly delegate* unmanaged<EFI_UNICODE_COLLATION_PROTOCOL*, char*, void> StrLwr;
+    public readonly delegate* unmanaged<EFI_UNICODE_COLLATION_PROTOCOL*, char*, void> StrUpr;
 
     // for supporting fat volumes
-    public readonly delegate* unmanaged<EFI_UNICODE_COLLATION_PROTOCOL*, ulong, byte*, char*, EFI_STATUS> FatToStr;
-    public readonly delegate* unmanaged<EFI_UNICODE_COLLATION_PROTOCOL*, char*, ulong, byte*, EFI_STATUS> StrToFat;
+    public readonly delegate* unmanaged<EFI_UNICODE_COLLATION_PROTOCOL*, ulong, byte*, char*, void> FatToStr;
+    public readonly delegate* unmanaged<EFI_UNICODE_COLLATION_PROTOCOL*, char*, ulong, byte*, bool> StrToFat;
 
     public byte* SupportedLanguages;
 }
@@ -313,6 +372,15 @@ public unsafe struct EFI_GRAPHICS_OUTPUT_BLT_PIXEL
     public byte Green;
     public byte Red;
     public byte Reserved;
+}
+
+[StructLayout(LayoutKind.Explicit)]
+public unsafe struct EFI_GRAPHICS_OUTPUT_BLT_PIXEL_UNION
+{
+    [FieldOffset(0)]
+    public EFI_GRAPHICS_OUTPUT_BLT_PIXEL Pixel;
+    [FieldOffset(0)]
+    public uint Raw;
 }
 
 public enum EFI_GRAPHICS_OUTPUT_BLT_OPERATION
@@ -362,7 +430,7 @@ public unsafe struct EFI_EDID_ACTIVE_PROTOCOL
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_EDID_OVERRIDE_PROTOCOL
 {
-    public readonly delegate* unmanaged<EFI_EDID_OVERRIDE_PROTOCOL*, EFI_HANDLE*, uint*, ulong*, EFI_STATUS> GetEdid;
+    public readonly delegate* unmanaged<EFI_EDID_OVERRIDE_PROTOCOL*, EFI_HANDLE*, uint*, ulong*, byte**, EFI_STATUS> GetEdid;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -375,9 +443,9 @@ public unsafe struct EFI_SERVICE_BINDING
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_DRIVER_BINDING_PROTOCOL
 {
-    public readonly delegate* unmanaged<EFI_DRIVER_BINDING_PROTOCOL*, EFI_HANDLE, EFI_STATUS> Supported;
-    public readonly delegate* unmanaged<EFI_DRIVER_BINDING_PROTOCOL*, EFI_HANDLE, EFI_STATUS> Start;
-    public readonly delegate* unmanaged<EFI_DRIVER_BINDING_PROTOCOL*, EFI_HANDLE, ulong, EFI_STATUS> Stop;
+    public readonly delegate* unmanaged<EFI_DRIVER_BINDING_PROTOCOL*, EFI_HANDLE, EFI_DEVICE_PATH*, EFI_STATUS> Supported;
+    public readonly delegate* unmanaged<EFI_DRIVER_BINDING_PROTOCOL*, EFI_HANDLE, EFI_DEVICE_PATH*, EFI_STATUS> Start;
+    public readonly delegate* unmanaged<EFI_DRIVER_BINDING_PROTOCOL*, EFI_HANDLE, ulong, EFI_HANDLE*, EFI_STATUS> Stop;
     public uint Version;
     public EFI_HANDLE ImageHandle;
     public EFI_HANDLE DriverBindingHandle;
@@ -386,16 +454,16 @@ public unsafe struct EFI_DRIVER_BINDING_PROTOCOL
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_COMPONENT_NAME_PROTOCOL
 {
-    public readonly delegate* unmanaged<EFI_COMPONENT_NAME_PROTOCOL*, byte*, EFI_STATUS> GetDriverName;
-    public readonly delegate* unmanaged<EFI_COMPONENT_NAME_PROTOCOL*, EFI_HANDLE, EFI_HANDLE, byte*, EFI_STATUS> GetControllerName;
+    public readonly delegate* unmanaged<EFI_COMPONENT_NAME_PROTOCOL*, byte*, char**, EFI_STATUS> GetDriverName;
+    public readonly delegate* unmanaged<EFI_COMPONENT_NAME_PROTOCOL*, EFI_HANDLE, EFI_HANDLE, byte*, char**, EFI_STATUS> GetControllerName;
     public byte* SupportedLanguages;
 }
 
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_COMPONENT_NAME2_PROTOCOL
 {
-    public readonly delegate* unmanaged<EFI_COMPONENT_NAME2_PROTOCOL*, byte*, EFI_STATUS> GetDriverName;
-    public readonly delegate* unmanaged<EFI_COMPONENT_NAME2_PROTOCOL*, EFI_HANDLE, EFI_HANDLE, byte*, EFI_STATUS> GetControllerName;
+    public readonly delegate* unmanaged<EFI_COMPONENT_NAME2_PROTOCOL*, byte*, char**, EFI_STATUS> GetDriverName;
+    public readonly delegate* unmanaged<EFI_COMPONENT_NAME2_PROTOCOL*, EFI_HANDLE, EFI_HANDLE, byte*, char**, EFI_STATUS> GetControllerName;
     public byte* SupportedLanguages;
 }
 
@@ -435,15 +503,15 @@ public unsafe struct EFI_RNG_PROTOCOL
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_PLATFORM_DRIVER_OVERRIDE_PROTOCOL
 {
-    public readonly delegate* unmanaged<EFI_PLATFORM_DRIVER_OVERRIDE_PROTOCOL*, EFI_HANDLE, EFI_STATUS> GetDriver;
-    public readonly delegate* unmanaged<EFI_PLATFORM_DRIVER_OVERRIDE_PROTOCOL*, EFI_HANDLE, EFI_STATUS> GetDriverPath;
-    public readonly delegate* unmanaged<EFI_PLATFORM_DRIVER_OVERRIDE_PROTOCOL*, EFI_HANDLE, EFI_DEVICE_PATH*, EFI_STATUS> DriverLoaded;
+    public readonly delegate* unmanaged<EFI_PLATFORM_DRIVER_OVERRIDE_PROTOCOL*, EFI_HANDLE, EFI_HANDLE*, EFI_STATUS> GetDriver;
+    public readonly delegate* unmanaged<EFI_PLATFORM_DRIVER_OVERRIDE_PROTOCOL*, EFI_HANDLE, EFI_DEVICE_PATH**, EFI_STATUS> GetDriverPath;
+    public readonly delegate* unmanaged<EFI_PLATFORM_DRIVER_OVERRIDE_PROTOCOL*, EFI_HANDLE, EFI_DEVICE_PATH*, EFI_HANDLE, EFI_STATUS> DriverLoaded;
 }
 
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL
 {
-    public readonly delegate* unmanaged<EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL*, EFI_STATUS> GetDriver;
+    public readonly delegate* unmanaged<EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL*, EFI_HANDLE*, EFI_STATUS> GetDriver;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -455,9 +523,17 @@ public unsafe struct EFI_DRIVER_FAMILY_OVERRIDE_PROTOCOL
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_EBC_PROTOCOL
 {
-    public readonly delegate* unmanaged<EFI_EBC_PROTOCOL*, EFI_HANDLE, void*, EFI_STATUS> CreateThunk;
-    public readonly delegate* unmanaged<EFI_EBC_PROTOCOL*, EFI_STATUS> UnloadImage;
-    public readonly delegate* unmanaged<EFI_EBC_PROTOCOL*, EFI_STATUS> RegisterICacheFlush;
-    public readonly delegate* unmanaged<EFI_EBC_PROTOCOL*, EFI_STATUS> GetVersion;
+    public readonly delegate* unmanaged<EFI_EBC_PROTOCOL*, EFI_HANDLE, void*, void**, EFI_STATUS> CreateThunk;
+    public readonly delegate* unmanaged<EFI_EBC_PROTOCOL*, EFI_HANDLE, EFI_STATUS> UnloadImage;
+    public readonly delegate* unmanaged<EFI_EBC_PROTOCOL*, delegate* unmanaged<EFI_PHYSICAL_ADDRESS, ulong, EFI_STATUS>, EFI_STATUS> RegisterICacheFlush;
+    public readonly delegate* unmanaged<EFI_EBC_PROTOCOL*, ulong*, EFI_STATUS> GetVersion;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct EFI_MEMORY_ATTRIBUTE_PROTOCOL
+{
+    public readonly delegate* unmanaged<EFI_MEMORY_ATTRIBUTE_PROTOCOL*, EFI_PHYSICAL_ADDRESS, ulong, ulong*, EFI_STATUS> GetMemoryAttributes;
+    public readonly delegate* unmanaged<EFI_MEMORY_ATTRIBUTE_PROTOCOL*, EFI_PHYSICAL_ADDRESS, ulong, ulong, EFI_STATUS> SetMemoryAttributes;
+    public readonly delegate* unmanaged<EFI_MEMORY_ATTRIBUTE_PROTOCOL*, EFI_PHYSICAL_ADDRESS, ulong, ulong, EFI_STATUS> ClearMemoryAttributes;
 }
 

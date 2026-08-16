@@ -1,6 +1,15 @@
 
 using System.Runtime.InteropServices;
 
+public enum EFI_SHELL_ARG_INFO_TYPES
+{
+    ARG_NO_ATTRIB = 0x0,
+    ARG_IS_QUOTED = 1 << 0,
+    ARG_PARTIALLY_QUOTED = 1 << 1,
+    ARG_FIRST_HALF_QUOTED = 1 << 2,
+    ARG_FIRST_CHAR_IS_ESC = 1 << 3
+}
+
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_SHELL_ARG_INFO
 {

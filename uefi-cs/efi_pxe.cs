@@ -15,7 +15,7 @@ Abstract:
 
 using System.Runtime.InteropServices;
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_OPCODE
 {
     ushort Value;
@@ -24,7 +24,7 @@ public unsafe struct PXE_OPCODE
     public static implicit operator ushort(PXE_OPCODE value) => value.Value;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_OPFLAGS
 {
     ushort Value;
@@ -33,7 +33,7 @@ public unsafe struct PXE_OPFLAGS
     public static implicit operator ushort(PXE_OPFLAGS value) => value.Value;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_STATCODE
 {
     ushort Value;
@@ -42,7 +42,7 @@ public unsafe struct PXE_STATCODE
     public static implicit operator ushort(PXE_STATCODE value) => value.Value;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_STATFLAGS
 {
     ushort Value;
@@ -51,7 +51,7 @@ public unsafe struct PXE_STATFLAGS
     public static implicit operator ushort(PXE_STATFLAGS value) => value.Value;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_CONTROL
 {
     ushort Value;
@@ -60,25 +60,25 @@ public unsafe struct PXE_CONTROL
     public static implicit operator ushort(PXE_CONTROL value) => value.Value;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_MAC_ADDR
 {
     public fixed byte Value[32];
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_IPV4
 {
     public uint Value;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_IPV6
 {
     public fixed uint Value[4];
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_MEDIA_PROTOCOL
 {
     ushort Value;
@@ -87,7 +87,7 @@ public unsafe struct PXE_MEDIA_PROTOCOL
     public static implicit operator ushort(PXE_MEDIA_PROTOCOL value) => value.Value;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_FRAME_TYPE
 {
     byte Value;
@@ -96,7 +96,7 @@ public unsafe struct PXE_FRAME_TYPE
     public static implicit operator byte(PXE_FRAME_TYPE value) => value.Value;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_HW_UNDI
 {
     public uint Signature;       // PXE_ROMID_SIGNATURE
@@ -114,7 +114,7 @@ public unsafe struct PXE_HW_UNDI
                                      // ulong CDBaddr;      // CDB address port
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_SW_UNDI
 {
     public uint Signature;       // PXE_ROMID_SIGNATURE
@@ -132,7 +132,16 @@ public unsafe struct PXE_SW_UNDI
     public fixed uint BusType[1];      // list of supported bustypes
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Explicit, Pack = 1)]
+public struct PXE_UNDI
+{
+    [FieldOffset(0)]
+    public PXE_HW_UNDI hw;
+    [FieldOffset(0)]
+    public PXE_SW_UNDI sw;
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_CDB
 {
     public PXE_OPCODE OpCode;
@@ -147,7 +156,7 @@ public unsafe struct PXE_CDB
     public PXE_CONTROL Control;
 }
 
-[StructLayout(LayoutKind.Explicit)]
+[StructLayout(LayoutKind.Explicit, Pack = 1)]
 public struct PXE_IP_ADDR
 {
     [FieldOffset(0)]
@@ -156,7 +165,36 @@ public struct PXE_IP_ADDR
     public PXE_IPV4 IPv4;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
+public struct PXE_PCI_DEVICE
+{
+    public uint BusType;
+    public ushort Bus;
+    public byte Device;
+    public byte Function;
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
+public struct PXE_USB_DEVICE
+{
+    public uint BusType;
+    public uint tdb;
+}
+
+[StructLayout(LayoutKind.Explicit, Pack = 1)]
+public struct PXE_DEVICE
+{
+    [FieldOffset(0)]
+    public PXE_PCI_DEVICE PCI;
+    [FieldOffset(0)]
+    public PXE_PCI_DEVICE PCC;
+    [FieldOffset(0)]
+    public PXE_USB_DEVICE USB;
+    [FieldOffset(0)]
+    public PXE_USB_DEVICE _1394;
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_CPB_START
 {
     //
@@ -213,7 +251,7 @@ public unsafe struct PXE_CPB_START
     public ulong Mem_IO;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_DB_GET_INIT_INFO
 {
     //
@@ -296,7 +334,7 @@ public unsafe struct PXE_DB_GET_INIT_INFO
     public byte LoopBack;
 }
 
-[StructLayout(LayoutKind.Explicit)]
+[StructLayout(LayoutKind.Explicit, Pack = 1)]
 public unsafe struct PXE_PCI_CONFIG_INFO
 {
     //
@@ -330,7 +368,7 @@ public unsafe struct PXE_PCI_CONFIG_INFO
     public fixed uint Config_Dword[64];
 }
 
-[StructLayout(LayoutKind.Explicit)]
+[StructLayout(LayoutKind.Explicit, Pack = 1)]
 public unsafe struct PXE_PCC_CONFIG_INFO
 {
     //
@@ -363,21 +401,34 @@ public unsafe struct PXE_PCC_CONFIG_INFO
     public fixed uint Config_Dword[64];
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_USB_CONFIG_INFO
 {
     public uint BusType;
     // %%TBD What should we return here...
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_1394_CONFIG_INFO
 {
     public uint BusType;
     // %%TBD What should we return here...
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Explicit, Pack = 1)]
+public struct PXE_DB_GET_CONFIG_INFO
+{
+    [FieldOffset(0)]
+    public PXE_PCI_CONFIG_INFO pci;
+    [FieldOffset(0)]
+    public PXE_PCC_CONFIG_INFO pcc;
+    [FieldOffset(0)]
+    public PXE_USB_CONFIG_INFO usb;
+    [FieldOffset(0)]
+    public PXE_1394_CONFIG_INFO _1394;
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_CPB_INITIALIZE
 {
     //
@@ -424,7 +475,7 @@ public unsafe struct PXE_CPB_INITIALIZE
     public byte LoopBack;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_DB_INITIALIZE
 {
     //
@@ -447,7 +498,7 @@ public unsafe struct PXE_DB_INITIALIZE
     public ushort RxBufSize;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_CPB_RECEIVE_FILTERS
 {
     //
@@ -464,7 +515,7 @@ public unsafe struct PXE_CPB_RECEIVE_FILTERS
     public PXE_MAC_ADDR MCastList_7;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_DB_RECEIVE_FILTERS
 {
     //
@@ -480,7 +531,7 @@ public unsafe struct PXE_DB_RECEIVE_FILTERS
     public PXE_MAC_ADDR MCastList_7;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_CPB_STATION_ADDRESS
 {
     //
@@ -490,7 +541,7 @@ public unsafe struct PXE_CPB_STATION_ADDRESS
     public PXE_MAC_ADDR StationAddr;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_DB_STATION_ADDRESS
 {
     //
@@ -509,7 +560,7 @@ public unsafe struct PXE_DB_STATION_ADDRESS
     public PXE_MAC_ADDR PermanentAddr;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_DB_STATISTICS
 {
     //
@@ -529,7 +580,7 @@ public unsafe struct PXE_DB_STATISTICS
     public fixed ulong Data[64];
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_CPB_MCAST_IP_TO_MAC
 {
     //
@@ -538,7 +589,7 @@ public unsafe struct PXE_CPB_MCAST_IP_TO_MAC
     public PXE_IP_ADDR IP;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_DB_MCAST_IP_TO_MAC
 {
     //
@@ -547,27 +598,186 @@ public unsafe struct PXE_DB_MCAST_IP_TO_MAC
     public PXE_MAC_ADDR MAC;
 }
 
-[StructLayout(LayoutKind.Sequential)]
-public unsafe struct PXE_CPB_NVDATA_SPARSE
+[StructLayout(LayoutKind.Explicit, Pack = 1)]
+public struct PXE_CPB_NVDATA_SPARSE_ITEM_DATA
 {
-    //
-    // NvData item list.  Only items in this list will be updated.
-    //
-    //  Non-volatile storage address to be changed.
+    [FieldOffset(0)]
+    public byte Byte;
+    [FieldOffset(0)]
+    public ushort Word;
+    [FieldOffset(0)]
+    public uint Dword;
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
+public struct PXE_CPB_NVDATA_SPARSE_ITEM
+{
     public uint Addr;
-
-    // Data item to write into above storage address.
-
-    public fixed uint Item[128];
+    public PXE_CPB_NVDATA_SPARSE_ITEM_DATA Data;
 }
 
-[StructLayout(LayoutKind.Sequential)]
-public unsafe struct PXE_DB_NVDATA
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
+public struct PXE_CPB_NVDATA_SPARSE
 {
-    public fixed uint Data[128];
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_0;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_1;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_2;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_3;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_4;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_5;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_6;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_7;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_8;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_9;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_10;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_11;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_12;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_13;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_14;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_15;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_16;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_17;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_18;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_19;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_20;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_21;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_22;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_23;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_24;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_25;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_26;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_27;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_28;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_29;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_30;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_31;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_32;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_33;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_34;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_35;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_36;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_37;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_38;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_39;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_40;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_41;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_42;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_43;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_44;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_45;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_46;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_47;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_48;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_49;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_50;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_51;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_52;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_53;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_54;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_55;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_56;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_57;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_58;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_59;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_60;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_61;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_62;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_63;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_64;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_65;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_66;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_67;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_68;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_69;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_70;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_71;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_72;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_73;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_74;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_75;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_76;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_77;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_78;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_79;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_80;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_81;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_82;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_83;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_84;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_85;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_86;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_87;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_88;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_89;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_90;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_91;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_92;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_93;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_94;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_95;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_96;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_97;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_98;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_99;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_100;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_101;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_102;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_103;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_104;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_105;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_106;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_107;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_108;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_109;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_110;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_111;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_112;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_113;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_114;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_115;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_116;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_117;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_118;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_119;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_120;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_121;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_122;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_123;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_124;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_125;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_126;
+    public PXE_CPB_NVDATA_SPARSE_ITEM Item_127;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Explicit, Pack = 1)]
+public unsafe struct PXE_CPB_NVDATA_BULK
+{
+    [FieldOffset(0)]
+    public fixed byte Byte[512];
+    [FieldOffset(0)]
+    public fixed ushort Word[256];
+    [FieldOffset(0)]
+    public fixed uint Dword[128];
+}
+
+[StructLayout(LayoutKind.Explicit, Pack = 1)]
+public unsafe struct PXE_DB_NVDATA_DATA
+{
+    [FieldOffset(0)]
+    public fixed byte Byte[512];
+    [FieldOffset(0)]
+    public fixed ushort Word[256];
+    [FieldOffset(0)]
+    public fixed uint Dword[128];
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
+public struct PXE_DB_NVDATA
+{
+    public PXE_DB_NVDATA_DATA Data;
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_DB_GET_STATUS
 {
     //
@@ -587,7 +797,7 @@ public unsafe struct PXE_DB_GET_STATUS
     public fixed ulong TxBuffer[32];
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_CPB_FILL_HEADER
 {
     //
@@ -621,7 +831,7 @@ public unsafe struct PXE_CPB_FILL_HEADER
     public ushort MediaHeaderLen;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_CPB_FILL_HEADER_FRAGMENTED
 {
     //
@@ -681,7 +891,7 @@ public unsafe struct PXE_CPB_FILL_HEADER_FRAGMENTED
 }
 
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_CPB_FILL_HEADER_FRAGMENTED_FRAG_DESC
 {
     //
@@ -700,7 +910,7 @@ public unsafe struct PXE_CPB_FILL_HEADER_FRAGMENTED_FRAG_DESC
     public uint reserved;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_CPB_TRANSMIT
 {
     //
@@ -726,7 +936,7 @@ public unsafe struct PXE_CPB_TRANSMIT
     public ushort reserved;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_CPB_TRANSMIT_FRAGMENTS
 {
     //
@@ -766,7 +976,7 @@ public unsafe struct PXE_CPB_TRANSMIT_FRAGMENTS
     public PXE_CPB_TRANSMIT_FRAGMENTS_FRAG_DESC FragDesc_15;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_CPB_TRANSMIT_FRAGMENTS_FRAG_DESC
 {
     //
@@ -785,7 +995,7 @@ public unsafe struct PXE_CPB_TRANSMIT_FRAGMENTS_FRAG_DESC
     public uint reserved;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_CPB_RECEIVE
 {
     //
@@ -807,7 +1017,7 @@ public unsafe struct PXE_CPB_RECEIVE
     public uint reserved;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct PXE_DB_RECEIVE
 {
     //

@@ -343,27 +343,27 @@ public unsafe struct BBS_BBS_DEVICE_PATH
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_DEVICE_PATH_TO_TEXT_PROTOCOL
 {
-    public readonly delegate* unmanaged<EFI_DEVICE_PATH_PROTOCOL*, bool, bool, EFI_STATUS> ConvertDeviceNodeToText;
-    public readonly delegate* unmanaged<EFI_DEVICE_PATH_PROTOCOL*, bool, bool, EFI_STATUS> ConvertDevicePathToText;
+    public readonly delegate* unmanaged<EFI_DEVICE_PATH_PROTOCOL*, bool, bool, char*> ConvertDeviceNodeToText;
+    public readonly delegate* unmanaged<EFI_DEVICE_PATH_PROTOCOL*, bool, bool, char*> ConvertDevicePathToText;
 }
 
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_DEVICE_PATH_FROM_TEXT_PROTOCOL
 {
-    public readonly delegate* unmanaged<char*, EFI_STATUS> ConvertTextToDeviceNode;
-    public readonly delegate* unmanaged<char*, EFI_STATUS> ConvertTextToDevicePath;
+    public readonly delegate* unmanaged<char*, EFI_DEVICE_PATH_PROTOCOL*> ConvertTextToDeviceNode;
+    public readonly delegate* unmanaged<char*, EFI_DEVICE_PATH_PROTOCOL*> ConvertTextToDevicePath;
 }
 
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct EFI_DEVICE_PATH_UTILITIES_PROTOCOL
 {
-    public readonly delegate* unmanaged<EFI_DEVICE_PATH_PROTOCOL*, EFI_STATUS> GetDevicePathSize;
-    public readonly delegate* unmanaged<EFI_DEVICE_PATH_PROTOCOL*, EFI_STATUS> DuplicateDevicePath;
-    public readonly delegate* unmanaged<EFI_DEVICE_PATH_PROTOCOL*, EFI_DEVICE_PATH_PROTOCOL*, EFI_STATUS> AppendDevicePath;
-    public readonly delegate* unmanaged<EFI_DEVICE_PATH_PROTOCOL*, EFI_DEVICE_PATH_PROTOCOL*, EFI_STATUS> AppendDeviceNode;
-    public readonly delegate* unmanaged<EFI_DEVICE_PATH_PROTOCOL*, EFI_DEVICE_PATH_PROTOCOL*, EFI_STATUS> AppendDevicePathInstance;
-    public readonly delegate* unmanaged<EFI_DEVICE_PATH_PROTOCOL**, ulong*, EFI_STATUS> GetNextDevicePathInstance;
-    public readonly delegate* unmanaged<EFI_DEVICE_PATH_PROTOCOL*, EFI_STATUS> IsDevicePathMultiInstance;
-    public readonly delegate* unmanaged<byte, byte, ushort, EFI_STATUS> CreateDeviceNode;
+    public readonly delegate* unmanaged<EFI_DEVICE_PATH_PROTOCOL*, ulong> GetDevicePathSize;
+    public readonly delegate* unmanaged<EFI_DEVICE_PATH_PROTOCOL*, EFI_DEVICE_PATH_PROTOCOL*> DuplicateDevicePath;
+    public readonly delegate* unmanaged<EFI_DEVICE_PATH_PROTOCOL*, EFI_DEVICE_PATH_PROTOCOL*, EFI_DEVICE_PATH_PROTOCOL*> AppendDevicePath;
+    public readonly delegate* unmanaged<EFI_DEVICE_PATH_PROTOCOL*, EFI_DEVICE_PATH_PROTOCOL*, EFI_DEVICE_PATH_PROTOCOL*> AppendDeviceNode;
+    public readonly delegate* unmanaged<EFI_DEVICE_PATH_PROTOCOL*, EFI_DEVICE_PATH_PROTOCOL*, EFI_DEVICE_PATH_PROTOCOL*> AppendDevicePathInstance;
+    public readonly delegate* unmanaged<EFI_DEVICE_PATH_PROTOCOL**, ulong*, EFI_DEVICE_PATH_PROTOCOL*> GetNextDevicePathInstance;
+    public readonly delegate* unmanaged<EFI_DEVICE_PATH_PROTOCOL*, bool> IsDevicePathMultiInstance;
+    public readonly delegate* unmanaged<byte, byte, ushort, EFI_DEVICE_PATH_PROTOCOL*> CreateDeviceNode;
 }
 

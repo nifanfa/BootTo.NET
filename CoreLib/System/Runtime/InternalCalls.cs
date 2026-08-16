@@ -155,19 +155,29 @@ namespace System.Runtime
         {
             var size = pEEType->BaseSize;
 
-            if (size % 8 > 0)
-                size = ((size / 8) + 1) * 8;
-
-            void* ptr = null;
-            gBS->AllocatePool(EFI_MEMORY_TYPE.EfiLoaderCode, size, &ptr);
+            void* ptr = GarbageCollector.Allocate(size);
             IntPtr data = (IntPtr)ptr;
 
             var obj = Unsafe.As<IntPtr, object>(ref data);
-            memset((byte*)data, 0, size);
+            if (ptr == null)
+                return null;
+
             *(IntPtr*)data = (IntPtr)pEEType;
 
             return obj;
         }
+
+        [RuntimeExport("RhpNewFinalizable")]
+        internal static unsafe object RhpNewFinalizable(EEType* pEEType) => RhpNewFast(pEEType);
+
+        [RuntimeExport("RhpNewFastAlign8")]
+        internal static unsafe object RhpNewFastAlign8(EEType* pEEType) => RhpNewFast(pEEType);
+
+        [RuntimeExport("RhpNewFinalizableAlign8")]
+        internal static unsafe object RhpNewFinalizableAlign8(EEType* pEEType) => RhpNewFast(pEEType);
+
+        [RuntimeExport("RhpNewFastMisalign")]
+        internal static unsafe object RhpNewFastMisalign(EEType* pEEType) => RhpNewFast(pEEType);
 
         /*
         [RuntimeImport(Redhawk.BaseName, "RhpNewFinalizable")]
@@ -179,17 +189,21 @@ namespace System.Runtime
         [RuntimeExport("RhpNewArray")]
         internal static unsafe object RhpNewArray(EEType* pEEType, int length)
         {
-            var size = pEEType->BaseSize + (ulong)length * pEEType->ComponentSize;
+            if (length < 0)
+                return null;
 
-            if (size % 8 > 0)
-                size = ((size / 8) + 1) * 8;
+            ulong componentSize = pEEType->ComponentSize;
+            if (componentSize != 0 && (ulong)length > (~0UL - pEEType->BaseSize) / componentSize)
+                return null;
 
-            void* ptr = null;
-            gBS->AllocatePool(EFI_MEMORY_TYPE.EfiLoaderCode, size, &ptr);
+            var size = pEEType->BaseSize + (ulong)length * componentSize;
+            void* ptr = GarbageCollector.Allocate(size);
             IntPtr data = (IntPtr)ptr;
 
             var obj = Unsafe.As<IntPtr, object>(ref data);
-            memset((byte*)data, 0, size);
+            if (ptr == null)
+                return null;
+
             *(IntPtr*)data = (IntPtr)pEEType;
 
             var b = (byte*)data;
@@ -198,6 +212,12 @@ namespace System.Runtime
 
             return obj;
         }
+
+        [RuntimeExport("RhpNewArrayAlign8")]
+        internal static unsafe object RhpNewArrayAlign8(EEType* pEEType, int length) => RhpNewArray(pEEType, length);
+
+        [RuntimeExport("RhpCollect")]
+        internal static void RhpCollect(int generation, int mode) => GarbageCollector.Collect();
 
         /*
 #if FEATURE_64BIT_ALIGNMENT

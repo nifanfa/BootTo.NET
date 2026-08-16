@@ -186,14 +186,14 @@ namespace System.Runtime.InteropServices
 
         public static bool operator !=(GCHandle a, GCHandle b) => a._handle != b._handle;
 
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static IntPtr GetHandleValue(IntPtr handle) => new IntPtr((nint)handle & ~(nint)1); // Remove Pin flag
 
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool IsPinned(IntPtr handle) => ((nint)handle & 1) != 0; // Check Pin flag
 
         /*
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void ThrowIfInvalid(IntPtr handle)
         {
             // Check if the handle was never initialized or was freed.

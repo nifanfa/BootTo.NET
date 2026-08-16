@@ -135,8 +135,16 @@ public unsafe struct EFI_IP4_COMPLETION_TOKEN
     public EFI_EVENT Event;
     public EFI_STATUS Status;
     void* Packet;
-    public EFI_IP4_RECEIVE_DATA* Packet_RxData => (EFI_IP4_RECEIVE_DATA*)Packet;
-    public EFI_IP4_TRANSMIT_DATA* Packet_TxData => (EFI_IP4_TRANSMIT_DATA*)Packet;
+    public EFI_IP4_RECEIVE_DATA* Packet_RxData
+    {
+        readonly get => (EFI_IP4_RECEIVE_DATA*)Packet;
+        set => Packet = value;
+    }
+    public EFI_IP4_TRANSMIT_DATA* Packet_TxData
+    {
+        readonly get => (EFI_IP4_TRANSMIT_DATA*)Packet;
+        set => Packet = value;
+    }
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -287,8 +295,16 @@ public unsafe struct EFI_IP6_COMPLETION_TOKEN
     public EFI_EVENT Event;
     public EFI_STATUS Status;
     void* Packet;
-    public EFI_IP6_RECEIVE_DATA* Packet_RxData => (EFI_IP6_RECEIVE_DATA*)Packet;
-    public EFI_IP6_TRANSMIT_DATA* Packet_TxData => (EFI_IP6_TRANSMIT_DATA*)Packet;
+    public EFI_IP6_RECEIVE_DATA* Packet_RxData
+    {
+        readonly get => (EFI_IP6_RECEIVE_DATA*)Packet;
+        set => Packet = value;
+    }
+    public EFI_IP6_TRANSMIT_DATA* Packet_TxData
+    {
+        readonly get => (EFI_IP6_TRANSMIT_DATA*)Packet;
+        set => Packet = value;
+    }
 }
 
 [StructLayout(LayoutKind.Sequential)]
