@@ -1,5 +1,7 @@
 # BootTo.NET Project
 
+*When will hobby OS developers realize that we don't need to implement everything from scratch? With a clean environment providing basic network, graphics, filesystem, and USB support, there's no need to build it yourself—just load a DXE driver and go ahead with your 'OS'.*  
+
 Publishing uses the repository-local `qemu-img` to create `ConsoleApp1.vhd`, then starts the repository-local QEMU x64 emulator. QEMU, its Windows runtime dependencies, and the EDK2 UEFI firmware are included in `qemu`; no QEMU or VMware installation and no administrator privileges are required.
 
 Use `dotnet publish --tl:off -c Release ConsoleApp1` to publish and run with live build output. Pass `-p:RunQemu=false` to publish without starting QEMU.
