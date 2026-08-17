@@ -1,5 +1,4 @@
 using Internal.Runtime;
-using Internal.Runtime.CompilerHelpers;
 using System;
 using System.Runtime;
 using System.Runtime.CompilerServices;
@@ -177,6 +176,23 @@ internal static unsafe class GarbageCollector
                 EEType* type = *(EEType**)ObjectAddress(header);
                 if (type != null && (type->Flags & EETypeFlags.HasPointersFlag) != 0 && header->Size > (ulong)sizeof(IntPtr))
                 {
+                    // Native AOT strictly confirms that GC pointers must be aligned.
+                    /*
+                     * For example 
+                     * class 
+                     * { 
+                     *    byte A; 
+                     *    int B;
+                     * } 
+                     * is laid out as 
+                     * class
+                     * { 
+                     *    byte A; 
+                     *    byte[7] padding1; 
+                     *    int B; 
+                     *    byte[4] padding2;
+                     * }
+                     */
                     byte* fields = ObjectAddress(header) + sizeof(IntPtr);
                     ScanMemory(fields, header->Size - (ulong)sizeof(IntPtr));
                 }
