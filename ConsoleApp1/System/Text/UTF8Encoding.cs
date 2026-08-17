@@ -94,7 +94,115 @@
                 }
             }
 
-            return string.Ctor(chars);
+            return new string(chars);
+        }
+
+        public override byte[] GetBytes(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return new byte[0];
+
+            int length = text.Length;
+            int byteCount = 0;
+            int i = 0;
+
+            while (i < length)
+            {
+                uint codePoint;
+                char c0 = text[i];
+
+                if (c0 >= 0xD800 && c0 <= 0xDBFF && i + 1 < length)
+                {
+                    char c1 = text[i + 1];
+                    if (c1 >= 0xDC00 && c1 <= 0xDFFF)
+                    {
+                        codePoint = (uint)((c0 - 0xD800) * 0x400 + (c1 - 0xDC00) + 0x10000);
+                        i += 2;
+                    }
+                    else
+                    {
+                        codePoint = c0;
+                        i += 1;
+                    }
+                }
+                else
+                {
+                    codePoint = c0;
+                    i += 1;
+                }
+
+                if (codePoint <= 0x7F)
+                {
+                    byteCount += 1;
+                }
+                else if (codePoint <= 0x7FF)
+                {
+                    byteCount += 2;
+                }
+                else if (codePoint <= 0xFFFF)
+                {
+                    byteCount += 3;
+                }
+                else
+                {
+                    byteCount += 4;
+                }
+            }
+
+            byte[] utf8Bytes = new byte[byteCount];
+            int bIndex = 0;
+            i = 0;
+
+            while (i < length)
+            {
+                uint codePoint;
+                char c0 = text[i];
+
+                if (c0 >= 0xD800 && c0 <= 0xDBFF && i + 1 < length)
+                {
+                    char c1 = text[i + 1];
+                    if (c1 >= 0xDC00 && c1 <= 0xDFFF)
+                    {
+                        codePoint = (uint)((c0 - 0xD800) * 0x400 + (c1 - 0xDC00) + 0x10000);
+                        i += 2;
+                    }
+                    else
+                    {
+                        codePoint = c0;
+                        i += 1;
+                    }
+                }
+                else
+                {
+                    codePoint = c0;
+                    i += 1;
+                }
+
+                if (codePoint <= 0x7F)
+                {
+                    utf8Bytes[bIndex++] = (byte)codePoint;
+                }
+                else if (codePoint <= 0x7FF)
+                {
+                    utf8Bytes[bIndex++] = (byte)(0xC0 | (codePoint >> 6));
+                    utf8Bytes[bIndex++] = (byte)(0x80 | (codePoint & 0x3F));
+                }
+                else if (codePoint <= 0xFFFF)
+                {
+                    utf8Bytes[bIndex++] = (byte)(0xE0 | (codePoint >> 12));
+                    utf8Bytes[bIndex++] = (byte)(0x80 | ((codePoint >> 6) & 0x3F));
+                    utf8Bytes[bIndex++] = (byte)(0x80 | (codePoint & 0x3F));
+                }
+                else
+                {
+                    utf8Bytes[bIndex++] = (byte)(0xF0 | (codePoint >> 18));
+                    utf8Bytes[bIndex++] = (byte)(0x80 | ((codePoint >> 12) & 0x3F));
+                    utf8Bytes[bIndex++] = (byte)(0x80 | ((codePoint >> 6) & 0x3F));
+                    utf8Bytes[bIndex++] = (byte)(0x80 | (codePoint & 0x3F));
+                }
+            }
+
+            return utf8Bytes;
         }
     }
 }

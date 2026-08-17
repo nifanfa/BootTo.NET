@@ -110,15 +110,7 @@ namespace System.Net.Sockets
                 fixed (EFI_TCP4_CONFIG_DATA* pcfg = &configuration)
                     tcp->Configure(tcp, pcfg);
 
-                Console.Write("Your IP is: ");
-                Console.Write(mode.ConfigData.StationAddress.Addr[0].ToString());
-                Console.Write('.');
-                Console.Write(mode.ConfigData.StationAddress.Addr[1].ToString());
-                Console.Write('.');
-                Console.Write(mode.ConfigData.StationAddress.Addr[2].ToString());
-                Console.Write('.');
-                Console.Write(mode.ConfigData.StationAddress.Addr[3].ToString());
-                Console.WriteLine();
+                printf("Your IP is %d.%d.%d.%d\r\n"u8, mode.ConfigData.StationAddress.Addr[0], mode.ConfigData.StationAddress.Addr[1], mode.ConfigData.StationAddress.Addr[2], mode.ConfigData.StationAddress.Addr[3]);
             }
 
             EFI_TCP4_CONNECTION_TOKEN conn;

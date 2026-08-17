@@ -1,7 +1,8 @@
-﻿using System.Runtime.InteropServices;
+﻿using Internal.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 [StructLayout(LayoutKind.Explicit)]
-internal struct VariableArgument
+internal unsafe struct VariableArgument
 {
     [FieldOffset(0)]
     public long SignedValue;
@@ -9,6 +10,8 @@ internal struct VariableArgument
     public ulong UnsignedValue;
     [FieldOffset(0)]
     public double FloatValue;
+    [FieldOffset(0)]
+    public void* PointerValue;
 
     public static implicit operator VariableArgument(sbyte value) => new VariableArgument() { SignedValue = value };
     public static implicit operator VariableArgument(short value) => new VariableArgument() { SignedValue = value };
@@ -20,4 +23,5 @@ internal struct VariableArgument
     public static implicit operator VariableArgument(ulong value) => new VariableArgument() { UnsignedValue = value };
     public static implicit operator VariableArgument(float value) => new VariableArgument() { FloatValue = value };
     public static implicit operator VariableArgument(double value) => new VariableArgument() { FloatValue = value };
+    public static implicit operator VariableArgument(byte[] value) => new VariableArgument() { PointerValue = Unsafe.AsPointer(ref value[0]) };
 }

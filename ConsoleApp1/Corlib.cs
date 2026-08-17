@@ -24,11 +24,6 @@ namespace System
 
         public virtual string ToString() => "System.Object";
 
-        public virtual void Dispose()
-        {
-            GC.SuppressFinalize(this);
-        }
-
         internal ref byte GetRawData()
         {
             return ref Unsafe.As<RawData>(this).Data;
@@ -55,7 +50,7 @@ namespace System
             char* ptr = stackalloc char[2];
             ptr[0] = this;
             ptr[1] = '\0';
-            return string.Ctor(ptr);
+            return new string(ptr);
         }
     }
     public struct SByte
@@ -89,7 +84,7 @@ namespace System
             byte[] buffer = new byte[32];
             fixed (byte* ptr = buffer)
             {
-                vsnprintf_(ptr, buffer.Length, "%lld"u8, this);
+                snprintf(ptr, buffer.Length, "%lld"u8, this);
                 return Encoding.UTF8.GetString(buffer);
             }
         }
@@ -101,7 +96,7 @@ namespace System
             byte[] buffer = new byte[32];
             fixed (byte* ptr = buffer)
             {
-                vsnprintf_(ptr, buffer.Length, "%llu"u8, this);
+                snprintf(ptr, buffer.Length, "%llu"u8, this);
                 return Encoding.UTF8.GetString(buffer);
             }
         }
@@ -191,11 +186,12 @@ namespace System
             byte[] buffer = new byte[32];
             fixed (byte* ptr = buffer)
             {
-                vsnprintf_(ptr, buffer.Length, "%lf"u8, this);
+                snprintf(ptr, buffer.Length, "%lf"u8, this);
                 return Encoding.UTF8.GetString(buffer);
             }
         }
     }
+    public class Type { }
 
     public class Exception
     {
@@ -231,6 +227,16 @@ namespace System
         public TypeLoadException() : base("Failure has occurred while loading a type.") { }
     }
 
+    internal sealed class NotSupportedException : Exception
+    {
+        public NotSupportedException() : base("Specified method is not supported.") { }
+    }
+
+    internal sealed class ArgumentNullException : Exception
+    {
+        public ArgumentNullException() : base("Value cannot be null.") { }
+    }
+
     public readonly unsafe ref struct ReadOnlySpan<T>
     {
         private readonly void* _pointer;
@@ -239,7 +245,7 @@ namespace System
         public ReadOnlySpan(T[] array, int start, int length)
         {
             _pointer = Unsafe.AsPointer(ref array[start]);
-            _length = length;
+            _length = length - start;
         }
 
         public int Length
@@ -305,7 +311,46 @@ namespace System
             }
         }
 
-        public static unsafe string Ctor(char* ptr)
+        public static bool IsNullOrEmpty(string value)
+        {
+            return (value == null || 0u >= (uint)value.Length) ? true : false;
+        }
+
+        public unsafe static string Concat(string a, string b)
+        {
+            int Length = a.Length + b.Length;
+            char* ptr = stackalloc char[Length];
+            int currentIndex = 0;
+            for (int i = 0; i < a.Length; i++)
+            {
+                ptr[currentIndex] = a[i];
+                currentIndex++;
+            }
+            for (int i = 0; i < b.Length; i++)
+            {
+                ptr[currentIndex] = b[i];
+                currentIndex++;
+            }
+            return new string(ptr, 0, Length);
+        }
+
+        public static string Concat(string a, string b, string c) => Concat(Concat(a, b), c);
+
+        public static string Concat(string a, string b, string c, string d) => Concat(Concat(a, b), Concat(c, d));
+
+        public static string Concat(params string[] vs)
+        {
+            string s = Empty;
+            for (int i = 0; i < vs.Length; i++) s += vs[i];
+            return s;
+        }
+
+        public extern unsafe String(char* ptr);
+        public extern String(IntPtr ptr);
+        public extern String(char[] buf);
+        public extern unsafe String(char* ptr, int index, int length);
+
+        static unsafe string Ctor(char* ptr)
         {
             int i = 0;
 
@@ -315,12 +360,9 @@ namespace System
             return Ctor(ptr, 0, i - 1);
         }
 
-        public static unsafe string Ctor(IntPtr ptr)
-        {
-            return Ctor((char*)ptr);
-        }
+        static unsafe string Ctor(IntPtr ptr) => Ctor((char*)ptr);
 
-        public static unsafe string Ctor(char[] buf)
+        static unsafe string Ctor(char[] buf)
         {
             fixed (char* _buf = buf)
             {
@@ -328,7 +370,7 @@ namespace System
             }
         }
 
-        public static unsafe string Ctor(char* ptr, int index, int length)
+        static unsafe string Ctor(char* ptr, int index, int length)
         {
             EETypePtr et = EETypePtr.EETypePtrOf<string>();
 
@@ -449,6 +491,13 @@ namespace System
         }
 
         internal sealed class IntrinsicAttribute : Attribute { }
+
+        public sealed class RequiredMemberAttribute : Attribute { }
+
+        public sealed class CompilerFeatureRequiredAttribute : Attribute
+        {
+            public CompilerFeatureRequiredAttribute(string featureName) { }
+        }
 
         public sealed class MethodImplAttribute : Attribute
         {

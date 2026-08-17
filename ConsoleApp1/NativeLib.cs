@@ -6,8 +6,8 @@ using System.Runtime.InteropServices;
 
 internal unsafe class NativeLib
 {
-    [DllImport("*")]
-    public static extern int vsnprintf_(byte* buffer, int count, void* format, params VariableArgument[] va);
+    [DllImport("*", EntryPoint = "vsnprintf_")]
+    public static extern int snprintf(byte* buffer, int count, void* format, params VariableArgument[] va);
 
     [DllImport("*")]
     public static extern void* memcpy(void* dest, void* src, ulong n);

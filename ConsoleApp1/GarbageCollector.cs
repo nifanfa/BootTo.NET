@@ -97,12 +97,12 @@ internal static unsafe class GarbageCollector
         if (allocationSize < size)
             return null;
 
-        EFI_STATUS status = efi.gBS->AllocatePool(EFI_MEMORY_TYPE.EfiLoaderData, allocationSize, &allocation);
-        if ((ulong)status != efi.EFI_SUCCESS)
+        EFI_STATUS status = gBS->AllocatePool(EFI_MEMORY_TYPE.EfiLoaderData, allocationSize, &allocation);
+        if ((ulong)status != EFI_SUCCESS)
         {
             Collect();
-            status = efi.gBS->AllocatePool(EFI_MEMORY_TYPE.EfiLoaderData, allocationSize, &allocation);
-            if ((ulong)status != efi.EFI_SUCCESS)
+            status = gBS->AllocatePool(EFI_MEMORY_TYPE.EfiLoaderData, allocationSize, &allocation);
+            if ((ulong)status != EFI_SUCCESS)
                 return null;
         }
 
@@ -299,7 +299,7 @@ internal static unsafe class GarbageCollector
                 else
                     previous->Next = next;
 
-                efi.gBS->FreePool(current);
+                gBS->FreePool(current);
             }
 
             current = next;

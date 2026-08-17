@@ -1,9 +1,18 @@
 using System;
+using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
+using System.Timers;
 
 unsafe class Program
 {
     static void Main() { }
+
+    [UnmanagedCallersOnly]
+    static void TimerElapsed(EFI_EVENT Event, void* Context)
+    {
+        Console.WriteLine("Timer elapsed!");
+    }
 
     [System.Runtime.RuntimeExport("EfiMain")]
     static EFI_STATUS EfiMain(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* systemTable)
@@ -15,37 +24,43 @@ unsafe class Program
         //Disable watchdog timer
         gBS->SetWatchdogTimer(0, 0, 0, null);
 
-        Console.Clear();
-
         double pi = 3.1415926;
         int one = 1;
-        printf("hello world from printf! one: %d, pi: %f\r\n"u8, one, pi);
+        byte[] maintainer = Encoding.UTF8.GetBytes("nifanfa");
+        printf("hello world from printf! one: %d, pi: %f, maintainer: %s\r\n"u8, one, pi, maintainer);
 
         //Encoding, ToString test
-        Console.Write(Encoding.UTF8.GetString("System available memory(MB): "u8));
-        Console.WriteLine((GetAvailableMemory() / 1048576f).ToString());
+        Console.WriteLine(Encoding.UTF8.GetString("System available memory(MB): "u8) + (GetAvailableMemory() / 1048576f).ToString());
 
         WriteLoadDriver(@"\EFI\Drivers\UsbKbDxe.efi");
         WriteLoadDriver(@"\EFI\Drivers\UsbMouseDxe.efi");
 
         void WriteLoadDriver(string path)
         {
-            Console.Write("Driver ");
             EFI_STATUS usbMouseDriverStatus = LoadDriver(path);
-            Console.Write(path);
-            Console.Write(' ');
-            Console.WriteLine(usbMouseDriverStatus == EFI_SUCCESS ? "is loaded!" : "failed to load!");
+            Console.WriteLine("Driver " + path + " " + (usbMouseDriverStatus == EFI_SUCCESS ? "is loaded!" : "failed to load!"));
         }
 
         Console.WriteLine("Welcome to the: ");
-        gST->ConOut->SetAttribute(gST->ConOut, EFI_BACKGROUND_BLACK | EFI_LIGHTGREEN);
-        Console.WriteLine("  ____              _ _______     _   _ ______ _______ ");
-        Console.WriteLine(" |  _ \\            | |__   __|   | \\ | |  ____|__   __| ");
-        Console.WriteLine(" | |_) | ___   ___ | |_ | | ___  |  \\| | |__     | | ");
-        Console.WriteLine(" |  _ < / _ \\ / _ \\| __|| |/ _ \\ | . ` |  __|    | | ");
-        Console.WriteLine(" | |_) | (_) | (_) | |_ | | (_) || |\\  | |____   | | ");
-        Console.WriteLine(" |____/ \\___/ \\___/ \\__||_|\\___(_)_| \\_|______|  |_| ");
-        gST->ConOut->SetAttribute(gST->ConOut, EFI_BACKGROUND_BLACK | EFI_LIGHTGRAY);
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine(" /$$$$$$$                        /$$  /$$$$$$$$           /$$   /$$ /$$$$$$$$ /$$$$$$$$");
+        Console.WriteLine("| $$__  $$                      | $$ |__  $$__/          | $$$ | $$| $$_____/|__  $$__/");
+        Console.WriteLine("| $$  \\ $$  /$$$$$$   /$$$$$$  /$$$$$$  | $$  /$$$$$$    | $$$$| $$| $$         | $$   ");
+        Console.WriteLine("| $$$$$$$  /$$__  $$ /$$__  $$|_  $$_/  | $$ /$$__  $$   | $$ $$ $$| $$$$$      | $$   ");
+        Console.WriteLine("| $$__  $$| $$  \\ $$| $$  \\ $$  | $$    | $$| $$  \\ $$   | $$  $$$$| $$__/      | $$   ");
+        Console.WriteLine("| $$  \\ $$| $$  | $$| $$  | $$  | $$ /$$| $$| $$  | $$   | $$\\  $$$| $$         | $$   ");
+        Console.WriteLine("| $$$$$$$/|  $$$$$$/|  $$$$$$/  |  $$$$/| $$|  $$$$$$//$$| $$ \\  $$| $$$$$$$$   | $$   ");
+        Console.WriteLine("|_______/  \\______/  \\______/    \\___/  |__/ \\______/|__/|__/  \\__/|________/   |__/   ");
+        Console.ForegroundColor = ConsoleColor.Gray;
+
+        Console.WriteLine("Test timer(5 seconds)...");
+        Timer timer = new Timer(1000)
+        {
+            Elapsed = &TimerElapsed
+        };
+        timer.Start();
+        Thread.Sleep(5000);
+        timer.Stop();
 
         Console.WriteLine("Press any key to continue...");
 
@@ -104,7 +119,7 @@ unsafe class Program
                             0);
                     }
 
-                    gBS->Stall((ulong)NyanCat.FrameDelayMilliseconds * 1000);
+                    Thread.Sleep(NyanCat.FrameDelayMilliseconds);
                 }
             }
         }
@@ -236,12 +251,9 @@ unsafe class Program
 #if false
         #region File Test
         {
-            byte[] buffer = File.ReadAllBytes("Test.txt");
+            byte[] buffer = System.IO.File.ReadAllBytes("Test.txt");
             Console.Write("Content of Test.txt is: ");
-            for (int i = 0; i < buffer.Length; i++)
-            {
-                Console.Write((char)buffer[i]);
-            }
+            printf("%s"u8, buffer);
         }
         #endregion
 #endif
@@ -257,12 +269,7 @@ unsafe class Program
             {
                 EFI_GRAPHICS_OUTPUT_MODE_INFORMATION* modeinfo;
                 gop->QueryMode(gop, u, &sizeofMode, &modeinfo);
-                Console.Write("GOP Mode ");
-                Console.Write(Convert.ToString(u, 10));
-                Console.Write(":");
-                Console.Write(Convert.ToString(modeinfo->HorizontalResolution, 10));
-                Console.Write("x");
-                Console.WriteLine(Convert.ToString(modeinfo->VerticalResolution, 10));
+                printf("GOP Mode %d: %dx%d\r\n"u8, u, modeinfo->HorizontalResolution, modeinfo->VerticalResolution);
             }
             //gop->SetMode(gop,7);
             Console.WriteLine("Press any key to continue...");
@@ -287,20 +294,16 @@ unsafe class Program
             EFI_IPv4_ADDRESS address = new EFI_IPv4_ADDRESS();
             address.Addr[0] = 192;
             address.Addr[1] = 168;
-            address.Addr[2] = 137;
-            address.Addr[3] = 1;
+            address.Addr[2] = 0;
+            address.Addr[3] = 102;
 
-            Socket socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+            System.Net.Sockets.Socket socket = new System.Net.Sockets.Socket(System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
             socket.Connect(address, 54188);
-            socket.Send(GetBytes("Hello world from BootTo.NET project!"));
+            socket.Send(Encoding.UTF8.GetBytes("Hello world from BootTo.NET project!"));
             Console.WriteLine("Try receive 64bytes from server");
             byte[] buffer = new byte[64];
             socket.Receive(buffer);
-            Console.Write("Buffer received: ");
-            for (int i = 0; i < buffer.Length; i++)
-            {
-                Console.Write((char)buffer[i]);
-            }
+            printf("Buffer received: %s\r\n"u8, buffer);
             socket.Close();
         }
         #endregion
@@ -376,13 +379,6 @@ unsafe class Program
         }
 
         return 0;
-    }
-
-    public static byte[] GetBytes(string s)
-    {
-        byte[] buffer = new byte[s.Length];
-        for (int i = 0; i < s.Length; i++) buffer[i] = (byte)s[i];
-        return buffer;
     }
 
     static EFI_STATUS LoadDriver(string path)
