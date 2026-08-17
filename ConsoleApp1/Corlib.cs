@@ -2,8 +2,10 @@
 using Internal.Runtime.CompilerHelpers;
 using Internal.Runtime.CompilerServices;
 using System;
+using System.Runtime;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace System
 {
@@ -82,42 +84,26 @@ namespace System
     }
     public struct Int64
     {
-        [DllImport("*")]
-        public static unsafe extern int snprintf_(byte* buffer, int count, IntPtr format, long value);
-
         public override unsafe string ToString()
         {
-            const int bufferSize = 32;
-            byte* buffer = stackalloc byte[bufferSize];
-            snprintf_(buffer, bufferSize, (IntPtr)"%lld"u8, this);
-            char* strBuffer = stackalloc char[bufferSize];
-            for (int i = 0; i < bufferSize; i++)
+            byte[] buffer = new byte[32];
+            fixed (byte* ptr = buffer)
             {
-                strBuffer[i] = (char)buffer[i];
-                if (buffer[i] == 0)
-                    break;
+                vsnprintf_(ptr, buffer.Length, "%lld"u8, this);
+                return Encoding.UTF8.GetString(buffer);
             }
-            return string.Ctor(strBuffer);
         }
     }
     public struct UInt64
     {
-        [DllImport("*")]
-        public static unsafe extern int snprintf_(byte* buffer, int count, IntPtr format, ulong value);
-
         public override unsafe string ToString()
         {
-            const int bufferSize = 32;
-            byte* buffer = stackalloc byte[bufferSize];
-            snprintf_(buffer, bufferSize, (IntPtr)"%llu"u8, this);
-            char* strBuffer = stackalloc char[bufferSize];
-            for (int i = 0; i < bufferSize; i++)
+            byte[] buffer = new byte[32];
+            fixed (byte* ptr = buffer)
             {
-                strBuffer[i] = (char)buffer[i];
-                if (buffer[i] == 0)
-                    break;
+                vsnprintf_(ptr, buffer.Length, "%llu"u8, this);
+                return Encoding.UTF8.GetString(buffer);
             }
-            return string.Ctor(strBuffer);
         }
     }
     public struct IntPtr
@@ -194,17 +180,65 @@ namespace System
         }
     }
     public struct UIntPtr { }
-    public struct Single { }
-    public struct Double { }
+    public struct Single
+    {
+        public override string ToString() => ((double)this).ToString();
+    }
+    public struct Double
+    {
+        public override unsafe string ToString()
+        {
+            byte[] buffer = new byte[32];
+            fixed (byte* ptr = buffer)
+            {
+                vsnprintf_(ptr, buffer.Length, "%lf"u8, this);
+                return Encoding.UTF8.GetString(buffer);
+            }
+        }
+    }
+
+    public class Exception
+    {
+        private string Message;
+
+        public Exception(string message = "Exception of type 'System.Exception' was thrown.") => Message = message;
+
+        [RuntimeExport("RhpThrowEx")]
+        internal static void RhpThrowEx(Exception exception)
+        {
+            Console.WriteLine(exception.Message);
+            for (; ; );
+        }
+    }
+
+    internal sealed class IndexOutOfRangeException : Exception
+    {
+        public IndexOutOfRangeException() : base("Index was outside the bounds of the array.") { }
+    }
+
+    internal sealed class InvalidProgramException : Exception
+    {
+        public InvalidProgramException() : base("Common Language Runtime detected an invalid program.") { }
+    }
+
+    internal sealed class OverflowException : Exception
+    {
+        public OverflowException() : base("Arithmetic operation resulted in an overflow.") { }
+    }
+
+    internal sealed class TypeLoadException : Exception
+    {
+        public TypeLoadException() : base("Failure has occurred while loading a type.") { }
+    }
 
     public readonly unsafe ref struct ReadOnlySpan<T>
     {
-        private readonly IntPtr _pointer;
+        private readonly void* _pointer;
         private readonly int _length;
 
-        public ReadOnlySpan(T[]? array, int start, int length)
+        public ReadOnlySpan(T[] array, int start, int length)
         {
-            _pointer = (IntPtr)Unsafe.AsPointer(ref array[start]);
+            _pointer = Unsafe.AsPointer(ref array[start]);
             _length = length;
         }
 
@@ -213,7 +247,23 @@ namespace System
             get => _length;
         }
 
-        public static explicit operator IntPtr(ReadOnlySpan<T> readOnlySpan) => readOnlySpan._pointer;
+        public bool IsEmpty => _length == 0;
+
+        public ref readonly T this[int index]
+        {
+            [Intrinsic]
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                if ((uint)index >= (uint)_length)
+                    ThrowHelpers.ThrowIndexOutOfRangeException();
+                return ref Unsafe.Add(ref Unsafe.AsRef<T>(_pointer), index);
+            }
+        }
+
+        public static implicit operator ReadOnlySpan<T>(T[] array) => new ReadOnlySpan<T>(array, 0, array.Length);
+
+        public static implicit operator void*(ReadOnlySpan<T> readOnlySpan) => readOnlySpan._pointer;
     }
 
     public unsafe struct EETypePtr
@@ -238,6 +288,9 @@ namespace System
         public int Length;
         internal char FirstChar;
 
+        [Intrinsic]
+        public static readonly string Empty = "";
+
         public unsafe char this[int index]
         {
             [Intrinsic]
@@ -251,6 +304,7 @@ namespace System
                 }
             }
         }
+
         public static unsafe string Ctor(char* ptr)
         {
             int i = 0;
@@ -274,9 +328,6 @@ namespace System
             }
         }
 
-        [DllImport("*")]
-        unsafe static extern void* memcpy(void* dest, void* src, ulong n);
-
         public static unsafe string Ctor(char* ptr, int index, int length)
         {
             EETypePtr et = EETypePtr.EETypePtrOf<string>();
@@ -293,7 +344,6 @@ namespace System
 
             return s;
         }
-
     }
 
     public abstract class Array
@@ -424,6 +474,15 @@ namespace System.Runtime.InteropServices
     public sealed class UnmanagedCallersOnlyAttribute : Attribute
     {
         public UnmanagedCallersOnlyAttribute() { }
+    }
+
+    public sealed class InAttribute : Attribute { }
+
+    public class Marshal
+    {
+        public static unsafe IntPtr AllocCoTaskMem(int cb) => (IntPtr)GarbageCollector.Allocate((ulong)cb);
+
+        public static void FreeCoTaskMem(IntPtr ptr) { }
     }
 
     sealed class StructLayoutAttribute : Attribute
@@ -641,11 +700,11 @@ namespace Internal.Runtime
 
         public static class ThrowHelpers
         {
-            public static void ThrowInvalidProgramException(int id) { }
-            public static void ThrowInvalidProgramExceptionWithArgument(int id, string methodName) { }
-            public static void ThrowOverflowException() { }
-            public static void ThrowIndexOutOfRangeException() { }
-            public static void ThrowTypeLoadException(int id, string className, string typeName) { }
+            public static void ThrowInvalidProgramException(int id) => throw new InvalidProgramException();
+            public static void ThrowInvalidProgramExceptionWithArgument(int id, string methodName) => throw new InvalidProgramException();
+            public static void ThrowOverflowException() => throw new OverflowException();
+            public static void ThrowIndexOutOfRangeException() => throw new IndexOutOfRangeException();
+            public static void ThrowTypeLoadException(int id, string className, string typeName) => throw new TypeLoadException();
         }
 
         class StartupCodeHelpers
@@ -684,12 +743,6 @@ namespace Internal.Runtime
 
                 return obj;
             }
-
-            [DllImport("*")]
-            unsafe static extern void* memcpy(void* dest, void* src, ulong n);
-
-            [DllImport("*")]
-            unsafe static extern void* memset(void* ptr, int value, ulong num);
 
             [RuntimeExport("RhpNewArray")]
             internal static unsafe object RhpNewArray(EEType* pEEType, int length)

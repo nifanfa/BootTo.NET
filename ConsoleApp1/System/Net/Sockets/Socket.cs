@@ -1,5 +1,4 @@
-﻿using static efi;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 
 namespace System.Net.Sockets
 {
@@ -46,7 +45,7 @@ namespace System.Net.Sockets
                 &devices
                 );
 
-            if(sts == EFI_NOT_FOUND)
+            if (sts == EFI_NOT_FOUND)
             {
                 Console.WriteLine("Your UEFI firmware does not support TCP!");
                 Console.WriteLine("Make sure you have \"Network Stack\" enabled on your BIOS!");

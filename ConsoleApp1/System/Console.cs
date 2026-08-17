@@ -17,7 +17,7 @@
 
         public static void Write(string s)
         {
-            fixed(char* ptr = s)
+            fixed (char* ptr = s)
             {
                 gST->ConOut->OutputString(gST->ConOut, ptr);
             }

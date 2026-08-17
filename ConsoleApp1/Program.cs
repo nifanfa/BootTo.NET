@@ -1,27 +1,9 @@
 using System;
-using System.Runtime;
-using System.Runtime.InteropServices;
+using System.Text;
 
 unsafe class Program
 {
     static void Main() { }
-
-    [DllImport("*")]
-    public static extern int vprintf_(IntPtr format, IntPtr* va);
-
-    public static int printf(IntPtr format, params IntPtr[] args)
-    {
-        fixed (IntPtr* pArgs = args)
-        {
-            return vprintf_(format, pArgs);
-        }
-    }
-
-    [RuntimeExport("_putchar")]
-    public static void _putchar(char character)
-    {
-        Console.Write(character);
-    }
 
     [System.Runtime.RuntimeExport("EfiMain")]
     static EFI_STATUS EfiMain(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* systemTable)
@@ -37,7 +19,11 @@ unsafe class Program
 
         double pi = 3.1415926;
         int one = 1;
-        printf((IntPtr)"hello world from printf! one: %d, pi: %f\r\n"u8, (IntPtr)one, new IntPtr(*(long*)&pi));
+        printf("hello world from printf! one: %d, pi: %f\r\n"u8, one, pi);
+
+        //Encoding, ToString test
+        Console.Write(Encoding.UTF8.GetString("System available memory(MB): "u8));
+        Console.WriteLine((GetAvailableMemory() / 1048576f).ToString());
 
         WriteLoadDriver(@"\EFI\Drivers\UsbKbDxe.efi");
         WriteLoadDriver(@"\EFI\Drivers\UsbMouseDxe.efi");

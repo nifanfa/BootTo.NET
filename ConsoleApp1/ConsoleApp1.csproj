@@ -25,6 +25,7 @@
     <QemuFirmware>$(QemuFirmwareDirectory)\edk2-x86_64-code.fd</QemuFirmware>
     <QemuVariablesTemplate>$(QemuFirmwareDirectory)\edk2-i386-vars.fd</QemuVariablesTemplate>
     <QemuDriveDirectory>$(MSBuildProjectDirectory)\..\Drive</QemuDriveDirectory>
+    <RootNamespace />
   </PropertyGroup>
 
   <!--Warning: This package is modified(/packages). Using official one may cause it fail to compile!-->

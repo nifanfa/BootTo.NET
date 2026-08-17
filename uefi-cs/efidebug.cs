@@ -344,15 +344,15 @@ public unsafe struct EFI_SYSTEM_CONTEXT_ARM
 public unsafe struct EFI_SYSTEM_CONTEXT
 {
     [FieldOffset(0)]
-    public EFI_SYSTEM_CONTEXT_EBC  *SystemContextEbc;
+    public EFI_SYSTEM_CONTEXT_EBC* SystemContextEbc;
     [FieldOffset(0)]
-    public EFI_SYSTEM_CONTEXT_IA32 *SystemContextIa32;
+    public EFI_SYSTEM_CONTEXT_IA32* SystemContextIa32;
     [FieldOffset(0)]
-    public EFI_SYSTEM_CONTEXT_X64  *SystemContextX64;
+    public EFI_SYSTEM_CONTEXT_X64* SystemContextX64;
     [FieldOffset(0)]
-    public EFI_SYSTEM_CONTEXT_IPF  *SystemContextIpf;
+    public EFI_SYSTEM_CONTEXT_IPF* SystemContextIpf;
     [FieldOffset(0)]
-    public EFI_SYSTEM_CONTEXT_ARM  *SystemContextArm;
+    public EFI_SYSTEM_CONTEXT_ARM* SystemContextArm;
 }
 
 public enum EFI_INSTRUCTION_SET_ARCHITECTURE

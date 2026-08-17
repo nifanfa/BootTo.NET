@@ -82,9 +82,6 @@ internal static unsafe class GarbageCollector
         s_gcStaticsEnd = end;
     }
 
-    [DllImport("*")]
-    static extern void* memset(void* ptr, int value, ulong num);
-
     internal static void* Allocate(ulong size)
     {
         if (size > MaximumUnsignedValue - 7)
