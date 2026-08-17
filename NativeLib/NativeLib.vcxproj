@@ -24,6 +24,7 @@
     </MASM>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="string.c" />
     <ClCompile Include="printf.c" />
   </ItemGroup>
   <ItemGroup>

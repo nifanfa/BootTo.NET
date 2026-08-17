@@ -1,18 +1,16 @@
-﻿using Internal.Runtime.CompilerHelpers;
+﻿global using static efi;
+
+using Internal.Runtime.CompilerHelpers;
 using System;
 
 public unsafe partial class efi
 {
-    static IntPtr _ST;
-    static IntPtr _BS;
-    static IntPtr _RT;
-
     public static void InitializeLib(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* systemTable)
     {
-        efi._ST = (IntPtr)systemTable;
-        efi._BS = (IntPtr)systemTable->BootServices;
-        efi._RT = (IntPtr)systemTable->RuntimeServices;
-        efi.gImageHandle = imageHandle;
+        gST = systemTable;
+        gBS = systemTable->BootServices;
+        gRT = systemTable->RuntimeServices;
+        gImageHandle = imageHandle;
 
         //C# startup
         EFI_LOADED_IMAGE_PROTOCOL* loadedimage = null;
@@ -29,9 +27,9 @@ public unsafe partial class efi
         StartupCodeHelpers.InitializeModules(moduleSec);
     }
 
-    public static EFI_SYSTEM_TABLE* gST => (EFI_SYSTEM_TABLE*)_ST;
-    public static EFI_BOOT_SERVICES* gBS => (EFI_BOOT_SERVICES*)_BS;
-    public static EFI_RUNTIME_SERVICES* gRT => (EFI_RUNTIME_SERVICES*)_RT;
+    public static EFI_SYSTEM_TABLE* gST;
+    public static EFI_BOOT_SERVICES* gBS;
+    public static EFI_RUNTIME_SERVICES* gRT;
 
     public static EFI_HANDLE gImageHandle;
     public static int END_DEVICE_PATH_LENGTH => (sizeof(EFI_DEVICE_PATH_PROTOCOL));

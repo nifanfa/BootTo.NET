@@ -1,4 +1,5 @@
 using Internal.Runtime;
+using Internal.Runtime.CompilerHelpers;
 using System;
 using System.Runtime;
 using System.Runtime.CompilerServices;
@@ -82,6 +83,9 @@ internal static unsafe class GarbageCollector
         s_gcStaticsEnd = end;
     }
 
+    [DllImport("*")]
+    static extern void* memset(void* ptr, int value, ulong num);
+
     internal static void* Allocate(ulong size)
     {
         if (size > MaximumUnsignedValue - 7)
@@ -114,7 +118,7 @@ internal static unsafe class GarbageCollector
         s_allocations = header;
 
         byte* objectAddress = (byte*)allocation + sizeof(AllocationHeader);
-        InternalCalls.memset(objectAddress, 0, size);
+        memset(objectAddress, 0, size);
 
         ulong objectStart = (ulong)objectAddress;
         ulong objectEnd = objectStart + size;
@@ -154,7 +158,7 @@ internal static unsafe class GarbageCollector
         for (AllocationHeader* header = s_allocations; header != null; header = header->Next)
         {
             EEType* type = *(EEType**)ObjectAddress(header);
-            if (type != null && type->IsFinalizable)
+            if (type != null && (type->Flags & EETypeFlags.HasFinalizerFlag) != 0)
                 header->Flags |= Marked;
         }
 
@@ -171,7 +175,7 @@ internal static unsafe class GarbageCollector
                 foundUnscanned = true;
 
                 EEType* type = *(EEType**)ObjectAddress(header);
-                if (type != null && type->HasGCPointers && header->Size > (ulong)sizeof(IntPtr))
+                if (type != null && (type->Flags & EETypeFlags.HasPointersFlag) != 0 && header->Size > (ulong)sizeof(IntPtr))
                 {
                     byte* fields = ObjectAddress(header) + sizeof(IntPtr);
                     ScanMemory(fields, header->Size - (ulong)sizeof(IntPtr));

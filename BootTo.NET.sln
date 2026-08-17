@@ -1,11 +1,12 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
-VisualStudioVersion = 18.9.12105.275 stable
+VisualStudioVersion = 18.9.12105.275
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ConsoleApp1", "ConsoleApp1\ConsoleApp1.csproj", "{86AF0AE0-BF6E-4532-8E9E-7F6D8B7DE644}"
-EndProject
-Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "CoreLib", "CoreLib\CoreLib.shproj", "{09702D3B-0A10-4653-9C75-12989E41B246}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D51F9603-001B-4272-ABA9-62FDB20453BC} = {D51F9603-001B-4272-ABA9-62FDB20453BC}
+	EndProjectSection
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "uefi-cs", "uefi-cs\uefi-cs.shproj", "{03406847-825A-4359-8159-E1769BEE543F}"
 EndProject
@@ -54,8 +55,6 @@ Global
 	EndGlobalSection
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		uefi-cs\uefi-cs.projitems*{03406847-825a-4359-8159-e1769bee543f}*SharedItemsImports = 13
-		CoreLib\CoreLib.projitems*{09702d3b-0a10-4653-9c75-12989e41b246}*SharedItemsImports = 13
-		CoreLib\CoreLib.projitems*{86af0ae0-bf6e-4532-8e9e-7f6d8b7de644}*SharedItemsImports = 5
 		uefi-cs\uefi-cs.projitems*{86af0ae0-bf6e-4532-8e9e-7f6d8b7de644}*SharedItemsImports = 5
 	EndGlobalSection
 EndGlobal

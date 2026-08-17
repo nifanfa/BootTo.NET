@@ -1,4 +1,3 @@
-global using static efi;
 using System;
 using System.Runtime;
 using System.Runtime.InteropServices;
@@ -8,7 +7,15 @@ unsafe class Program
     static void Main() { }
 
     [DllImport("*")]
-    public static extern int printf_(IntPtr format);
+    public static extern int vprintf_(IntPtr format, IntPtr* va);
+
+    public static int printf(IntPtr format, params IntPtr[] args)
+    {
+        fixed (IntPtr* pArgs = args)
+        {
+            return vprintf_(format, pArgs);
+        }
+    }
 
     [RuntimeExport("_putchar")]
     public static void _putchar(char character)
@@ -28,7 +35,9 @@ unsafe class Program
 
         Console.Clear();
 
-        printf_("hello world from printf!\r\n"u8._pointer);
+        double pi = 3.1415926;
+        int one = 1;
+        printf((IntPtr)"hello world from printf! one: %d, pi: %f\r\n"u8, (IntPtr)one, new IntPtr(*(long*)&pi));
 
         WriteLoadDriver(@"\EFI\Drivers\UsbKbDxe.efi");
         WriteLoadDriver(@"\EFI\Drivers\UsbMouseDxe.efi");

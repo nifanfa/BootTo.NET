@@ -112,13 +112,13 @@ namespace System.Net.Sockets
                     tcp->Configure(tcp, pcfg);
 
                 Console.Write("Your IP is: ");
-                Console.Write(Convert.ToString(mode.ConfigData.StationAddress.Addr[0], 10));
+                Console.Write(mode.ConfigData.StationAddress.Addr[0].ToString());
                 Console.Write('.');
-                Console.Write(Convert.ToString(mode.ConfigData.StationAddress.Addr[1], 10));
+                Console.Write(mode.ConfigData.StationAddress.Addr[1].ToString());
                 Console.Write('.');
-                Console.Write(Convert.ToString(mode.ConfigData.StationAddress.Addr[2], 10));
+                Console.Write(mode.ConfigData.StationAddress.Addr[2].ToString());
                 Console.Write('.');
-                Console.Write(Convert.ToString(mode.ConfigData.StationAddress.Addr[3], 10));
+                Console.Write(mode.ConfigData.StationAddress.Addr[3].ToString());
                 Console.WriteLine();
             }
 
