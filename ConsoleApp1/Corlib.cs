@@ -162,7 +162,11 @@ namespace System
     }
     public partial struct Double { }
     public class Type { }
-
+    public delegate void EventHandler(object? sender, EventArgs e);
+    public class EventArgs
+    {
+        public static readonly EventArgs Empty = new EventArgs();
+    }
     public class Exception
     {
         private readonly string _message;
@@ -212,15 +216,29 @@ namespace System
         public InvalidCastException() : base("Specified cast is not valid.") { }
     }
 
+    public ref struct ByReference<T>
+    {
+        private readonly IntPtr _value;
+
+        [Intrinsic]
+        public extern ByReference(ref T value);
+
+        public extern ref T Value
+        {
+            [Intrinsic]
+            get;
+        }
+    }
+
     public readonly unsafe ref struct ReadOnlySpan<T>
     {
-        private readonly void* _pointer;
+        internal readonly ByReference<T> _pointer;
         private readonly int _length;
 
         public ReadOnlySpan(T[] array, int start, int length)
         {
-            _pointer = Unsafe.AsPointer(ref array[start]);
-            _length = length - start;
+            _pointer = new ByReference<T>(ref Unsafe.Add(ref array[0], start));
+            _length = length;
         }
 
         public int Length
@@ -238,13 +256,23 @@ namespace System
             {
                 if ((uint)index >= (uint)_length)
                     ThrowHelpers.ThrowIndexOutOfRangeException();
-                return ref Unsafe.Add(ref Unsafe.AsRef<T>(_pointer), index);
+                return ref Unsafe.Add(ref _pointer.Value, index);
             }
         }
 
         public static implicit operator ReadOnlySpan<T>(T[] array) => new ReadOnlySpan<T>(array, 0, array.Length);
 
-        public static implicit operator void*(ReadOnlySpan<T> readOnlySpan) => readOnlySpan._pointer;
+        public static implicit operator T[](ReadOnlySpan<T> readOnlySpan)
+        {
+            var array = new T[readOnlySpan.Length];
+            for (int i = 0; i < readOnlySpan.Length; i++)
+            {
+                array[i] = readOnlySpan[i];
+            }
+            return array;
+        }
+
+        public static implicit operator void*(ReadOnlySpan<T> readOnlySpan) => Unsafe.AsPointer(ref readOnlySpan._pointer.Value);
     }
 
     public unsafe struct EETypePtr
@@ -1508,11 +1536,11 @@ namespace System.Runtime
     internal static unsafe class EH
     {
         // A PE x64 RUNTIME_FUNCTION contains three 32-bit RVAs.
-        private static int RuntimeFunctionSize => sizeof(RuntimeFunction);
+        internal static int RuntimeFunctionSize => sizeof(RuntimeFunction);
 
-        private static byte* s_imageBase;
-        private static RuntimeFunction* s_exceptionTable;
-        private static int s_runtimeFunctionCount;
+        internal static byte* s_imageBase;
+        internal static RuntimeFunction* s_exceptionTable;
+        internal static int s_runtimeFunctionCount;
 
         private const byte UnwindFlagHandlerMask = 0x03;
         private const byte FunctionKindMask = 0x03;
@@ -1533,24 +1561,11 @@ namespace System.Runtime
         private const byte EhClauseFault = 1;
         private const byte EhClauseFilter = 2;
 
-        // The EFI startup code supplies raw addresses. Keeping the state here
-        // lets the compiler runtime stay independent of EFI protocols and PE
-        // header types.
-        internal static void Initialize(
-            byte* imageBase,
-            byte* exceptionTable,
-            uint exceptionTableSize)
-        {
-            s_imageBase = imageBase;
-            s_exceptionTable = (RuntimeFunction*)exceptionTable;
-            s_runtimeFunctionCount = (int)(exceptionTableSize / RuntimeFunctionSize);
-        }
-
         // RhpThrowEx is the native entry point in ExceptionHandling.asm.
         // This managed method has the CoreRT name and performs the metadata
         // lookup before the assembly helper calls the selected funclet.
         [RuntimeExport("RhThrowEx")]
-        internal static void RhThrowEx(object exception, ref ExInfo exInfo)
+        private static void RhThrowEx(object exception, ref ExInfo exInfo)
         {
             if (exception == null)
                 exception = new Exception();
@@ -2361,7 +2376,7 @@ namespace Internal.Runtime
             [MethodImpl(MethodImplOptions.InternalCall)]
             internal static extern void RegisterStatics(IntPtr start, IntPtr end);
 
-            public static unsafe void InitializeModules(IntPtr Modules)
+            public static unsafe void InitializeModules(byte* ImageBase, IntPtr Modules, byte* ExceptionTable, uint ExceptionTableSize)
             {
                 var header = (ReadyToRunHeader*)*(IntPtr*)Modules;
                 var sections = (ModuleInfoRow*)(header + 1);
@@ -2383,6 +2398,10 @@ namespace Internal.Runtime
                             RunEagerClassConstructors(sections[k].Start, sections[k].End);
                     }
                 }
+
+                EH.s_imageBase = ImageBase;
+                EH.s_exceptionTable = (RuntimeFunction*)ExceptionTable;
+                EH.s_runtimeFunctionCount = (int)(ExceptionTableSize / EH.RuntimeFunctionSize);
             }
 
             private static unsafe void RunEagerClassConstructors(IntPtr cctorTableStart, IntPtr cctorTableEnd)

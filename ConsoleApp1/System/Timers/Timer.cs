@@ -5,9 +5,7 @@ namespace System.Timers
 {
     internal unsafe class Timer
     {
-        public delegate void TimerEventHandler(EFI_EVENT Event, IntPtr Context);
-        public event TimerEventHandler Elapsed;
-        EFI_EVENT TimerEvent;
+        public event EventHandler Elapsed;
         bool Started;
 
         [UnmanagedCallersOnly]
@@ -15,18 +13,20 @@ namespace System.Timers
         {
             IntPtr context = (IntPtr)Context;
             Timer timer = Unsafe.As<IntPtr, Timer>(ref context);
-            timer.Elapsed?.Invoke(Event, context);
+            timer.Elapsed?.Invoke(timer, EventArgs.Empty);
         }
 
         public double Interval;
 
         public Timer(double interval) => Interval = interval;
 
+        EFI_EVENT TimerEvent;
+
         public void Start()
         {
             if (Started)
             {
-                gBS->SetTimer(TimerEvent, EFI_TIMER_DELAY.TimerPeriodic, (ulong)Interval * 10000);
+                gBS->SetTimer(TimerEvent, TimerPeriodic, (ulong)Interval * 10000);
                 return;
             }
 
@@ -47,7 +47,7 @@ namespace System.Timers
 
             EFI_STATUS setTimerStatus = gBS->SetTimer(
                 TimerEvent,
-                EFI_TIMER_DELAY.TimerPeriodic,
+                TimerPeriodic,
                 (ulong)Interval * 10000
             );
             if ((ulong)setTimerStatus != EFI_SUCCESS)
@@ -65,7 +65,7 @@ namespace System.Timers
             if (!Started)
                 return;
 
-            gBS->SetTimer(TimerEvent, EFI_TIMER_DELAY.TimerCancel, 0);
+            gBS->SetTimer(TimerEvent, TimerCancel, 0);
             gBS->CloseEvent(TimerEvent);
             TimerEvent = default;
             Started = false;

@@ -41,7 +41,7 @@ namespace System.Threading.Tasks
 
                 status = gBS->SetTimer(
                     _event,
-                    EFI_TIMER_DELAY.TimerRelative,
+                    TimerRelative,
                     (ulong)_millisecondsDelay * 10000);
                 if ((ulong)status != EFI_SUCCESS)
                 {

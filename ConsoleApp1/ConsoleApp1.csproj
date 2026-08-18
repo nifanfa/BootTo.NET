@@ -68,12 +68,13 @@
   <Target Name="RunQemu" AfterTargets="CreateVHD" Condition="'$(RunQemu)' != 'false' and '$(CreateVHD)' != 'false'">
     <PropertyGroup>
       <QemuVariablesFile Condition="'$(QemuVariablesFile)' == ''">$(MSBuildProjectDirectory)\$(NativeOutputPath)$(TargetName).vars.fd</QemuVariablesFile>
+      <QemuArguments>-L &quot;$(QemuFirmwareDirectory)&quot; -name BootTo.NET -machine q35,i8042=off -smp 2 -m 1024M -display sdl -chardev console,id=com1 -serial chardev:com1 -vga std -device qemu-xhci,id=xhci -device usb-kbd,bus=xhci.0 -device usb-mouse,bus=xhci.0 -object rng-builtin,id=rng0 -device virtio-rng-pci,rng=rng0 -drive &quot;if=pflash,format=raw,unit=0,readonly=on,file=$(QemuFirmware)&quot; -drive &quot;if=pflash,format=raw,unit=1,file=$(QemuVariablesFile)&quot; -drive &quot;file=$(VhdFilePath),format=vpc,media=disk&quot; -boot order=c,menu=on -netdev user,id=net0 -device e1000,netdev=net0,romfile=efi-e1000.rom -no-reboot</QemuArguments>
     </PropertyGroup>
     <Error Text="Bundled QEMU was not found at $(QemuExecutable)." Condition="!Exists('$(QemuExecutable)')" />
     <Error Text="Bundled x64 UEFI firmware was not found at $(QemuFirmware)." Condition="!Exists('$(QemuFirmware)')" />
     <Error Text="Bundled x86 UEFI variables template was not found at $(QemuVariablesTemplate)." Condition="!Exists('$(QemuVariablesTemplate)')" />
     <Copy SourceFiles="$(QemuVariablesTemplate)" DestinationFiles="$(QemuVariablesFile)" Condition="!Exists('$(QemuVariablesFile)')" />
-    <Exec Command="&quot;$(QemuExecutable)&quot; -L &quot;$(QemuFirmwareDirectory)&quot; -name BootTo.NET -machine q35,i8042=off -smp 2 -m 1024M -display sdl -vga std -device qemu-xhci,id=xhci -device usb-kbd,bus=xhci.0 -device usb-mouse,bus=xhci.0 -object rng-builtin,id=rng0 -device virtio-rng-pci,rng=rng0 -drive &quot;if=pflash,format=raw,unit=0,readonly=on,file=$(QemuFirmware)&quot; -drive &quot;if=pflash,format=raw,unit=1,file=$(QemuVariablesFile)&quot; -drive &quot;file=$(VhdFilePath),format=vpc,media=disk&quot; -boot order=c,menu=on -netdev user,id=net0 -device e1000,netdev=net0,romfile=efi-e1000.rom -no-reboot" />
+    <Exec Command="powershell.exe -NoProfile -NonInteractive -Command &quot;$command = 'title COM1 &amp; ' + [char]34 + $env:BOOTTONET_QEMU_EXE + [char]34 + ' ' + $env:BOOTTONET_QEMU_ARGS; Start-Process -FilePath $env:ComSpec -ArgumentList @('/d', '/c', $command)&quot;" EnvironmentVariables="BOOTTONET_QEMU_EXE=$(QemuExecutable);BOOTTONET_QEMU_ARGS=$(QemuArguments)" />
   </Target>
 
 </Project>

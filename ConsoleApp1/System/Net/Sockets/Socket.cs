@@ -225,7 +225,7 @@ namespace System.Net.Sockets
             ulong deviceCount = 0;
             EFI_HANDLE* devices = null;
             EFI_STATUS status = gBS->LocateHandleBuffer(
-                EFI_LOCATE_SEARCH_TYPE.ByProtocol,
+                ByProtocol,
                 (EFI_GUID*)EFI_TCP4_SERVICE_BINDING_PROTOCOL,
                 null,
                 &deviceCount,

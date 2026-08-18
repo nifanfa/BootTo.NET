@@ -50,17 +50,15 @@ public unsafe partial class efi
         byte* imageBase = (byte*)loadedimage->ImageBase;
         DOSHeader* doshdr = (DOSHeader*)imageBase;
         NtHeaders64* nthdr = (NtHeaders64*)(imageBase + doshdr->e_lfanew);
-        System.Runtime.EH.Initialize(
-                imageBase,
-                imageBase + nthdr->OptionalHeader.ExceptionTable.VirtualAddress,
-                nthdr->OptionalHeader.ExceptionTable.Size);
         SectionHeader* sections = ((SectionHeader*)(imageBase + doshdr->e_lfanew + sizeof(NtHeaders64)));
         IntPtr moduleSec = IntPtr.Zero;
         for (int i = 0; i < nthdr->FileHeader.NumberOfSections; i++)
         {
             if (*(ulong*)sections[i].Name == 0x73656C75646F6D2E) moduleSec = (IntPtr)(imageBase + sections[i].VirtualAddress);
         }
-        StartupCodeHelpers.InitializeModules(moduleSec);
+        StartupCodeHelpers.InitializeModules(imageBase, moduleSec,
+            imageBase + nthdr->OptionalHeader.ExceptionTable.VirtualAddress,
+            nthdr->OptionalHeader.ExceptionTable.Size);
     }
 
     public static EFI_SYSTEM_TABLE* gST;

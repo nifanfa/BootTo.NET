@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Ports;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,12 +11,12 @@ class Program
 {
     static extern void Main();
 
-    static void TimerTest1Elapsed(EFI_EVENT Event, IntPtr Context)
+    static void TimerTest1Elapsed(object sender, EventArgs args)
     {
         Console.WriteLine("Timer elapsed(1)!");
     }
 
-    static void TimerTest2Elapsed(EFI_EVENT Event, IntPtr Context)
+    static void TimerTest2Elapsed(object sender, EventArgs args)
     {
         Console.WriteLine("Timer elapsed(2)!");
     }
@@ -30,7 +31,8 @@ class Program
     unsafe static EFI_STATUS EfiMain(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* systemTable)
     {
         ulong stackMarker = 0;
-        GC_EFI.InitializeStack(&stackMarker);
+        EFI.GC.InitializeStack(&stackMarker);
+
         InitializeLib(imageHandle, systemTable);
 
         //Disable watchdog timer
@@ -39,16 +41,16 @@ class Program
         double pi = 3.1415926;
         int one = 1;
         byte[] maintainer = Encoding.UTF8.GetBytes("nifanfa");
-        printf("hello world from printf! one: %d, pi: %f, maintainer: %s\r\n"u8, one, pi, maintainer);
+        printf("hello world from printf! one: %d, pi: %f, maintainer: %s (nifanfa@nifanfa.com)\r\n"u8, one, pi, maintainer);
 
         try
         {
             Console.WriteLine("Try throwing an exception!");
-            throw new Exception();
+            throw new Exception("This is a test exception.");
         }
-        catch
+        catch (Exception ex)
         {
-            Console.WriteLine("Exception caught!");
+            Console.WriteLine("Exception caught! " + ex.Message);
         }
         finally
         {
@@ -139,7 +141,7 @@ class Program
                         Graphics->Blt(
                             Graphics,
                             (EFI_GRAPHICS_OUTPUT_BLT_PIXEL*)pixels,
-                            EFI_GRAPHICS_OUTPUT_BLT_OPERATION.EfiBltBufferToVideo,
+                            EfiBltBufferToVideo,
                             0,
                             0,
                             0,
@@ -324,10 +326,28 @@ class Program
         #endregion
 #endif
 
+#if false
+        #region Serial Test
+        SerialTest test = new SerialTest();
+        _ = test.Run();
+        #endregion
+#endif
+
         Console.WriteLine("Finished!");
         Thread.Sleep(Timeout.Infinite);
 
         return EFI_SUCCESS;
+    }
+
+    class SerialTest
+    {
+        public async Task Run()
+        {
+            SerialPort port = new SerialPort("COM1", 9600);
+            port.Open();
+            await port.WriteAsync("Hello world from BootTo.NET project!"u8);
+            port.Close();
+        }
     }
 
     class FileTest
@@ -397,7 +417,7 @@ class Program
             memoryMapSize += descriptorSize * 2;
             EFI_MEMORY_DESCRIPTOR* memoryMap = null;
             status = gBS->AllocatePool(
-                EFI_MEMORY_TYPE.EfiLoaderData,
+                EfiLoaderData,
                 memoryMapSize,
                 (void**)&memoryMap);
             if ((ulong)status != EFI_SUCCESS || memoryMap == null)
@@ -431,7 +451,7 @@ class Program
             {
                 EFI_MEMORY_DESCRIPTOR* descriptor =
                     (EFI_MEMORY_DESCRIPTOR*)((byte*)memoryMap + offset);
-                if (descriptor->Type == (uint)EFI_MEMORY_TYPE.EfiConventionalMemory)
+                if (descriptor->Type == (uint)EfiConventionalMemory)
                     availablePages += descriptor->NumberOfPages;
             }
 
@@ -465,7 +485,7 @@ class Program
 
         EFI_HANDLE* handles = null;
         ulong handleCount = 0;
-        status = gBS->LocateHandleBuffer(EFI_LOCATE_SEARCH_TYPE.AllHandles, null, null, &handleCount, &handles);
+        status = gBS->LocateHandleBuffer(AllHandles, null, null, &handleCount, &handles);
         if ((ulong)status != EFI_SUCCESS)
             return status;
 

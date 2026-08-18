@@ -1,8 +1,8 @@
 using System.Runtime;
 
-namespace System.Threading
+namespace System.Threading.EFI
 {
-    public static unsafe class Monitor_EFI
+    public static unsafe class Monitor
     {
         private static EFI_TPL s_previousTpl;
         private static int s_lockDepth;
