@@ -2,6 +2,7 @@
 {
     public static unsafe class Console
     {
+        private static readonly object s_syncRoot = new object();
         static Console()
         {
             BackgroundColor = ConsoleColor.Black;
@@ -16,27 +17,30 @@
         {
             set
             {
-                EfiBackgroundColor = value switch
+                lock (s_syncRoot)
                 {
-                    ConsoleColor.Black => EFI_BACKGROUND_BLACK,
-                    ConsoleColor.DarkBlue => EFI_BACKGROUND_BLUE,
-                    ConsoleColor.DarkGreen => EFI_BACKGROUND_GREEN,
-                    ConsoleColor.DarkCyan => EFI_BACKGROUND_CYAN,
-                    ConsoleColor.DarkRed => EFI_BACKGROUND_RED,
-                    ConsoleColor.DarkMagenta => EFI_BACKGROUND_MAGENTA,
-                    ConsoleColor.DarkYellow => EFI_BACKGROUND_BROWN,
-                    ConsoleColor.Gray => EFI_BACKGROUND_LIGHTGRAY,
-                    ConsoleColor.DarkGray => EFI_BACKGROUND_BLACK,
-                    ConsoleColor.Blue => EFI_BACKGROUND_BLUE,
-                    ConsoleColor.Green => EFI_BACKGROUND_GREEN,
-                    ConsoleColor.Cyan => EFI_BACKGROUND_CYAN,
-                    ConsoleColor.Red => EFI_BACKGROUND_RED,
-                    ConsoleColor.Magenta => EFI_BACKGROUND_MAGENTA,
-                    ConsoleColor.Yellow => EFI_BACKGROUND_BROWN,
-                    ConsoleColor.White => EFI_BACKGROUND_LIGHTGRAY,
-                    _ => EFI_BACKGROUND_BLACK
-                };
-                gST->ConOut->SetAttribute(gST->ConOut, EfiBackgroundColor | EfiForegroundColor);
+                    EfiBackgroundColor = value switch
+                    {
+                        ConsoleColor.Black => EFI_BACKGROUND_BLACK,
+                        ConsoleColor.DarkBlue => EFI_BACKGROUND_BLUE,
+                        ConsoleColor.DarkGreen => EFI_BACKGROUND_GREEN,
+                        ConsoleColor.DarkCyan => EFI_BACKGROUND_CYAN,
+                        ConsoleColor.DarkRed => EFI_BACKGROUND_RED,
+                        ConsoleColor.DarkMagenta => EFI_BACKGROUND_MAGENTA,
+                        ConsoleColor.DarkYellow => EFI_BACKGROUND_BROWN,
+                        ConsoleColor.Gray => EFI_BACKGROUND_LIGHTGRAY,
+                        ConsoleColor.DarkGray => EFI_BACKGROUND_BLACK,
+                        ConsoleColor.Blue => EFI_BACKGROUND_BLUE,
+                        ConsoleColor.Green => EFI_BACKGROUND_GREEN,
+                        ConsoleColor.Cyan => EFI_BACKGROUND_CYAN,
+                        ConsoleColor.Red => EFI_BACKGROUND_RED,
+                        ConsoleColor.Magenta => EFI_BACKGROUND_MAGENTA,
+                        ConsoleColor.Yellow => EFI_BACKGROUND_BROWN,
+                        ConsoleColor.White => EFI_BACKGROUND_LIGHTGRAY,
+                        _ => EFI_BACKGROUND_BLACK
+                    };
+                    gST->ConOut->SetAttribute(gST->ConOut, EfiBackgroundColor | EfiForegroundColor);
+                }
             }
         }
 
@@ -44,36 +48,46 @@
         {
             set
             {
-                EfiForegroundColor = value switch
+                lock (s_syncRoot)
                 {
-                    ConsoleColor.Black => EFI_BLACK,
-                    ConsoleColor.DarkBlue => EFI_BLUE,
-                    ConsoleColor.DarkGreen => EFI_GREEN,
-                    ConsoleColor.DarkCyan => EFI_CYAN,
-                    ConsoleColor.DarkRed => EFI_RED,
-                    ConsoleColor.DarkMagenta => EFI_MAGENTA,
-                    ConsoleColor.DarkYellow => EFI_BROWN,
-                    ConsoleColor.Gray => EFI_LIGHTGRAY,
-                    ConsoleColor.DarkGray => EFI_DARKGRAY,
-                    ConsoleColor.Blue => EFI_LIGHTBLUE,
-                    ConsoleColor.Green => EFI_LIGHTGREEN,
-                    ConsoleColor.Cyan => EFI_LIGHTCYAN,
-                    ConsoleColor.Red => EFI_LIGHTRED,
-                    ConsoleColor.Magenta => EFI_LIGHTMAGENTA,
-                    ConsoleColor.Yellow => EFI_YELLOW,
-                    ConsoleColor.White => EFI_WHITE,
-                    _ => EFI_LIGHTGRAY
-                };
-                gST->ConOut->SetAttribute(gST->ConOut, EfiBackgroundColor | EfiForegroundColor);
+                    EfiForegroundColor = value switch
+                    {
+                        ConsoleColor.Black => EFI_BLACK,
+                        ConsoleColor.DarkBlue => EFI_BLUE,
+                        ConsoleColor.DarkGreen => EFI_GREEN,
+                        ConsoleColor.DarkCyan => EFI_CYAN,
+                        ConsoleColor.DarkRed => EFI_RED,
+                        ConsoleColor.DarkMagenta => EFI_MAGENTA,
+                        ConsoleColor.DarkYellow => EFI_BROWN,
+                        ConsoleColor.Gray => EFI_LIGHTGRAY,
+                        ConsoleColor.DarkGray => EFI_DARKGRAY,
+                        ConsoleColor.Blue => EFI_LIGHTBLUE,
+                        ConsoleColor.Green => EFI_LIGHTGREEN,
+                        ConsoleColor.Cyan => EFI_LIGHTCYAN,
+                        ConsoleColor.Red => EFI_LIGHTRED,
+                        ConsoleColor.Magenta => EFI_LIGHTMAGENTA,
+                        ConsoleColor.Yellow => EFI_YELLOW,
+                        ConsoleColor.White => EFI_WHITE,
+                        _ => EFI_LIGHTGRAY
+                    };
+                    gST->ConOut->SetAttribute(gST->ConOut, EfiBackgroundColor | EfiForegroundColor);
+                }
             }
         }
 
         public static void Clear()
         {
-            gST->ConOut->ClearScreen(gST->ConOut);
+            lock (s_syncRoot)
+                gST->ConOut->ClearScreen(gST->ConOut);
         }
 
         public static void Write(char c)
+        {
+            lock (s_syncRoot)
+                WriteImpl(c);
+        }
+
+        private static void WriteImpl(char c)
         {
             char* chr = stackalloc char[2];
             chr[0] = c;
@@ -83,19 +97,30 @@
 
         public static void Write(string s)
         {
-            for (int i = 0; i < s.Length; i++)
+            lock (s_syncRoot)
             {
-                Write(s[i]);
+                for (int i = 0; i < s.Length; i++)
+                    WriteImpl(s[i]);
             }
         }
 
         public static void WriteLine(string s)
         {
-            Write(s);
-            WriteLine();
+            lock (s_syncRoot)
+            {
+                for (int i = 0; i < s.Length; i++)
+                    WriteImpl(s[i]);
+                WriteLineImpl();
+            }
         }
 
         public static void WriteLine()
+        {
+            lock (s_syncRoot)
+                WriteLineImpl();
+        }
+
+        private static void WriteLineImpl()
         {
             char* chr = stackalloc char[3];
             chr[0] = '\r';

@@ -1,4 +1,36 @@
-﻿global using static efi;
+﻿#pragma warning disable
+global using static efi;
+global using static EFI_TIMER_DELAY;
+global using static EFI_LOCATE_SEARCH_TYPE;
+global using static EFI_RESET_TYPE;
+global using static EFI_INTERFACE_TYPE;
+global using static EFI_GCD_MEMORY_TYPE_T;
+global using static EFI_INSTRUCTION_SET_ARCHITECTURE;
+global using static EFI_ALLOCATE_TYPE;
+global using static EFI_MEMORY_TYPE;
+global using static EFI_IP6_NEIGHBOR_STATE;
+global using static EFI_SIMPLE_NETWORK_STATE;
+global using static EFI_PCI_IO_PROTOCOL_WIDTH;
+global using static EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_WIDTH;
+global using static EFI_PCI_IO_PROTOCOL_OPERATION;
+global using static EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_OPERATION;
+global using static EFI_PCI_IO_PROTOCOL_ATTRIBUTE_OPERATION;
+global using static EFI_IO_WIDTH;
+global using static EFI_IO_OPERATION_TYPE;
+global using static EFI_GRAPHICS_PIXEL_FORMAT;
+global using static EFI_GRAPHICS_OUTPUT_BLT_OPERATION;
+global using static EFI_PXE_BASE_CODE_TFTP_OPCODE;
+global using static EFI_PXE_BASE_CODE_FUNCTION;
+global using static EFI_PXE_BASE_CODE_CALLBACK_STATUS;
+global using static EFI_PARITY_TYPE;
+global using static EFI_STOP_BITS_TYPE;
+global using static SHELL_STATUS;
+global using static EFI_SHELL_ARG_INFO_TYPES;
+global using static EFI_TCP4_CONNECTION_STATE;
+global using static EFI_TCP6_CONNECTION_STATE;
+global using static UI_STRING_TYPE;
+global using static EFI_NETWORK_INTERFACE_TYPE;
+#pragma warning restore
 
 using Internal.Runtime.CompilerHelpers;
 using System;
@@ -15,14 +47,18 @@ public unsafe partial class efi
         //C# startup
         EFI_LOADED_IMAGE_PROTOCOL* loadedimage = null;
         gBS->HandleProtocol(gImageHandle, (EFI_GUID*)EFI_LOADED_IMAGE_PROTOCOL_GUID, (void**)&loadedimage);
-        long ImageBase = (long)loadedimage->ImageBase;
-        DOSHeader* doshdr = (DOSHeader*)ImageBase;
-        NtHeaders64* nthdr = (NtHeaders64*)(ImageBase + doshdr->e_lfanew);
-        SectionHeader* sections = ((SectionHeader*)(ImageBase + doshdr->e_lfanew + sizeof(NtHeaders64)));
+        byte* imageBase = (byte*)loadedimage->ImageBase;
+        DOSHeader* doshdr = (DOSHeader*)imageBase;
+        NtHeaders64* nthdr = (NtHeaders64*)(imageBase + doshdr->e_lfanew);
+        System.Runtime.EH.Initialize(
+                imageBase,
+                imageBase + nthdr->OptionalHeader.ExceptionTable.VirtualAddress,
+                nthdr->OptionalHeader.ExceptionTable.Size);
+        SectionHeader* sections = ((SectionHeader*)(imageBase + doshdr->e_lfanew + sizeof(NtHeaders64)));
         IntPtr moduleSec = IntPtr.Zero;
         for (int i = 0; i < nthdr->FileHeader.NumberOfSections; i++)
         {
-            if (*(ulong*)sections[i].Name == 0x73656C75646F6D2E) moduleSec = (IntPtr)(ImageBase + sections[i].VirtualAddress);
+            if (*(ulong*)sections[i].Name == 0x73656C75646F6D2E) moduleSec = (IntPtr)(imageBase + sections[i].VirtualAddress);
         }
         StartupCodeHelpers.InitializeModules(moduleSec);
     }

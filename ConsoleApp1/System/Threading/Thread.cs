@@ -1,7 +1,9 @@
-﻿namespace System.Threading
+﻿using System.Threading.Tasks;
+
+namespace System.Threading
 {
     internal class Thread
     {
-        public static unsafe void Sleep(int millisecondsTimeout) => gBS->Stall((ulong)millisecondsTimeout * 1000);
+        public static void Sleep(int millisecondsTimeout) => Task.Delay(millisecondsTimeout).Wait();
     }
 }

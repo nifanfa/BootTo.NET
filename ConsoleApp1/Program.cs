@@ -1,24 +1,36 @@
 using System;
-using System.Runtime.InteropServices;
+using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Timers;
 
-unsafe class Program
+class Program
 {
-    static void Main() { }
+    static extern void Main();
 
-    [UnmanagedCallersOnly]
-    static void TimerElapsed(EFI_EVENT Event, void* Context)
+    static void TimerTest1Elapsed(EFI_EVENT Event, IntPtr Context)
     {
-        Console.WriteLine("Timer elapsed!");
+        Console.WriteLine("Timer elapsed(1)!");
     }
 
+    static void TimerTest2Elapsed(EFI_EVENT Event, IntPtr Context)
+    {
+        Console.WriteLine("Timer elapsed(2)!");
+    }
+
+    static readonly List<string> DxeDrivers = new()
+    {
+        @"\EFI\Drivers\UsbKbDxe.efi",
+        @"\EFI\Drivers\UsbMouseDxe.efi"
+    };
+
     [System.Runtime.RuntimeExport("EfiMain")]
-    static EFI_STATUS EfiMain(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* systemTable)
+    unsafe static EFI_STATUS EfiMain(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* systemTable)
     {
         ulong stackMarker = 0;
-        GarbageCollector.InitializeStack(&stackMarker);
+        GC_EFI.InitializeStack(&stackMarker);
         InitializeLib(imageHandle, systemTable);
 
         //Disable watchdog timer
@@ -29,11 +41,28 @@ unsafe class Program
         byte[] maintainer = Encoding.UTF8.GetBytes("nifanfa");
         printf("hello world from printf! one: %d, pi: %f, maintainer: %s\r\n"u8, one, pi, maintainer);
 
+        try
+        {
+            Console.WriteLine("Try throwing an exception!");
+            throw new Exception();
+        }
+        catch
+        {
+            Console.WriteLine("Exception caught!");
+        }
+        finally
+        {
+            Console.WriteLine("Exception thrown!");
+        }
+        //throw new Exception("Unhandled exception...");
+
         //Encoding, ToString test
         Console.WriteLine(Encoding.UTF8.GetString("System available memory(MB): "u8) + (GetAvailableMemory() / 1048576f).ToString());
 
-        WriteLoadDriver(@"\EFI\Drivers\UsbKbDxe.efi");
-        WriteLoadDriver(@"\EFI\Drivers\UsbMouseDxe.efi");
+        foreach (var driver in DxeDrivers)
+        {
+            WriteLoadDriver(driver);
+        }
 
         void WriteLoadDriver(string path)
         {
@@ -54,13 +83,14 @@ unsafe class Program
         Console.ForegroundColor = ConsoleColor.Gray;
 
         Console.WriteLine("Test timer(5 seconds)...");
-        Timer timer = new Timer(1000)
-        {
-            Elapsed = &TimerElapsed
-        };
+        Timer timer = new Timer(1000);
+        timer.Elapsed += TimerTest1Elapsed;
+        timer.Elapsed += TimerTest2Elapsed;
         timer.Start();
         Thread.Sleep(5000);
         timer.Stop();
+
+        printf("GC.Collect freed %d unreferenced objects!\r\n"u8, GC.Collect());
 
         Console.WriteLine("Press any key to continue...");
 
@@ -251,9 +281,8 @@ unsafe class Program
 #if false
         #region File Test
         {
-            byte[] buffer = System.IO.File.ReadAllBytes("Test.txt");
-            Console.Write("Content of Test.txt is: ");
-            printf("%s"u8, buffer);
+            FileTest test = new FileTest();
+            _ = test.Run();
         }
         #endregion
 #endif
@@ -290,29 +319,61 @@ unsafe class Program
 
 #if false
         #region Socket Test
-        {
-            EFI_IPv4_ADDRESS address = new EFI_IPv4_ADDRESS();
-            address.Addr[0] = 192;
-            address.Addr[1] = 168;
-            address.Addr[2] = 0;
-            address.Addr[3] = 102;
-
-            System.Net.Sockets.Socket socket = new System.Net.Sockets.Socket(System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
-            socket.Connect(address, 54188);
-            socket.Send(Encoding.UTF8.GetBytes("Hello world from BootTo.NET project!"));
-            Console.WriteLine("Try receive 64bytes from server");
-            byte[] buffer = new byte[64];
-            socket.Receive(buffer);
-            printf("Buffer received: %s\r\n"u8, buffer);
-            socket.Close();
-        }
+        SocketTest test = new SocketTest();
+        _ = test.Run();
         #endregion
 #endif
 
-        for (; ; );
+        Console.WriteLine("Finished!");
+        Thread.Sleep(Timeout.Infinite);
+
+        return EFI_SUCCESS;
     }
 
-    public static ulong GetAvailableMemory()
+    class FileTest
+    {
+        public async Task Run()
+        {
+            FileStream fs = new FileStream("Test.txt", FileMode.Open);
+            byte[] buffer = new byte[fs.Length];
+            await fs.ReadAsync(buffer);
+            fs.Close();
+            Console.Write("Content of Test.txt is: ");
+            unsafe
+            {
+                printf("%s\r\n"u8, buffer);
+            }
+        }
+    }
+
+    class SocketTest
+    {
+        public async Task Run()
+        {
+            EFI_IPv4_ADDRESS address = new EFI_IPv4_ADDRESS();
+            unsafe
+            {
+                address.Addr[0] = 192;
+                address.Addr[1] = 168;
+                address.Addr[2] = 0;
+                address.Addr[3] = 102;
+            }
+
+            System.Net.Sockets.Socket socket = new System.Net.Sockets.Socket(System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
+            await socket.ConnectAsync(address, 54188);
+            await socket.SendAsync(Encoding.UTF8.GetBytes("Hello world from BootTo.NET project!"));
+            Console.WriteLine("Try receive 64bytes from server");
+            byte[] buffer = new byte[64];
+            await socket.ReceiveAsync(buffer);
+            unsafe
+            {
+                printf("Buffer received: %s\r\n"u8, buffer);
+            }
+            socket.Close();
+        }
+    }
+
+    public unsafe static ulong GetAvailableMemory()
     {
         ulong memoryMapSize = 0;
         ulong mapKey = 0;
@@ -381,7 +442,7 @@ unsafe class Program
         return 0;
     }
 
-    static EFI_STATUS LoadDriver(string path)
+    unsafe static EFI_STATUS LoadDriver(string path)
     {
         if (!System.IO.File.Exists(path))
             return EFI_NOT_FOUND;

@@ -21,6 +21,9 @@
     <ClCompile Include="string.c">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="MathHelpers.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="printf.h">
@@ -29,6 +32,15 @@
   </ItemGroup>
   <ItemGroup>
     <MASM Include="GcRegisters.asm">
+      <Filter>源文件</Filter>
+    </MASM>
+    <MASM Include="StubDispatch.asm">
+      <Filter>源文件</Filter>
+    </MASM>
+    <MASM Include="WriteBarriers.asm">
+      <Filter>源文件</Filter>
+    </MASM>
+    <MASM Include="ExceptionHandling.asm">
       <Filter>源文件</Filter>
     </MASM>
   </ItemGroup>

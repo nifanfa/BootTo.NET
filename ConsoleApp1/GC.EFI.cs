@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 
 // BootTo.NET is single-threaded while UEFI boot services are active. This collector
 // deliberately uses a non-moving, conservative mark/sweep policy for that environment.
-internal static unsafe class GarbageCollector
+internal static unsafe class GC_EFI
 {
     [StructLayout(LayoutKind.Sequential)]
     private struct AllocationHeader
@@ -76,13 +76,26 @@ internal static unsafe class GarbageCollector
             s_stackUpperBound = upperBound;
     }
 
+    [RuntimeExport("GcRegisterStatics")]
     internal static void RegisterStatics(IntPtr start, IntPtr end)
     {
         s_gcStaticsStart = start;
         s_gcStaticsEnd = end;
     }
 
-    internal static void* Allocate(ulong size)
+    [RuntimeExport("AllocCoTaskMem")]
+    internal static void* AllocateNative(ulong size)
+    {
+        void* allocation = null;
+        EFI_STATUS status = gBS->AllocatePool(EFI_MEMORY_TYPE.EfiLoaderData, size, &allocation);
+        if ((ulong)status != EFI_SUCCESS)
+            return null;
+
+        return allocation;
+    }
+
+    [RuntimeExport("GcAllocate")]
+    public static void* Allocate(ulong size)
     {
         if (size > MaximumUnsignedValue - 7)
             return null;
@@ -92,30 +105,31 @@ internal static unsafe class GarbageCollector
         if (!s_collecting && s_stackUpperBound != 0 && s_allocatedSinceCollection >= s_nextCollectionThreshold)
             Collect();
 
-        void* allocation = null;
         ulong allocationSize = size + (ulong)sizeof(AllocationHeader);
         if (allocationSize < size)
             return null;
 
-        EFI_STATUS status = gBS->AllocatePool(EFI_MEMORY_TYPE.EfiLoaderData, allocationSize, &allocation);
-        if ((ulong)status != EFI_SUCCESS)
+        void* allocation = AllocateNative(allocationSize);
+        if (allocation == null)
         {
             Collect();
-            status = gBS->AllocatePool(EFI_MEMORY_TYPE.EfiLoaderData, allocationSize, &allocation);
-            if ((ulong)status != EFI_SUCCESS)
+            allocation = AllocateNative(allocationSize);
+            if (allocation == null)
                 return null;
         }
+
+        // Managed objects are zero-initialized by the runtime. Keep this at
+        // the managed layer so AllocateNative remains a raw EFI allocation.
+        memset(allocation, 0, allocationSize);
 
         AllocationHeader* header = (AllocationHeader*)allocation;
         header->Next = s_allocations;
         header->Size = size;
         header->Flags = 0;
-        header->Reserved = 0;
+        header->Reserved = s_totalAllocatedBytes;
         s_allocations = header;
 
         byte* objectAddress = (byte*)allocation + sizeof(AllocationHeader);
-        memset(objectAddress, 0, size);
-
         ulong objectStart = (ulong)objectAddress;
         ulong objectEnd = objectStart + size;
         if (objectStart < s_lowestObject)
@@ -125,15 +139,25 @@ internal static unsafe class GarbageCollector
 
         s_liveBytes += size;
         s_allocatedSinceCollection += size;
-        s_totalAllocatedBytes += size;
         s_objectCount++;
+        s_totalAllocatedBytes += size;
         return objectAddress;
     }
 
-    internal static void Collect()
+    [RuntimeExport("FreeCoTaskMem")]
+    internal static void FreeNative(void* pointer)
+    {
+        if (pointer == null)
+            return;
+
+        gBS->FreePool(pointer);
+    }
+
+    [RuntimeExport("GcCollect")]
+    internal static int Collect()
     {
         if (s_collecting || s_allocations == null || s_stackUpperBound == 0)
-            return;
+            return 0;
 
         s_collecting = true;
 
@@ -197,7 +221,7 @@ internal static unsafe class GarbageCollector
         }
         while (foundUnscanned);
 
-        Sweep();
+        int objectFreed = Sweep();
         s_collectionCount++;
         s_allocatedSinceCollection = 0;
 
@@ -208,6 +232,8 @@ internal static unsafe class GarbageCollector
             nextThreshold = MinimumCollectionThreshold;
         s_nextCollectionThreshold = nextThreshold;
         s_collecting = false;
+
+        return objectFreed;
     }
 
     private static byte* ObjectAddress(AllocationHeader* header)
@@ -230,7 +256,7 @@ internal static unsafe class GarbageCollector
             if (blockValue == 0 || (blockValue & (ulong)GCStaticRegionConstants.Uninitialized) != 0)
                 continue;
 
-            MarkCandidate(*(ulong*)blockValue);
+            MarkCandidate(blockValue);
         }
     }
 
@@ -266,7 +292,7 @@ internal static unsafe class GarbageCollector
         }
     }
 
-    private static void Sweep()
+    private static int Sweep()
     {
         AllocationHeader* previous = null;
         AllocationHeader* current = s_allocations;
@@ -274,6 +300,7 @@ internal static unsafe class GarbageCollector
         ulong highestObjectEnd = 0;
         ulong liveBytes = 0;
         int objectCount = 0;
+        int objectFreed = 0;
 
         while (current != null)
         {
@@ -299,7 +326,8 @@ internal static unsafe class GarbageCollector
                 else
                     previous->Next = next;
 
-                gBS->FreePool(current);
+                FreeNative(current);
+                objectFreed++;
             }
 
             current = next;
@@ -309,5 +337,7 @@ internal static unsafe class GarbageCollector
         s_highestObjectEnd = highestObjectEnd;
         s_liveBytes = liveBytes;
         s_objectCount = objectCount;
+
+        return objectFreed;
     }
 }

@@ -47,7 +47,7 @@
   </Target>
   
   <ItemGroup>
-    <NativeLibrary Include="..\x64\Debug\NativeLib.lib" />
+    <NativeLibrary Include="..\NativeLib\x64\Debug\NativeLib.lib" />
   </ItemGroup>
 
   <Target Name="CopyEFI" AfterTargets="Publish">

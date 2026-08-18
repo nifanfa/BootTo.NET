@@ -22,8 +22,18 @@
     <MASM Include="GcRegisters.asm">
       <FileType>Document</FileType>
     </MASM>
+    <MASM Include="ExceptionHandling.asm">
+      <FileType>Document</FileType>
+    </MASM>
+    <MASM Include="StubDispatch.asm">
+      <FileType>Document</FileType>
+    </MASM>
+    <MASM Include="WriteBarriers.asm">
+      <FileType>Document</FileType>
+    </MASM>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="MathHelpers.c" />
     <ClCompile Include="string.c" />
     <ClCompile Include="printf.c" />
   </ItemGroup>
