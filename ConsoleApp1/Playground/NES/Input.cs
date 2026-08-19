@@ -1,4 +1,4 @@
-namespace NES
+namespace Playground.NES
 {
     public class Input
     {

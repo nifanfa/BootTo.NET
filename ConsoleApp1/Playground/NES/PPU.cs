@@ -1,7 +1,7 @@
 using System;
 using System.Drawing;
 
-namespace NES
+namespace Playground.NES
 {
     public class PPU
     {

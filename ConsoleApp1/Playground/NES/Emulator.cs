@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace NES
+namespace Playground.NES
 {
     public partial class Emulator
     {

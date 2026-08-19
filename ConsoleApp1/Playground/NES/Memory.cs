@@ -1,7 +1,6 @@
-using System;
-using System.Collections.Generic;
+﻿using System;
 
-namespace NES
+namespace Playground.NES
 {
     public class MemoryMap
     {
@@ -78,6 +77,10 @@ namespace NES
         // Temporary placeholder for bogus 2007 reads from addr [2000-2FFF]
         byte byteLastRead = 0;
 
+        // PPU register reads from write-only registers ($2005/$2006) return
+        // the value currently on the PPU data bus (open bus).
+        byte ppuOpenBus = 0;
+
         // PPU Access (0x2006) Counter
         /* 0x2006 is written to 2 times followed by a read/write to 0x2007.
            This happens because each memory location can only take 1 byte so
@@ -145,52 +148,26 @@ namespace NES
             #region Mappers
             else if (addr >= 0x8000 && addr <= 0xFFFF)
             {
-                //switch (MapperNumber)
-                //{
-                //    case 00:
-                //        {
-                //            // Do nothing, just write to address
-                //            memory.memCPU[addr] = data;
-                //        }
-                //        break;
+                // UxROM (mapper 2) uses the write value to select the
+                // switchable 16KB bank at $8000-$BFFF.  The upper bank at
+                // $C000-$FFFF remains fixed to the last PRG bank.
+                if (MapperNumber == 2 && memPRG != null && memPRG.Length > 0)
+                {
+                    int selectedBank = data % memPRG.Length;
+                    if (MapperBank != selectedBank)
+                    {
+                        MapperBank = (byte)selectedBank;
+                        if (mappers != null)
+                        {
+                            mappers.MapperBank = MapperBank;
+                        }
 
-                //    case 02:
-                //    case 66:
-                //        {
-                //            if (MapperBank != (byte)((data & (memory.memPRG.Length - 1))))
-                //            {
-                //                MapperBank = (byte)((data & (memory.memPRG.Length - 1)));
-
-                //                for (int i = 0; i < 0x4000; i++)
-                //                {
-                //                    memory.memCPU[i + 0x8000] = memory.memPRG[MapperBank][i];
-                //                }
-                //            }
-                //        }
-                //        break;
-
-                //    case 03:
-                //    case 67:
-                //    case 64:
-                //        {
-                //            if (MapperBank != (byte)((data & (memory.memCHR.Length - 1))))
-                //            {
-                //                MapperBank = (byte)((data & (memory.memCHR.Length - 1)));
-
-                //                for (int i = 0; i < 0x2000; i++)
-                //                {
-                //                    memory.memPPU[i] = memory.memCHR[MapperBank][i];
-                //                }
-                //            }
-                //        }
-                //        break;
-
-                //    default:
-                //        {
-                //            MessageBox.Show("Unsupported Mapper Number: " + Convert.ToString(MapperNumber));
-                //        }
-                //        break;
-                //}
+                        for (int i = 0; i < 0x4000; i++)
+                        {
+                            memCPU[0x8000 + i] = memPRG[selectedBank][i];
+                        }
+                    }
+                }
             }
             #endregion
             // Handles all memory spaces not related to PPU, and controllers
@@ -217,7 +194,7 @@ namespace NES
             // Catch out of range addressing <<-- This should not happen because of the line above
             if (addr > 0xFFFF)
             {
-                //MessageBox.Show("[OpCodes.cs, getMemoryByte()] BAD ADDRESS: " + String.Format("{0:x2}", addr));
+                Console.WriteLine("[OpCodes.cs, getMemoryByte()] BAD ADDRESS: " + String.Format("{0:x2}", addr));
                 //cpu.badOpCode = true;
                 return 0;
             }
@@ -283,7 +260,8 @@ namespace NES
             // PPU Control Register 1
             if (addr == 0x2000)
             {
-                return memCPU[0x2000];
+                ppuOpenBus = memCPU[0x2000];
+                return ppuOpenBus;
             }
             #endregion
 
@@ -291,7 +269,8 @@ namespace NES
             // PPU Control Register 2
             else if (addr == 0x2001)
             {
-                return memCPU[0x2001];
+                ppuOpenBus = memCPU[0x2001];
+                return ppuOpenBus;
             }
             #endregion
 
@@ -324,6 +303,7 @@ namespace NES
                 // Reading 2002 will clear the latch, NOT WRITING 2002
                 PPULatchToggle = false;
 
+                ppuOpenBus = tempByte;
                 return tempByte;
             }
             #endregion
@@ -333,7 +313,8 @@ namespace NES
             else if (addr == 0x2003)
             {
                 // Program should not need to read this
-                return memCPU[0x2003];
+                ppuOpenBus = memCPU[0x2003];
+                return ppuOpenBus;
             }
             #endregion
 
@@ -345,8 +326,18 @@ namespace NES
 
                 // Pg 5 of 117 in "NES Specifications says that 0x2003 is NOT incremented after a read, only writes
                 //memCPU[0x2003] += 1;
-
+                ppuOpenBus = tempByte;
                 return tempByte;
+            }
+            #endregion
+
+            #region Read 0x2005/0x2006
+            // These registers are write-only on the NES.  A read returns the
+            // current PPU bus value instead of raising an invalid-address
+            // error.  Contra relies on this hardware behaviour during boot.
+            else if (addr == 0x2005 || addr == 0x2006)
+            {
+                return ppuOpenBus;
             }
             #endregion
 
@@ -437,13 +428,17 @@ namespace NES
 
             else
             {
-                //MessageBox.Show("[MEMORY.cs, getPPUMemoryByte()] PPU Address read to address not accounted for: " + String.Format("{0:x4}", addr));
+                Console.WriteLine("[MEMORY.cs, getPPUMemoryByte()] PPU Address read to address not accounted for: " + String.Format("{0:x4}", addr));
                 return 0x00;
             }
         }
 
         public void setPPUMemoryByte(int addr, byte data)
         {
+            // Every PPU register write drives the PPU data bus.  Preserve it
+            // for reads from the write-only scroll/address registers.
+            ppuOpenBus = data;
+
             #region Write 0x2000
             // PPU Control Register 1
             if (addr == 0x2000)
@@ -646,7 +641,7 @@ namespace NES
             // This should never happen    
             else
             {
-                //MessageBox.Show("[PPU.cs, setPPUMemoryByte()] PPU Address read to address not accounted for: " + String.Format("{0:x4}", addr));
+                Console.WriteLine("[PPU.cs, setPPUMemoryByte()] PPU Address read to address not accounted for: " + String.Format("{0:x4}", addr));
             }
         }
 
