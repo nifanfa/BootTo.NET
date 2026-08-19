@@ -24,7 +24,7 @@ class Program
 
     static readonly List<string> DxeDrivers = new()
     {
-        @"\EFI\Drivers\UsbKbDxe.efi",
+        @"\EFI\Drivers\XhciDxe.efi",
         @"\EFI\Drivers\UsbMouseDxe.efi"
     };
 
@@ -365,50 +365,15 @@ class Program
             ScreenHeight = (int)Graphics->Mode->Info->VerticalResolution;
             Screen = new uint[ScreenWidth * ScreenHeight];
 
-            nes.openROM(File.ReadAllBytes("Super Mario Bros. (Japan, USA).nes"));
-        }
-
-        readonly Dictionary<ConsoleKey, int> KeyPhases = new Dictionary<ConsoleKey, int>(new ConsoleKeyComparer());
-
-        sealed class ConsoleKeyComparer : IEqualityComparer<ConsoleKey>
-        {
-            public bool Equals(ConsoleKey left, ConsoleKey right) => left == right;
-
-            public int GetHashCode(ConsoleKey key) => (int)key;
+            nes.openROM("Super Mario Bros. (Japan, USA).nes");
         }
 
         async Task RunInput()
         {
             for (; ; )
             {
-                ConsoleKey key = (await Console.ReadKeyAsync()).Key;
-                if (KeyPhases.TryGetValue(key, out _))
-                {
-                    ++KeyPhases[key];
-                }
-                else
-                {
-                    _ = ReleaseKeyWhenIdle(key);
-                }
-            }
-        }
-
-        async Task ReleaseKeyWhenIdle(ConsoleKey key)
-        {
-            int phase = 0, lastPhase = 0;
-            KeyPhases.Add(key, lastPhase);
-            nes.SendKey(key, true);
-            for (; ; )
-            {
-                await Task.Delay(lastPhase > 0 ? 250 : 500);
-                KeyPhases.TryGetValue(key, out phase);
-                if (phase == lastPhase)
-                {
-                    KeyPhases.Remove(key);
-                    nes.SendKey(key, false);
-                    break;
-                }
-                lastPhase = phase;
+                ConsoleKeyEvent keyEvent = await Console.ReadKeyEventAsync();
+                nes.SendKey(keyEvent.Key, keyEvent.IsKeyDown);
             }
         }
 

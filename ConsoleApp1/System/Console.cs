@@ -5,12 +5,14 @@
         private sealed class ReadKeyOperation : TaskPoller
         {
             private System.Threading.Tasks.TaskCompletionSource<ConsoleKeyInfo> _completion;
+            private bool _useUsbKeyboard;
 
             internal System.Threading.Tasks.Task<ConsoleKeyInfo> Start()
             {
                 System.Threading.Tasks.TaskCompletionSource<ConsoleKeyInfo> completion =
                     new System.Threading.Tasks.TaskCompletionSource<ConsoleKeyInfo>();
                 _completion = completion;
+                _useUsbKeyboard = UsbKeyboard.TryStart();
                 TaskScheduler.Register(this);
                 Poll();
                 return completion.Task;
@@ -18,6 +20,19 @@
 
             internal override void Poll()
             {
+                if (_useUsbKeyboard)
+                {
+                    while (UsbKeyboard.TryDequeue(out ConsoleKeyEvent keyEvent))
+                    {
+                        if (keyEvent.IsKeyDown)
+                        {
+                            Complete(keyEvent.KeyInfo);
+                            return;
+                        }
+                    }
+                    return;
+                }
+
                 if ((void*)gST->ConIn == null)
                 {
                     CompleteException();
@@ -57,6 +72,33 @@
                 TaskScheduler.Unregister(this);
                 if (completion != null)
                     completion.TrySetException(new Exception("The console input protocol is unavailable."));
+            }
+        }
+
+        private sealed class ReadKeyEventOperation : TaskPoller
+        {
+            private System.Threading.Tasks.TaskCompletionSource<ConsoleKeyEvent> _completion;
+
+            internal System.Threading.Tasks.Task<ConsoleKeyEvent> Start()
+            {
+                System.Threading.Tasks.TaskCompletionSource<ConsoleKeyEvent> completion =
+                    new System.Threading.Tasks.TaskCompletionSource<ConsoleKeyEvent>();
+                _completion = completion;
+                TaskScheduler.Register(this);
+                Poll();
+                return completion.Task;
+            }
+
+            internal override void Poll()
+            {
+                if (!UsbKeyboard.TryDequeue(out ConsoleKeyEvent keyEvent))
+                    return;
+
+                System.Threading.Tasks.TaskCompletionSource<ConsoleKeyEvent> completion = _completion;
+                _completion = null;
+                TaskScheduler.Unregister(this);
+                if (completion != null)
+                    completion.TrySetResult(keyEvent);
             }
         }
         private static readonly object s_syncRoot = new object();
@@ -193,6 +235,18 @@
 
         public static System.Threading.Tasks.Task<ConsoleKeyInfo> ReadKeyAsync()
             => new ReadKeyOperation().Start();
+
+        public static System.Threading.Tasks.Task<ConsoleKeyEvent> ReadKeyEventAsync()
+        {
+            if (!UsbKeyboard.TryStart())
+                throw new Exception("A USB HID boot keyboard is unavailable.");
+            return new ReadKeyEventOperation().Start();
+        }
+
+        public static bool IsKeyDown(ConsoleKey key)
+        {
+            return UsbKeyboard.TryStart() && UsbKeyboard.IsKeyDown(key);
+        }
 
         private static ConsoleKeyInfo CreateKeyInfo(EFI_INPUT_KEY key)
         {

@@ -1,9 +1,11 @@
 using System;
+using System.IO;
 
 namespace NES
 {
     public partial class Emulator
     {
+        MemoryStream fsOpenRom;
         Registers registers;
         MemoryMap memory;
         Mappers mappers;
@@ -53,109 +55,78 @@ namespace NES
             }
         }
 
-        public unsafe void openROM(byte[] bytes)
+        public void openROM(string strFileLoc)
         {
-            fixed (byte* ptr = bytes)
+            byte[] buffer = File.ReadAllBytes(strFileLoc);
+            fsOpenRom = new MemoryStream(buffer);
+            byte[] temp = new byte[16];
+
+            fsOpenRom.Read(temp, 0, temp.Length);
+            memory.byteMirror = (byte)(temp[6] & 0x01);
+
+            mappers.MapperNumber = (byte)((temp[6] >> 0x04) | (temp[7] & 0xF0));
+            memory.MapperNumber = mappers.MapperNumber;
+
+            byte byteNumPRGBanks = temp[4];
+            byte byteNumCHRBanks = temp[5];
+
+            memory.memPRG = new byte[byteNumPRGBanks][];
+            if (byteNumPRGBanks == 0x01)
             {
-                byte* rom = ptr;
+                fsOpenRom.Read(memory.memCPU, 0xC000, 0x4000);
 
-                byte[] temp = new byte[16];
-
-                fixed (byte* p = temp)
+                for (int i = 0x0000; i < 0x4000; i++)
                 {
-                    for (int i = 0; i < temp.Length; i++)
-                    {
-                        p[i] = rom[i];
-                    }
+                    memory.memCPU[0x8000 + i] = memory.memCPU[0xC000 + i];
                 }
-                rom += temp.Length;
-                memory.byteMirror = (byte)(temp[6] & 0x01);
-
-                mappers.MapperNumber = (byte)((temp[6] >> 0x04) | (temp[7] & 0xF0));
-                memory.MapperNumber = mappers.MapperNumber;
-
-                byte byteNumPRGBanks = temp[4];
-                byte byteNumCHRBanks = temp[5];
-
-                memory.memPRG = new byte[byteNumPRGBanks][];
-                if (byteNumPRGBanks == 0x01)
-                {
-                    fixed (byte* p = memory.memCPU)
-                    {
-                        for (int i = 0; i < 0x4000; i++)
-                        {
-                            (p + 0xC000)[i] = rom[i];
-                        }
-                    }
-                    rom += 0x4000;
-
-                    for (int i = 0x0000; i < 0x4000; i++)
-                    {
-                        memory.memCPU[0x8000 + i] = memory.memCPU[0xC000 + i];
-                    }
-                }
-                else
-                {
-                    for (int j = 0; j < memory.memPRG.Length; j++)
-                    {
-                        memory.memPRG[j] = new byte[0x4000];
-                    }
-
-                    for (int k = 0; k < memory.memPRG.Length; k++)
-                    {
-                        fixed (byte* p = memory.memPRG[k])
-                        {
-                            for (int i = 0; i < 0x4000; i++)
-                            {
-                                p[i] = rom[i];
-                            }
-                        }
-                        rom += 0x4000;
-                    }
-
-                    for (int l = 0; l < 0x4000; l++)
-                    {
-                        memory.memCPU[l + 0x8000] = memory.memPRG[0][l];
-                        memory.memCPU[l + 0xC000] = memory.memPRG[memory.memPRG.Length - 1][l];
-                    }
-                }
-
-                if (byteNumCHRBanks != 0)
-                {
-                    memory.memCHR = new byte[byteNumCHRBanks][];
-
-
-                    for (int x = 0; x < memory.memCHR.Length; x++)
-                    {
-                        memory.memCHR[x] = new byte[0x2000];
-                    }
-
-                    for (int y = 0; y < memory.memCHR.Length; y++)
-                    {
-                        fixed (byte* p = memory.memCHR[y])
-                        {
-                            for (int i = 0; i < 0x2000; i++)
-                            {
-                                p[i] = rom[i];
-                            }
-                        }
-                        rom += 0x2000;
-                    }
-
-                    for (int z = 0; z < 0x2000; z++)
-                    {
-                        memory.memPPU[z] = memory.memCHR[0][z];
-                    }
-                }
-
-                registers.regPC = memory.memCPU[0xFFFC] + memory.memCPU[0xFFFD] * 16 * 16;
-
-
-                memory.memCPU[0x4016] = 0x40;
-                memory.memCPU[0x4017] = 0x40;
-
-                bolRunGame = true;
             }
+            else
+            {
+                for (int j = 0; j < memory.memPRG.Length; j++)
+                {
+                    memory.memPRG[j] = new byte[0x4000];
+                }
+
+                for (int k = 0; k < memory.memPRG.Length; k++)
+                {
+                    fsOpenRom.Read(memory.memPRG[k], 0, 0x4000);
+                }
+
+                for (int l = 0; l < 0x4000; l++)
+                {
+                    memory.memCPU[l + 0x8000] = memory.memPRG[0][l];
+                    memory.memCPU[l + 0xC000] = memory.memPRG[memory.memPRG.Length - 1][l];
+                }
+            }
+
+            if (byteNumCHRBanks != 0)
+            {
+                memory.memCHR = new byte[byteNumCHRBanks][];
+
+
+                for (int x = 0; x < memory.memCHR.Length; x++)
+                {
+                    memory.memCHR[x] = new byte[0x2000];
+                }
+
+                for (int y = 0; y < memory.memCHR.Length; y++)
+                {
+                    fsOpenRom.Read(memory.memCHR[y], 0, 0x2000);
+                }
+
+                for (int z = 0; z < 0x2000; z++)
+                {
+                    memory.memPPU[z] = memory.memCHR[0][z];
+                }
+            }
+
+            registers.regPC = memory.memCPU[0xFFFC] + memory.memCPU[0xFFFD] * 16 * 16;
+
+
+            memory.memCPU[0x4016] = 0x40;
+            memory.memCPU[0x4017] = 0x40;
+
+            bolRunGame = true;
         }
 
         public void resetGame()

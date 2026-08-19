@@ -14,6 +14,9 @@ namespace System.IO
         }
 
         public override int Length => (int)_fileSize;
+        public override bool CanRead => File != null;
+        public override bool CanSeek => File != null;
+        public override bool CanWrite => File != null;
 
         EFI_FILE_HANDLE* Volume = null;
         EFI_FILE_HANDLE* File = null;
@@ -94,6 +97,20 @@ namespace System.IO
         public override int Read(byte[] buffer)
             => ReadAsync(buffer).GetAwaiter().GetResult();
 
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            ValidateRange(buffer, offset, count);
+            if (offset == 0 && count == buffer.Length)
+                return Read(buffer);
+
+            byte[] data = new byte[count];
+            int bytesRead = Read(data);
+            for (int i = 0; i < bytesRead; i++)
+                buffer[offset + i] = data[i];
+
+            return bytesRead;
+        }
+
         public override Task<int> ReadAsync(byte[] buffer)
         {
             if (buffer == null)
@@ -130,6 +147,19 @@ namespace System.IO
 
         public override int Write(byte[] buffer)
             => WriteAsync(buffer).GetAwaiter().GetResult();
+
+        public override int Write(byte[] buffer, int offset, int count)
+        {
+            ValidateRange(buffer, offset, count);
+            if (offset == 0 && count == buffer.Length)
+                return Write(buffer);
+
+            byte[] data = new byte[count];
+            for (int i = 0; i < count; i++)
+                data[i] = buffer[offset + i];
+
+            return Write(data);
+        }
 
         public override Task<int> WriteAsync(byte[] buffer)
         {
@@ -405,6 +435,14 @@ namespace System.IO
 
             gBS->CloseEvent(e);
             e = default;
+        }
+
+        private static void ValidateRange(byte[] buffer, int offset, int count)
+        {
+            if (buffer == null)
+                throw new ArgumentNullException();
+            if (offset < 0 || count < 0 || offset > buffer.Length - count)
+                throw new ArgumentException();
         }
     }
 }
