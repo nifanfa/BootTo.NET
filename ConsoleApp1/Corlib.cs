@@ -229,6 +229,11 @@ namespace System
         public InvalidCastException() : base("Specified cast is not valid.") { }
     }
 
+    internal sealed class NullReferenceException : Exception
+    {
+        public NullReferenceException() : base("Object reference not set to an instance of an object.") { }
+    }
+
     public class InvalidOperationException : Exception
     {
         public InvalidOperationException() : base("The operation is not valid due to the current state of the object.") { }
@@ -2037,6 +2042,85 @@ namespace System.Runtime
 
             return result;
         }
+
+        [RuntimeExport("RhUnbox2")]
+        internal static ref byte RhUnbox2(EEType* pUnboxToEEType, object obj)
+        {
+            if (obj == null)
+                throw new NullReferenceException();
+
+            if (!UnboxAnyTypeCompare(obj.EEType, pUnboxToEEType))
+                throw new InvalidCastException();
+
+            return ref obj.GetRawData();
+        }
+
+        private static bool UnboxAnyTypeCompare(EEType* objectType, EEType* targetType)
+        {
+            if (AreTypesEquivalent(objectType, targetType))
+                return true;
+
+            EETypeElementType objectElementType = GetElementType(objectType);
+            EETypeElementType targetElementType = GetElementType(targetType);
+            if (objectElementType != targetElementType)
+                return false;
+
+            switch (targetElementType)
+            {
+                case EETypeElementType.Byte:
+                case EETypeElementType.SByte:
+                case EETypeElementType.Int16:
+                case EETypeElementType.UInt16:
+                case EETypeElementType.Int32:
+                case EETypeElementType.UInt32:
+                case EETypeElementType.Int64:
+                case EETypeElementType.UInt64:
+                case EETypeElementType.IntPtr:
+                case EETypeElementType.UIntPtr:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static bool AreTypesEquivalent(EEType* first, EEType* second)
+        {
+            if (first == second)
+                return true;
+            if (first == null || second == null)
+                return false;
+
+            if (GetKind(first) == EETypeKind.ClonedEEType)
+                first = GetRelatedType(first);
+            if (GetKind(second) == EETypeKind.ClonedEEType)
+                second = GetRelatedType(second);
+
+            if (first == second)
+                return true;
+
+            if (GetKind(first) != EETypeKind.ParameterizedEEType ||
+                GetKind(second) != EETypeKind.ParameterizedEEType ||
+                first->BaseSize != second->BaseSize)
+                return false;
+
+            return AreTypesEquivalent(GetRelatedType(first), GetRelatedType(second));
+        }
+
+        private static EETypeKind GetKind(EEType* type)
+            => (EETypeKind)((ushort)type->Flags & (ushort)EETypeFlags.EETypeKindMask);
+
+        private static EETypeElementType GetElementType(EEType* type)
+            => type == null
+                ? EETypeElementType.Unknown
+                : (EETypeElementType)(((ushort)type->Flags & (ushort)EETypeFlags.ElementTypeMask) >> (int)EETypeFlags.ElementTypeShift);
+
+        private static EEType* GetRelatedType(EEType* type)
+        {
+            if ((type->Flags & EETypeFlags.RelatedTypeViaIATFlag) != 0)
+                return *type->RelatedType.RelatedParameterTypeViaIAT;
+
+            return type->RelatedType.RelatedParameterType;
+        }
     }
 
     internal static unsafe class TypeCast
@@ -2435,6 +2519,31 @@ namespace Internal.Runtime
 
         public static partial class StartupCodeHelpers
         {
+            private static string[] s_mainMethodArguments;
+
+            internal static unsafe void InitializeCommandLineArgsW(int argc, char** argv)
+            {
+                if (argc <= 1 || argv == null)
+                {
+                    s_mainMethodArguments = new string[0];
+                    return;
+                }
+
+                string[] arguments = new string[argc - 1];
+                for (int i = 1; i < argc; i++)
+                    arguments[i - 1] = new string(argv[i]);
+
+                s_mainMethodArguments = arguments;
+            }
+
+            private static string[] GetMainMethodArguments()
+            {
+                if (s_mainMethodArguments == null)
+                    s_mainMethodArguments = new string[0];
+
+                return s_mainMethodArguments;
+            }
+
             [RuntimeImport("*", "GcRegisterStatics")]
             [MethodImpl(MethodImplOptions.InternalCall)]
             internal static extern void RegisterStatics(IntPtr start, IntPtr end);

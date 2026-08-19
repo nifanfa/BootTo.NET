@@ -9,8 +9,8 @@ namespace System
             byte[] buffer = new byte[32];
             fixed (byte* ptr = buffer)
             {
-                snprintf(ptr, buffer.Length, "%lf"u8, this);
-                return Encoding.UTF8.GetString(buffer);
+                int length = snprintf(ptr, buffer.Length, "%lf"u8, this);
+                return Encoding.UTF8.GetString(new ReadOnlySpan<byte>(buffer, 0, length));
             }
         }
     }
