@@ -14,8 +14,10 @@ Use `dotnet publish --tl:off -c Release ConsoleApp1` to publish and run with liv
 - [Debugging with QEMU](#debugging-with-qemu)
 
 <img width="1282" height="839" alt="QQ_1787098965779" src="https://github.com/user-attachments/assets/79cb6705-0e18-40cf-adaa-6ee414ddfec6" />
-  
 
+## NES Emulator
+<img width="1282" height="839" alt="QQ_1787126322833" src="https://github.com/user-attachments/assets/7fc72f57-035b-414a-b112-314bf19eeb03" />
+  
 ## Nyan cat
 <img width="1282" height="839" alt="QQ_1786863585140" src="https://github.com/user-attachments/assets/4d7d2cce-847c-43b0-8f61-f5433d30cb28" />  
 
