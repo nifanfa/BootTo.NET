@@ -9,7 +9,7 @@ Use `dotnet publish --tl:off -c Release ConsoleApp1` to publish and run with liv
 - [Running on real hardware](#running-on-real-hardware)
 - [Debugging with QEMU](#debugging-with-qemu)
 
-<img width="1282" height="839" alt="QQ_1787031436544" src="https://github.com/user-attachments/assets/82840834-e6dc-491e-9d1e-afea20e4064c" />
+<img width="1282" height="839" alt="QQ_1787098965779" src="https://github.com/user-attachments/assets/79cb6705-0e18-40cf-adaa-6ee414ddfec6" />
   
 
 ## Nyan cat
