@@ -1,5 +1,11 @@
 # BootTo.NET Project
 
+## Debugging
+1. **Open Project**: Open the `BootTo.NET.sln` solution in Visual Studio.
+2. **Launch**: Select **QEMU** from the launch profile dropdown, or simply press **F5**.
+<img width="1232" height="387" alt="QQ_1787146565287" src="https://github.com/user-attachments/assets/671fb673-dab9-4685-a80b-f43171ff109e" />
+
+## Synopsis
 *When will hobby OS developers realize that we don't need to implement everything from scratch? With a clean environment providing basic network, graphics, filesystem, and USB support, there's no need to build it yourself—just load a DXE driver and go ahead with your 'OS'.*  
 
 Publishing uses the repository-local `qemu-img` to create `ConsoleApp1.vhd`, then starts the repository-local QEMU x64 emulator. QEMU, its Windows runtime dependencies, and the EDK2 UEFI firmware are included in `qemu`; no system QEMU installation and no administrator privileges are required.
