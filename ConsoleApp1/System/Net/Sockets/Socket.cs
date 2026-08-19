@@ -1,3 +1,4 @@
+using System.Net;
 using System.Threading.Tasks;
 
 namespace System.Net.Sockets
@@ -45,11 +46,15 @@ namespace System.Net.Sockets
             poller = new SocketPoller(this);
         }
 
-        public void Connect(EFI_IPv4_ADDRESS address, ushort port)
+        public void Connect(IPAddress address, int port)
             => ConnectAsync(address, port).GetAwaiter().GetResult();
 
-        public Task ConnectAsync(EFI_IPv4_ADDRESS address, ushort port)
+        public Task ConnectAsync(IPAddress address, int port)
         {
+            if (address == null)
+                throw new ArgumentNullException();
+            if ((uint)port > ushort.MaxValue)
+                throw new ArgumentException();
             if (connected)
                 return Task.CompletedTask;
             if (connectCompletion != null)
@@ -69,8 +74,8 @@ namespace System.Net.Sockets
             configuration.TimeToLive = 188;
             configuration.AccessPoint.UseDefaultAddress = true;
             configuration.AccessPoint.ActiveFlag = true;
-            configuration.AccessPoint.RemotePort = port;
-            configuration.AccessPoint.RemoteAddress = address;
+            configuration.AccessPoint.RemotePort = (ushort)port;
+            configuration.AccessPoint.RemoteAddress = ToEfiIPv4Address(address);
 
             fixed (EFI_TCP4_CONFIG_DATA* config = &configuration)
                 status = tcp->Configure(tcp, config);
@@ -90,6 +95,17 @@ namespace System.Net.Sockets
             }
 
             return completion.Task;
+        }
+
+        private static EFI_IPv4_ADDRESS ToEfiIPv4Address(IPAddress address)
+        {
+            byte[] bytes = address.GetAddressBytes();
+            EFI_IPv4_ADDRESS result = new EFI_IPv4_ADDRESS();
+            result.Addr[0] = bytes[0];
+            result.Addr[1] = bytes[1];
+            result.Addr[2] = bytes[2];
+            result.Addr[3] = bytes[3];
+            return result;
         }
 
         public void Send(byte[] buffer)

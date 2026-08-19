@@ -78,6 +78,8 @@ namespace System
     }
     public struct UInt16
     {
+        public const ushort MaxValue = 0xFFFF;
+
         public override string ToString() => ((ulong)this).ToString();
     }
     public struct Int32
@@ -86,6 +88,8 @@ namespace System
     }
     public struct UInt32
     {
+        public const uint MaxValue = 0xFFFFFFFF;
+
         public override string ToString() => ((ulong)this).ToString();
     }
     public partial struct Int64 { }

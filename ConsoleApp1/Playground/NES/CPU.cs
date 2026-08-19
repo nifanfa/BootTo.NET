@@ -1,6 +1,6 @@
 using System;
 
-namespace NES
+namespace Playground.NES
 {
     public class CPU
     {

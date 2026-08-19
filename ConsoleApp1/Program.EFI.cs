@@ -1,4 +1,3 @@
-using NES;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -8,7 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Timers;
+using Playground.NES;
 
 partial class Program
 {
@@ -97,7 +96,7 @@ partial class Program
             return (ulong)GraphicsStatus == EFI_SUCCESS ? EFI_DEVICE_ERROR : GraphicsStatus;
         }
 
-        NesTest test = new NesTest(Graphics);
+        NesTest test = new NesTest(Graphics, @"\Contra (USA).nes");
         _ = test.Run();
 #endif
 
@@ -340,7 +339,7 @@ partial class Program
         int ScreenWidth, ScreenHeight;
         uint[] Screen;
 
-        public unsafe NesTest(EFI_GRAPHICS_OUTPUT_PROTOCOL* graphics)
+        public unsafe NesTest(EFI_GRAPHICS_OUTPUT_PROTOCOL* graphics, string rom)
         {
             Graphics = graphics;
 
@@ -348,7 +347,7 @@ partial class Program
             ScreenHeight = (int)Graphics->Mode->Info->VerticalResolution;
             Screen = new uint[ScreenWidth * ScreenHeight];
 
-            nes.openROM(@"\Super Mario Bros. (Japan, USA).nes");
+            nes.openROM(rom);
         }
 
         async Task RunInput()
@@ -424,14 +423,7 @@ partial class Program
     {
         public async Task Run()
         {
-            EFI_IPv4_ADDRESS address = new EFI_IPv4_ADDRESS();
-            unsafe
-            {
-                address.Addr[0] = 192;
-                address.Addr[1] = 168;
-                address.Addr[2] = 0;
-                address.Addr[3] = 102;
-            }
+            System.Net.IPAddress address = System.Net.IPAddress.Parse("192.168.0.102");
 
             System.Net.Sockets.Socket socket = new System.Net.Sockets.Socket(System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
             await socket.ConnectAsync(address, 54188);
