@@ -22,6 +22,7 @@ Use `dotnet publish --tl:off -c Release ConsoleApp1` to publish and run with liv
 <img width="1282" height="839" alt="QQ_1787098965779" src="https://github.com/user-attachments/assets/79cb6705-0e18-40cf-adaa-6ee414ddfec6" />
 
 ## NES Emulator
+> **Key Mapping:** `Q` -> A | `E` -> B | `Z` -> Select | `C` -> Start | `W` `S` `A` `D` -> Directional Pad
 <img width="1282" height="839" alt="QQ_1787126322833" src="https://github.com/user-attachments/assets/7fc72f57-035b-414a-b112-314bf19eeb03" />
   
 ## Nyan cat
