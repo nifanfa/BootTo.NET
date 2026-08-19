@@ -365,7 +365,7 @@ class Program
             ScreenHeight = (int)Graphics->Mode->Info->VerticalResolution;
             Screen = new uint[ScreenWidth * ScreenHeight];
 
-            nes.openROM("Super Mario Bros. (Japan, USA).nes");
+            nes.openROM(@"\Super Mario Bros. (Japan, USA).nes");
         }
 
         async Task RunInput()

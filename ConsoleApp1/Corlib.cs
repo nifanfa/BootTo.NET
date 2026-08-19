@@ -219,9 +219,19 @@ namespace System
         public ArgumentNullException() : base("Value cannot be null.") { }
     }
 
+    public class FormatException : Exception
+    {
+        public FormatException() : base("Input string was not in a correct format.") { }
+    }
+
     internal sealed class InvalidCastException : Exception
     {
         public InvalidCastException() : base("Specified cast is not valid.") { }
+    }
+
+    public class InvalidOperationException : Exception
+    {
+        public InvalidOperationException() : base("The operation is not valid due to the current state of the object.") { }
     }
 
     public ref struct ByReference<T>
@@ -650,6 +660,12 @@ namespace System
     }
 
     public delegate void Action();
+    public delegate void Action<in T>(T arg);
+    public delegate void Action<in T1, in T2>(T1 arg1, T2 arg2);
+    public delegate TResult Func<out TResult>();
+    public delegate TResult Func<in T, out TResult>(T arg);
+    public delegate TResult Func<in T1, in T2, out TResult>(T1 arg1, T2 arg2);
+    public delegate bool Predicate<in T>(T obj);
 
     public static class GC
     {
