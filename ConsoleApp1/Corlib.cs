@@ -38,7 +38,15 @@ namespace System
             => Unsafe.As<object, ulong>(ref a) == Unsafe.As<object, ulong>(ref b);
 
         public virtual int GetHashCode()
-            => 0;
+        {
+            // The collector contract for this runtime is non-moving, so the
+            // object reference remains stable for the lifetime of this object.
+            // Mix both halves of the native pointer into the 32-bit hash value.
+            object value = this;
+            ulong address = Unsafe.As<object, ulong>(ref value);
+            int hash = unchecked((int)(address ^ (address >> 32)));
+            return hash == 0 ? 1 : hash;
+        }
 
         public virtual string ToString() => "System.Object";
 
@@ -2036,16 +2044,55 @@ namespace System.Runtime
             if (pTargetType == obj.EEType)
                 return obj;
 
-            EEType* baseType = obj.EEType->RelatedType.BaseType;
+            // Parameterized array EETypes do not use their RelatedType union
+            // as a normal class base. Arrays are nevertheless assignable to
+            // System.Array (and System.Object), so handle System.Array before
+            // walking the ordinary class hierarchy.
+            if (IsArrayType(obj.EEType) && GetElementType(pTargetType) == EETypeElementType.SystemArray)
+                return obj;
+
+            EEType* baseType = GetBaseType(obj.EEType);
             while (baseType != null)
             {
                 if (pTargetType == baseType)
                     return obj;
 
-                baseType = baseType->RelatedType.BaseType;
+                baseType = GetBaseType(baseType);
             }
 
             return null;
+        }
+
+        private static EEType* GetBaseType(EEType* type)
+        {
+            if (type == null)
+                return null;
+
+            EETypeElementType elementType = GetElementType(type);
+
+            // Parameterized array EETypes store their element type in the
+            // RelatedType union. Their actual managed base type is System.Array.
+            if (elementType == EETypeElementType.Array || elementType == EETypeElementType.SzArray)
+                return EETypePtr.EETypePtrOf<Array>().Value;
+
+            if ((type->Flags & EETypeFlags.RelatedTypeViaIATFlag) != 0)
+                return *type->RelatedType.BaseTypeViaIAT;
+
+            return type->RelatedType.BaseType;
+        }
+
+        private static bool IsArrayType(EEType* type)
+        {
+            EETypeElementType elementType = GetElementType(type);
+            return elementType == EETypeElementType.Array || elementType == EETypeElementType.SzArray;
+        }
+
+        private static EETypeElementType GetElementType(EEType* type)
+        {
+            if (type == null)
+                return EETypeElementType.Unknown;
+
+            return (EETypeElementType)(((ushort)type->Flags & (ushort)EETypeFlags.ElementTypeMask) >> (int)EETypeFlags.ElementTypeShift);
         }
 
         [RuntimeExport("RhTypeCast_CheckCastClass")]
@@ -2538,5 +2585,105 @@ namespace Internal.Runtime
         private const int ValueTypePaddingHighShift = 8;
         private const uint ValueTypePaddingAlignmentMask = 0xF8;
         private const int ValueTypePaddingAlignmentShift = 3;
+    }
+}
+
+namespace Internal.Runtime.CompilerHelpers
+{
+    // Entry point used by ILC for array constructors emitted as newobj.
+    internal static unsafe class ArrayHelpers
+    {
+        private static uint SzArrayBaseSize => (uint)(sizeof(IntPtr) * 3);
+
+        public static System.Array NewObjArray(IntPtr pEEType, int nDimensions, int* pDimensions)
+        {
+            if (pDimensions == null || nDimensions <= 0)
+                throw new System.ArgumentException();
+
+            Internal.Runtime.EEType* eeType = (Internal.Runtime.EEType*)(void*)pEEType;
+            if (eeType == null || eeType->BaseSize < SzArrayBaseSize)
+                throw new System.ArgumentException();
+
+            if (eeType->BaseSize == SzArrayBaseSize)
+            {
+                int length = pDimensions[0];
+                if (length < 0)
+                    throw new System.OverflowException();
+
+                object resultObject = System.Runtime.InternalCalls.RhpNewArray(eeType, length);
+                System.Array result = Internal.Runtime.CompilerServices.Unsafe.As<object, System.Array>(ref resultObject);
+                if (result == null || nDimensions == 1)
+                    return result;
+
+                // Jagged arrays carry one dimension for each nested SZ array.
+                Internal.Runtime.EEType* elementType = GetArrayElementType(eeType);
+                object resultReference = result;
+                byte* resultAddress = (byte*)(void*)Internal.Runtime.CompilerServices.Unsafe.As<object, IntPtr>(ref resultReference);
+                byte* elementAddress = resultAddress + eeType->BaseSize - sizeof(Internal.Runtime.ObjHeader);
+
+                for (int i = 0; i < length; i++)
+                {
+                    System.Array nested = NewObjArray(
+                        (IntPtr)(void*)elementType,
+                        nDimensions - 1,
+                        pDimensions + 1);
+                    object nestedObject = nested;
+                    *(IntPtr*)(elementAddress + i * eeType->ComponentSize) =
+                        Internal.Runtime.CompilerServices.Unsafe.As<object, IntPtr>(ref nestedObject);
+                }
+
+                return result;
+            }
+
+            uint boundsSize = eeType->BaseSize - SzArrayBaseSize;
+            int rank = (int)(boundsSize / (uint)(sizeof(int) * 2));
+            if (rank <= 0 || rank != nDimensions && rank * 2 != nDimensions)
+                throw new System.ArgumentException();
+
+            // The alternate constructor form supplies lower-bound/length pairs.
+            // This runtime supports only zero lower bounds.
+            if (rank * 2 == nDimensions)
+            {
+                for (int i = 0; i < rank; i++)
+                {
+                    if (pDimensions[i * 2] != 0)
+                        throw new System.NotSupportedException();
+
+                    pDimensions[i] = pDimensions[i * 2 + 1];
+                }
+            }
+
+            ulong totalLength = 1;
+            for (int i = 0; i < rank; i++)
+            {
+                int length = pDimensions[i];
+                if (length < 0)
+                    throw new System.OverflowException();
+
+                totalLength *= (ulong)length;
+                if (totalLength > (~0U >> 1))
+                    throw new System.OverflowException();
+            }
+
+            object arrayObject = System.Runtime.InternalCalls.RhpNewArray(eeType, (int)totalLength);
+            System.Array array = Internal.Runtime.CompilerServices.Unsafe.As<object, System.Array>(ref arrayObject);
+            if (array == null)
+                return null;
+
+            byte* arrayAddress = (byte*)(void*)Internal.Runtime.CompilerServices.Unsafe.As<object, IntPtr>(ref arrayObject);
+            int* bounds = (int*)(arrayAddress + sizeof(IntPtr) * 2);
+            for (int i = 0; i < rank; i++)
+                bounds[i] = pDimensions[i];
+
+            return array;
+        }
+
+        private static Internal.Runtime.EEType* GetArrayElementType(Internal.Runtime.EEType* eeType)
+        {
+            if ((eeType->Flags & Internal.Runtime.EETypeFlags.RelatedTypeViaIATFlag) != 0)
+                return *eeType->RelatedType.RelatedParameterTypeViaIAT;
+
+            return eeType->RelatedType.RelatedParameterType;
+        }
     }
 }

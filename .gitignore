@@ -365,3 +365,5 @@ FodyWeavers.xsd
 Drive/NvVars
 Drive/EFI/BOOT/BOOTX64.efi
 *.scoreboard
+*.vmem
+*.lck

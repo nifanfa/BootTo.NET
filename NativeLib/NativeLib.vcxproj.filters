@@ -31,6 +31,9 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <MASM Include="MiscStubs.asm">
+      <Filter>源文件</Filter>
+    </MASM>
     <MASM Include="GcRegisters.asm">
       <Filter>源文件</Filter>
     </MASM>

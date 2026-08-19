@@ -1,6 +1,6 @@
 # Bundled QEMU runtime
 
-This directory contains the Windows x64 QEMU files required to build and run BootTo.NET without a system QEMU or VMware installation.
+This directory contains the Windows x64 QEMU files required to build and run BootTo.NET without a system QEMU installation.
 
 - Version: QEMU 11.0.92
 - Source installer: `qemu-w64-setup-20260729.exe` from `https://qemu.weilnetz.de/w64/2026/`

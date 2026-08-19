@@ -19,6 +19,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <MASM Include="MiscStubs.asm">
+      <FileType>Document</FileType>
+    </MASM>
     <MASM Include="GcRegisters.asm">
       <FileType>Document</FileType>
     </MASM>

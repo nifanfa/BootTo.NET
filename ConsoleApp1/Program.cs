@@ -1,3 +1,4 @@
+using NES;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -74,14 +75,14 @@ class Program
 
         Console.WriteLine("Welcome to the: ");
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine(" /$$$$$$$                        /$$  /$$$$$$$$           /$$   /$$ /$$$$$$$$ /$$$$$$$$");
-        Console.WriteLine("| $$__  $$                      | $$ |__  $$__/          | $$$ | $$| $$_____/|__  $$__/");
-        Console.WriteLine("| $$  \\ $$  /$$$$$$   /$$$$$$  /$$$$$$  | $$  /$$$$$$    | $$$$| $$| $$         | $$   ");
-        Console.WriteLine("| $$$$$$$  /$$__  $$ /$$__  $$|_  $$_/  | $$ /$$__  $$   | $$ $$ $$| $$$$$      | $$   ");
-        Console.WriteLine("| $$__  $$| $$  \\ $$| $$  \\ $$  | $$    | $$| $$  \\ $$   | $$  $$$$| $$__/      | $$   ");
-        Console.WriteLine("| $$  \\ $$| $$  | $$| $$  | $$  | $$ /$$| $$| $$  | $$   | $$\\  $$$| $$         | $$   ");
-        Console.WriteLine("| $$$$$$$/|  $$$$$$/|  $$$$$$/  |  $$$$/| $$|  $$$$$$//$$| $$ \\  $$| $$$$$$$$   | $$   ");
-        Console.WriteLine("|_______/  \\______/  \\______/    \\___/  |__/ \\______/|__/|__/  \\__/|________/   |__/   ");
+        Console.WriteLine(@" /$$$$$$$                        /$$  /$$$$$$$$           /$$   /$$ /$$$$$$$$ /$$$$$$$$");
+        Console.WriteLine(@"| $$__  $$                      | $$ |__  $$__/          | $$$ | $$| $$_____/|__  $$__/");
+        Console.WriteLine(@"| $$  \ $$  /$$$$$$   /$$$$$$  /$$$$$$  | $$  /$$$$$$    | $$$$| $$| $$         | $$   ");
+        Console.WriteLine(@"| $$$$$$$  /$$__  $$ /$$__  $$|_  $$_/  | $$ /$$__  $$   | $$ $$ $$| $$$$$      | $$   ");
+        Console.WriteLine(@"| $$__  $$| $$  \ $$| $$  \ $$  | $$    | $$| $$  \ $$   | $$  $$$$| $$__/      | $$   ");
+        Console.WriteLine(@"| $$  \ $$| $$  | $$| $$  | $$  | $$ /$$| $$| $$  | $$   | $$\  $$$| $$         | $$   ");
+        Console.WriteLine(@"| $$$$$$$/|  $$$$$$/|  $$$$$$/  |  $$$$/| $$|  $$$$$$//$$| $$ \  $$| $$$$$$$$   | $$   ");
+        Console.WriteLine(@"|_______/  \______/  \______/    \___/  |__/ \______/|__/|__/  \__/|________/   |__/   ");
         Console.ForegroundColor = ConsoleColor.Gray;
 
         Console.WriteLine("Test timer(5 seconds)...");
@@ -100,6 +101,24 @@ class Program
         Console.WriteLine("Key pressed!");
 
 #if true
+        EFI_GRAPHICS_OUTPUT_PROTOCOL* Graphics = null;
+        EFI_STATUS GraphicsStatus = gBS->LocateProtocol(
+            (EFI_GUID*)EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID,
+            null,
+            (void**)&Graphics);
+        if ((ulong)GraphicsStatus != EFI_SUCCESS ||
+            Graphics == null ||
+            Graphics->Mode == null ||
+            Graphics->Mode->Info == null)
+        {
+            return (ulong)GraphicsStatus == EFI_SUCCESS ? EFI_DEVICE_ERROR : GraphicsStatus;
+        }
+
+        NesTest test = new NesTest(Graphics);
+        _ = test.Run();
+#endif
+
+#if false
         #region NyanCat
         {
             EFI_GRAPHICS_OUTPUT_PROTOCOL* Graphics = null;
@@ -125,16 +144,7 @@ class Program
                 for (int frameIndex = 0; frameIndex < NyanCat.FrameCount; frameIndex++)
                 {
                     NyanCat.DecodeFrame(frameIndex, Frame);
-                    for (int y = 0; y < ScreenHeight; y++)
-                    {
-                        int sourceRow = y * NyanCat.Height / ScreenHeight * NyanCat.Width;
-                        int destinationRow = y * ScreenWidth;
-                        for (int x = 0; x < ScreenWidth; x++)
-                        {
-                            Screen[destinationRow + x] =
-                                Frame[sourceRow + x * NyanCat.Width / ScreenWidth];
-                        }
-                    }
+                    Resize(Screen, ScreenWidth, Frame, NyanCat.Width);
 
                     fixed (uint* pixels = Screen)
                     {
@@ -339,6 +349,102 @@ class Program
         return EFI_SUCCESS;
     }
 
+    class NesTest
+    {
+        Emulator nes = new Emulator();
+
+        unsafe EFI_GRAPHICS_OUTPUT_PROTOCOL* Graphics;
+        int ScreenWidth, ScreenHeight;
+        uint[] Screen;
+
+        public unsafe NesTest(EFI_GRAPHICS_OUTPUT_PROTOCOL* graphics)
+        {
+            Graphics = graphics;
+
+            ScreenWidth = (int)Graphics->Mode->Info->HorizontalResolution;
+            ScreenHeight = (int)Graphics->Mode->Info->VerticalResolution;
+            Screen = new uint[ScreenWidth * ScreenHeight];
+
+            nes.openROM(File.ReadAllBytes("Super Mario Bros. (Japan, USA).nes"));
+        }
+
+        readonly Dictionary<ConsoleKey, int> KeyPhases = new Dictionary<ConsoleKey, int>(new ConsoleKeyComparer());
+
+        sealed class ConsoleKeyComparer : IEqualityComparer<ConsoleKey>
+        {
+            public bool Equals(ConsoleKey left, ConsoleKey right) => left == right;
+
+            public int GetHashCode(ConsoleKey key) => (int)key;
+        }
+
+        async Task RunInput()
+        {
+            for (; ; )
+            {
+                ConsoleKey key = (await Console.ReadKeyAsync()).Key;
+                if (KeyPhases.TryGetValue(key, out _))
+                {
+                    ++KeyPhases[key];
+                }
+                else
+                {
+                    _ = ReleaseKeyWhenIdle(key);
+                }
+            }
+        }
+
+        async Task ReleaseKeyWhenIdle(ConsoleKey key)
+        {
+            int phase = 0, lastPhase = 0;
+            KeyPhases.Add(key, lastPhase);
+            nes.SendKey(key, true);
+            for (; ; )
+            {
+                await Task.Delay(lastPhase > 0 ? 250 : 500);
+                KeyPhases.TryGetValue(key, out phase);
+                if (phase == lastPhase)
+                {
+                    KeyPhases.Remove(key);
+                    nes.SendKey(key, false);
+                    break;
+                }
+                lastPhase = phase;
+            }
+        }
+
+        public async Task Run()
+        {
+            _ = RunInput();
+
+            for (; ; )
+            {
+                nes.runGame();
+                if (nes.gameRender.screenUpdated)
+                {
+                    Resize(Screen, ScreenWidth, nes.gameRender.screen, GameRender.screenWidth);
+                    unsafe
+                    {
+                        fixed (uint* pixels = Screen)
+                        {
+                            Graphics->Blt(
+                                Graphics,
+                                (EFI_GRAPHICS_OUTPUT_BLT_PIXEL*)pixels,
+                                EfiBltBufferToVideo,
+                                0,
+                                0,
+                                0,
+                                0,
+                                (ulong)ScreenWidth,
+                               (ulong)ScreenHeight,
+                                0);
+                        }
+                    }
+                    nes.gameRender.screenUpdated = false;
+                }
+            }
+        }
+    }
+
     class SerialTest
     {
         public async Task Run()
@@ -390,6 +496,26 @@ class Program
                 printf("Buffer received: %s\r\n"u8, buffer);
             }
             socket.Close();
+        }
+    }
+
+    static void Resize(uint[] dst, long dstWidth, uint[] src, long srcWidth)
+    {
+        int srcHeight = (int)(src.Length / srcWidth);
+        int dstHeight = (int)(dst.Length / dstWidth);
+
+        for (int y = 0; y < dstHeight; y++)
+        {
+            int srcY = y * srcHeight / dstHeight;
+            int sourceRow = srcY * (int)srcWidth;
+            int destinationRow = y * (int)dstWidth;
+
+            for (int x = 0; x < dstWidth; x++)
+            {
+                int srcX = x * (int)srcWidth / (int)dstWidth;
+
+                dst[destinationRow + x] = src[sourceRow + srcX];
+            }
         }
     }
 

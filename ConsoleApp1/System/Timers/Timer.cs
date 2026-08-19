@@ -48,7 +48,7 @@ namespace System.Timers
             EFI_STATUS setTimerStatus = gBS->SetTimer(
                 TimerEvent,
                 TimerPeriodic,
-                (ulong)Interval * 10000
+                (ulong)(Interval * 10000)
             );
             if ((ulong)setTimerStatus != EFI_SUCCESS)
             {
