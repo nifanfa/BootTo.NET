@@ -111,6 +111,122 @@
         }
 
         static ulong EfiBackgroundColor, EfiForegroundColor;
+        private static bool s_lineWrapped;
+
+        public static int BufferWidth
+        {
+            get
+            {
+                lock (s_syncRoot)
+                {
+                    int width;
+                    int height;
+                    QueryBufferDimensions(out width, out height);
+                    return width;
+                }
+            }
+            set => SetBufferDimensions(value, false);
+        }
+
+        public static int BufferHeight
+        {
+            get
+            {
+                lock (s_syncRoot)
+                {
+                    int width;
+                    int height;
+                    QueryBufferDimensions(out width, out height);
+                    return height;
+                }
+            }
+            set => SetBufferDimensions(value, true);
+        }
+
+        // UEFI simple text output has no separate window and screen buffer.
+        public static int WindowWidth
+        {
+            get => BufferWidth;
+            set => BufferWidth = value;
+        }
+
+        public static int WindowHeight
+        {
+            get => BufferHeight;
+            set => BufferHeight = value;
+        }
+
+        private static void QueryBufferDimensions(out int width, out int height)
+        {
+            SIMPLE_TEXT_OUTPUT_INTERFACE* consoleOut = GetConsoleOutput();
+            ulong columns = 0;
+            ulong rows = 0;
+            EFI_STATUS status = consoleOut->QueryMode(
+                consoleOut,
+                (ulong)consoleOut->Mode->Mode,
+                &columns,
+                &rows);
+
+            if ((ulong)status != EFI_SUCCESS)
+                throw new System.IO.IOException();
+            if (columns > (ulong)int.MaxValue || rows > (ulong)int.MaxValue)
+                throw new OverflowException();
+
+            width = (int)columns;
+            height = (int)rows;
+        }
+
+        private static void SetBufferDimensions(int value, bool height)
+        {
+            if (value <= 0)
+                throw new ArgumentException();
+
+            lock (s_syncRoot)
+            {
+                SIMPLE_TEXT_OUTPUT_INTERFACE* consoleOut = GetConsoleOutput();
+                int currentWidth;
+                int currentHeight;
+                QueryBufferDimensions(out currentWidth, out currentHeight);
+
+                int requestedWidth = height ? currentWidth : value;
+                int requestedHeight = height ? value : currentHeight;
+                if (requestedWidth == currentWidth && requestedHeight == currentHeight)
+                    return;
+
+                int maxMode = consoleOut->Mode->MaxMode;
+                for (int mode = 0; mode < maxMode; mode++)
+                {
+                    ulong modeWidth = 0;
+                    ulong modeHeight = 0;
+                    EFI_STATUS status = consoleOut->QueryMode(
+                        consoleOut,
+                        (ulong)mode,
+                        &modeWidth,
+                        &modeHeight);
+                    if ((ulong)status != EFI_SUCCESS ||
+                        modeWidth != (ulong)requestedWidth ||
+                        modeHeight != (ulong)requestedHeight)
+                        continue;
+
+                    status = consoleOut->SetMode(consoleOut, (ulong)mode);
+                    if ((ulong)status != EFI_SUCCESS)
+                        throw new System.IO.IOException();
+                    s_lineWrapped = false;
+                    return;
+                }
+            }
+
+            throw new ArgumentException();
+        }
+
+        private static SIMPLE_TEXT_OUTPUT_INTERFACE* GetConsoleOutput()
+        {
+            if ((void*)gST == null || (void*)gST->ConOut == null ||
+                (void*)gST->ConOut->Mode == null)
+                throw new InvalidOperationException();
+
+            return gST->ConOut;
+        }
 
         public static ConsoleColor BackgroundColor
         {
@@ -177,7 +293,10 @@
         public static void Clear()
         {
             lock (s_syncRoot)
+            {
                 gST->ConOut->ClearScreen(gST->ConOut);
+                s_lineWrapped = false;
+            }
         }
 
         public static void Write(char c)
@@ -188,10 +307,16 @@
 
         private static void WriteImpl(char c)
         {
+            SIMPLE_TEXT_OUTPUT_INTERFACE* consoleOut = GetConsoleOutput();
             char* chr = stackalloc char[2];
             chr[0] = c;
             chr[1] = '\0';
-            gST->ConOut->OutputString(gST->ConOut, chr);
+            consoleOut->OutputString(consoleOut, chr);
+
+            // UEFI advances to the next row after writing in the last column.
+            // Remember that implicit wrap so WriteLine does not add another row.
+            s_lineWrapped = c != '\r' && c != '\n' && c != '\b' &&
+                consoleOut->Mode->CursorColumn == 0;
         }
 
         public static void Write(string s)
@@ -221,11 +346,18 @@
 
         private static void WriteLineImpl()
         {
+            if (s_lineWrapped)
+            {
+                s_lineWrapped = false;
+                return;
+            }
+
             char* chr = stackalloc char[3];
             chr[0] = '\r';
             chr[1] = '\n';
             chr[2] = '\0';
             gST->ConOut->OutputString(gST->ConOut, chr);
+            s_lineWrapped = false;
         }
 
         public static ConsoleKeyInfo ReadKey()

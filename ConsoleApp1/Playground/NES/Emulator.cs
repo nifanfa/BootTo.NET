@@ -1,15 +1,17 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace Playground.NES
 {
-    public partial class Emulator
+    public class Emulator
     {
         MemoryStream fsOpenRom;
         Registers registers;
         MemoryMap memory;
         Mappers mappers;
         CPU cpu;
+        APU apu;
+        WaveOutAudio audio;
         public GameRender gameRender;
         Input input;
         PPU ppu;
@@ -36,14 +38,17 @@ namespace Playground.NES
             {
                 if (cpu.intTotalCpuCycles < intMaxCPUCycles)
                 {
+                    int cpuCyclesBefore = cpu.intTotalCpuCycles;
                     cpu.execOpCode();
 
                     ppu.RunPPU(cpu.intTotalCpuCycles);
+                    apu.Clock((cpu.intTotalCpuCycles - cpuCyclesBefore) / 15);
                 }
 
                 if (ppu.bolReadyToRender)
                 {
-                    gameRender.WriteBitmap(ppu.byteBGFrame, ppu.BGColor);
+                    if (ppu.bolRenderCurrentFrame)
+                        gameRender.WriteBitmap(ppu.byteBGFrame, ppu.BGColor);
 
                     ppu.bolReadyToRender = false;
 
@@ -131,19 +136,30 @@ namespace Playground.NES
 
         public void resetGame()
         {
+            if (audio != null)
+            {
+                if (apu != null)
+                    apu.FlushPcm();
+            }
+
             registers = new Registers();
             input = new Input();
             mappers = new Mappers();
             memory = new MemoryMap(registers, input, this, mappers);
+            apu = new APU(memory.ReadPRG);
+            audio = new WaveOutAudio(APU.PcmSampleRate);
+            apu.PcmOutput = audio;
+            memory.AttachAPU(apu);
             ppu = new PPU(memory, this);
             cpu = new CPU(memory, input, ppu, registers);
 
-            gameRender = new GameRender();
+            gameRender = new GameRender(this);
 
             bolStartFrame = true;
             bolReset = true;
         }
 
+        #region Keyboard Input
         public void SendKey(ConsoleKey c, bool pressed)
         {
             if (pressed)
@@ -217,6 +233,7 @@ namespace Playground.NES
                 }
             }
         }
+        #endregion
 
         public void NMIHandler()
         {
@@ -226,6 +243,11 @@ namespace Playground.NES
         public void AddCPUCycles(int cycles)
         {
             cpu.intTotalCpuCycles += cycles * 15;
+        }
+
+        public bool ShouldRenderVideoFrame()
+        {
+            return true;
         }
 
         public Emulator()

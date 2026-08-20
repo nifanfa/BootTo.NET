@@ -20,6 +20,9 @@ namespace System
 
     public readonly struct TimeSpan
     {
+        public static readonly TimeSpan MinValue = new TimeSpan(long.MinValue);
+        public static readonly TimeSpan MaxValue = new TimeSpan(long.MaxValue);
+
         public const long TicksPerMillisecond = 10000;
         public const long TicksPerSecond = TicksPerMillisecond * 1000;
         public const long TicksPerMinute = TicksPerSecond * 60;
@@ -60,6 +63,9 @@ namespace System
 
     public readonly struct DateTime
     {
+        public static readonly DateTime MinValue = new DateTime(0);
+        public static readonly DateTime MaxValue = new DateTime(3155378975999999999);
+
         private const long TicksAtUnixEpoch = 621355968000000000;
         private readonly long _ticks;
 
