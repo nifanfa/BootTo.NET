@@ -8,6 +8,7 @@ namespace Playground.NES
         Mappers mappers;
         Input input;
         Emulator tn;
+        APU apu;
 
         /* -----   MEMORY MAP   -----
            
@@ -145,6 +146,15 @@ namespace Playground.NES
             }
             #endregion
 
+            #region Write to APU
+            else if ((addr >= 0x4000 && addr <= 0x4013) || addr == 0x4015 || addr == 0x4017)
+            {
+                memCPU[addr] = data;
+                if (apu != null)
+                    apu.WriteRegister(addr, data);
+            }
+            #endregion
+
             #region Mappers
             else if (addr >= 0x8000 && addr <= 0xFFFF)
             {
@@ -222,6 +232,13 @@ namespace Playground.NES
             else if (addr == 0x4016)
             {
                 return input.ReadJoypad();
+            }
+            #endregion
+
+            #region Read APU Status
+            else if (addr == 0x4015 && apu != null)
+            {
+                return apu.ReadStatus();
             }
             #endregion
 
@@ -722,6 +739,11 @@ namespace Playground.NES
             {
                 memCPU[0x2002] &= 0xBF;
             }
+        }
+
+        public void AttachAPU(APU audioProcessingUnit)
+        {
+            apu = audioProcessingUnit;
         }
 
         // Memory Map Constructor

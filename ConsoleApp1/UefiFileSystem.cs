@@ -77,6 +77,17 @@ internal static unsafe class UefiFileSystem
         }
     }
 
+    internal static bool FileExists(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+            return false;
+
+        if (!TryGetInfo(path, out UefiFileMetadata metadata))
+            return false;
+
+        return (metadata.Attribute & EFI_FILE_DIRECTORY) == 0;
+    }
+
     internal static string[] ReadDirectory(string path, bool directoriesOnly)
     {
         if (!OpenVolume(out EFI_FILE_HANDLE* volume))
@@ -181,4 +192,3 @@ internal static unsafe class UefiFileSystem
         }
     }
 }
-

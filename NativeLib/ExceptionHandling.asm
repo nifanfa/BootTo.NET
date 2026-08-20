@@ -92,4 +92,20 @@ Unhandled:
     jmp     Unhandled
 RhpThrowEx ENDP
 
+PUBLIC RhpCallFilterFunclet
+RhpCallFilterFunclet PROC
+    ; RCX: exception object, RDX: filter address, R8: establisher SP,
+    ; R9: establisher frame pointer. The filter returns its decision in RAX.
+    push    rbp
+    mov     rbp, r9
+    mov     r10, rdx
+    mov     rdx, rcx
+    mov     rcx, r8
+    sub     rsp, 20h
+    call    r10
+    add     rsp, 20h
+    pop     rbp
+    ret
+RhpCallFilterFunclet ENDP
+
 END

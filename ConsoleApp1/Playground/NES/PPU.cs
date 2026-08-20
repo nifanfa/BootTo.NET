@@ -20,6 +20,7 @@ namespace Playground.NES
 
         byte setAlpha = 0xFF;
         public bool bolReadyToRender = false;
+        public bool bolRenderCurrentFrame = true;
         public bool bolDrawBG = true;
         public bool bolDrawSprites = true;
         int pixelX = 0;
@@ -93,6 +94,14 @@ namespace Playground.NES
 
         public void renderPixel()
         {
+            if (!bolRenderCurrentFrame)
+            {
+                // Keep scroll/timing state current while a video frame is
+                // skipped to let the audio producer recover its lead.
+                UpdateDrawLocation();
+                return;
+            }
+
             #region Draw Background to Frame Buffer
 
             // ---------------- BACKGROUND DRAWING ------------------
@@ -201,10 +210,12 @@ namespace Playground.NES
 
                 // ***Clean THIS UP...READ MEMORY ONCE INTO VARIABLE AND USE THAT TO SET EACH COLOR INSTEAD OF READING MEMORY 3 TIMES ****************************************************
                 int intPixelColor = memory.memPPU[pal + bytePTableResult] & 0x3F;
-                drawBGTile(bgTileNumberTemp, bgTileLineNumberTemp, bgPixelNumberTemp, byteColors[intPixelColor, 0], 2);
-                drawBGTile(bgTileNumberTemp, bgTileLineNumberTemp, bgPixelNumberTemp, byteColors[intPixelColor, 1], 1);
-                drawBGTile(bgTileNumberTemp, bgTileLineNumberTemp, bgPixelNumberTemp, byteColors[intPixelColor, 2], 0);
-                drawBGTile(bgTileNumberTemp, bgTileLineNumberTemp, bgPixelNumberTemp, setAlpha, 3);
+                int frameOffset = (bgTileNumberTemp * 32) + (bgTileLineNumberTemp * 1024) +
+                    (bgPixelNumberTemp * 4) + (bgTileNumberTemp / 32) * 32 * 224;
+                byteBGFrame[frameOffset] = byteColors[intPixelColor, 2];
+                byteBGFrame[frameOffset + 1] = byteColors[intPixelColor, 1];
+                byteBGFrame[frameOffset + 2] = byteColors[intPixelColor, 0];
+                byteBGFrame[frameOffset + 3] = setAlpha;
 
                 #endregion
             }
@@ -248,10 +259,11 @@ namespace Playground.NES
                         {
                             int intPixelColor = memory.memPPU[sprPal + bytePTableResult] & 0x3F;
 
-                            drawSprites(x, y, pixel, byteColors[intPixelColor, 2], 0);
-                            drawSprites(x, y, pixel, byteColors[intPixelColor, 1], 1);
-                            drawSprites(x, y, pixel, byteColors[intPixelColor, 0], 2);
-                            drawSprites(x, y, pixel, setAlpha, 3);
+                            int spriteOffset = x * 4 + y * 1024;
+                            byteBGFrame[spriteOffset] = byteColors[intPixelColor, 2];
+                            byteBGFrame[spriteOffset + 1] = byteColors[intPixelColor, 1];
+                            byteBGFrame[spriteOffset + 2] = byteColors[intPixelColor, 0];
+                            byteBGFrame[spriteOffset + 3] = setAlpha;
                         }
                     }
                 }
@@ -327,6 +339,7 @@ namespace Playground.NES
                 pixelM = 0;
                 cntScanlineCycle = 0;
                 cntScanline++;
+                bolRenderCurrentFrame = tn.ShouldRenderVideoFrame();
                 scanlineChanged = true;
             }
 

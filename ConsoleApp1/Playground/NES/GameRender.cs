@@ -1,27 +1,26 @@
-using System.Drawing;
+﻿using System.Drawing;
+using System.Runtime.InteropServices;
 
 namespace Playground.NES
 {
     public class GameRender
     {
-        // Setup background color to use with Alpha
-        Color colorBG;
+        Emulator NES;
 
-        public const int screenWidth = 256;
-        public const int screenHeight = 240;
-        public uint[] screen = new uint[screenWidth * screenHeight];
-        public volatile bool screenUpdated = false;
+        public uint[] displayBuffer;
+        public bool screenUpdated = false;
+        public int screenWidth = 256, screenHeight = 240;
 
         public void InitializeGame()
         {
-            colorBG = Color.Blue;
+            displayBuffer = new uint[screenWidth * screenHeight];
         }
 
         public unsafe void WriteBitmap(byte[] byteToWrite, Color XColor)
         {
             lock (this)
             {
-                for (int i = 0; i < screen.Length; i++) screen[i] = XColor.ToArgb();
+                for (int i = 0; i < displayBuffer.Length; i++) displayBuffer[i] = XColor.ToArgb();
 
                 int w = 0;
                 int h = 0;
@@ -31,7 +30,7 @@ namespace Playground.NES
                     Color color = Color.FromArgb(byteToWrite[i + 3], byteToWrite[i + 2], byteToWrite[i + 1], byteToWrite[i + 0]);
                     if (color.A != 0)
                     {
-                        screen[screenWidth * h + w] = color.ToArgb();
+                        displayBuffer[screenWidth * h + w] = color.ToArgb();
                     }
                     //
                     w++;
@@ -47,8 +46,9 @@ namespace Playground.NES
             }
         }
 
-        public GameRender()
+        public GameRender(Emulator formObject)
         {
+            NES = formObject;
             InitializeGame();
         }
     }

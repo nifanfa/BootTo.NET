@@ -1,3 +1,4 @@
+using Playground.NES;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -7,7 +8,6 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Playground.NES;
 
 partial class Program
 {
@@ -17,6 +17,7 @@ partial class Program
 
     static readonly List<string> DxeDrivers = new()
     {
+        @"\EFI\Drivers\AudioDxe.efi",
         @"\EFI\Drivers\XhciDxe.efi",
         @"\EFI\Drivers\UsbMouseDxe.efi"
     };
@@ -59,8 +60,8 @@ partial class Program
 
         void WriteLoadDriver(string path)
         {
-            EFI_STATUS usbMouseDriverStatus = LoadDriver(path);
-            Console.WriteLine("Driver " + path + " " + (usbMouseDriverStatus == EFI_SUCCESS ? "is loaded!" : "failed to load!"));
+            EFI_STATUS driverStatus = LoadDriver(path);
+            Console.WriteLine("Driver " + path + " " + (driverStatus == EFI_SUCCESS ? "is loaded!" : "failed to load!"));
         }
 
         Console.WriteLine("Welcome to the: ");
@@ -77,10 +78,17 @@ partial class Program
 
         printf("GC.Collect freed %d unreferenced objects!\r\n"u8, GC.Collect());
 
+#if true
         Console.WriteLine("Press any key to continue...");
 
         Console.ReadKey();
         Console.WriteLine("Key pressed!");
+#endif
+
+#if false
+        Console.WriteLine("Enjoy the song! gonna last about 2 minutes...");
+        WavPlayer.Play(@"\Nokia - Breath.wav");
+#endif
 
 #if true
         EFI_GRAPHICS_OUTPUT_PROTOCOL* Graphics = null;
@@ -337,7 +345,8 @@ partial class Program
 
         unsafe EFI_GRAPHICS_OUTPUT_PROTOCOL* Graphics;
         int ScreenWidth, ScreenHeight;
-        uint[] Screen;
+
+        uint[] cachedDisplayBuffer;
 
         public unsafe NesTest(EFI_GRAPHICS_OUTPUT_PROTOCOL* graphics, string rom)
         {
@@ -345,7 +354,23 @@ partial class Program
 
             ScreenWidth = (int)Graphics->Mode->Info->HorizontalResolution;
             ScreenHeight = (int)Graphics->Mode->Info->VerticalResolution;
-            Screen = new uint[ScreenWidth * ScreenHeight];
+
+            cachedDisplayBuffer = new uint[nes.gameRender.screenWidth * nes.gameRender.screenHeight];
+
+            Console.Clear();
+            int height = Console.BufferHeight - 2;
+            int width = Console.BufferWidth - 1;
+            int h = 0;
+            for (; h <= height; h++)
+            {
+                for (int i = 0; i <= width; i++)
+                {
+                    if (h % height == 0 || i % width == 0)
+                        Console.Write('#');
+                    else Console.Write(' ');
+                }
+                Console.WriteLine();
+            }
 
             nes.openROM(rom);
         }
@@ -366,26 +391,28 @@ partial class Program
             for (; ; )
             {
                 nes.runGame();
+
                 if (nes.gameRender.screenUpdated)
                 {
-                    Resize(Screen, ScreenWidth, nes.gameRender.screen, GameRender.screenWidth);
-                    unsafe
+                    int baseX = (ScreenWidth / 2) - (nes.gameRender.screenWidth / 2);
+                    int baseY = (ScreenHeight / 2) - (nes.gameRender.screenHeight / 2);
+
+                    for (int y = 0; y < nes.gameRender.screenHeight; y++)
                     {
-                        fixed (uint* pixels = Screen)
+                        for (int x = 0; x < nes.gameRender.screenWidth; x++)
                         {
-                            Graphics->Blt(
-                                Graphics,
-                                (EFI_GRAPHICS_OUTPUT_BLT_PIXEL*)pixels,
-                                EfiBltBufferToVideo,
-                                0,
-                                0,
-                                0,
-                                0,
-                                (ulong)ScreenWidth,
-                               (ulong)ScreenHeight,
-                                0);
+                            if (cachedDisplayBuffer[y * nes.gameRender.screenWidth + x] != nes.gameRender.displayBuffer[y * nes.gameRender.screenWidth + x])
+                            {
+                                uint color = nes.gameRender.displayBuffer[y * nes.gameRender.screenWidth + x];
+                                cachedDisplayBuffer[y * nes.gameRender.screenWidth + x] = color;
+                                unsafe
+                                {
+                                    Graphics->Blt(Graphics, (EFI_GRAPHICS_OUTPUT_BLT_PIXEL*)&color, EfiBltBufferToVideo, 0,0, (ulong)(baseX + x), (ulong)(baseY + y), 1, 1, 0);
+                                }
+                            }
                         }
                     }
+
                     nes.gameRender.screenUpdated = false;
                 }
             }

@@ -1,4 +1,6 @@
 ﻿using Internal.Runtime;
+using System.Collections;
+using System.Collections.Generic;
 using Internal.Runtime.CompilerHelpers;
 using Internal.Runtime.CompilerServices;
 using System;
@@ -50,50 +52,78 @@ namespace System
 
         public virtual string ToString() => "System.Object";
 
-        internal ref byte GetRawData()
-        {
-            return ref Unsafe.As<RawData>(this).Data;
-        }
+        internal ref byte GetRawData() => ref Unsafe.As<RawData>(this).Data;
 
-        internal uint GetRawDataSize()
-        {
-            return EEType->BaseSize - (uint)sizeof(ObjHeader) - (uint)sizeof(EEType*);
-        }
+        internal uint GetRawDataSize() => EEType->BaseSize - (uint)sizeof(ObjHeader) - (uint)sizeof(EEType*);
     }
     public struct Void { }
 
     public struct Boolean { }
-    public partial struct Char { }
+    public partial struct Char
+    {
+        public const char MinValue = (char)0;
+        public const char MaxValue = (char)0xFFFF;
+
+        public override unsafe string ToString()
+        {
+            char* ptr = stackalloc char[2];
+            ptr[0] = this;
+            ptr[1] = '\0';
+            return new string(ptr);
+        }
+    }
     public struct SByte
     {
+        public const sbyte MinValue = -128;
+        public const sbyte MaxValue = 127;
+
         public override string ToString() => ((long)this).ToString();
     }
     public struct Byte
     {
+        public const byte MinValue = 0;
+        public const byte MaxValue = 0xFF;
+
         public override string ToString() => ((ulong)this).ToString();
     }
     public struct Int16
     {
+        public const short MinValue = -32768;
+        public const short MaxValue = 32767;
+
         public override string ToString() => ((long)this).ToString();
     }
     public struct UInt16
     {
+        public const ushort MinValue = 0;
         public const ushort MaxValue = 0xFFFF;
 
         public override string ToString() => ((ulong)this).ToString();
     }
     public struct Int32
     {
+        public const int MinValue = -2147483648;
+        public const int MaxValue = 2147483647;
+
         public override string ToString() => ((long)this).ToString();
     }
     public struct UInt32
     {
+        public const uint MinValue = 0;
         public const uint MaxValue = 0xFFFFFFFF;
 
         public override string ToString() => ((ulong)this).ToString();
     }
-    public partial struct Int64 { }
-    public partial struct UInt64 { }
+    public partial struct Int64
+    {
+        public const long MinValue = -9223372036854775808;
+        public const long MaxValue = 9223372036854775807;
+    }
+    public partial struct UInt64
+    {
+        public const ulong MinValue = 0;
+        public const ulong MaxValue = 0xFFFFFFFFFFFFFFFF;
+    }
     public struct IntPtr
     {
         unsafe private void* _value;
@@ -170,21 +200,38 @@ namespace System
     public struct UIntPtr { }
     public struct Single
     {
+        public const float MinValue = -3.4028234663852886E+38F;
+        public const float MaxValue = 3.4028234663852886E+38F;
+
         public override string ToString() => ((double)this).ToString();
     }
-    public partial struct Double { }
-    public class Type { }
+    public partial struct Double
+    {
+        public const double MinValue = -1.7976931348623157E+308;
+        public const double MaxValue = 1.7976931348623157E+308;
+    }
+    public class Type
+    {
+        public static Type GetTypeFromHandle(RuntimeTypeHandle handle) => new Type();
+    }
+    public static class Convert
+    {
+        public static int ToUInt16(bool boolean) => boolean ? 1 : 0;
+        public static int ToInt16(bool boolean) => boolean ? 1 : 0;
+        public static int ToInt16(byte b) => b;
+        public static bool ToBoolean(int integer) => integer != 0;
+        public static byte ToByte(int v) => (byte)v;
+        public static byte ToByte(uint v) => (byte)v;
+        public static int ToInt32(byte b) => b;
+        public static int ToInt32(int b) => b;
+    }
     public delegate void EventHandler(object? sender, EventArgs e);
     public class EventArgs
     {
         public static readonly EventArgs Empty = new EventArgs();
     }
-    public class Exception
+    public class Exception(string _message = "Exception of type 'System.Exception' was thrown.")
     {
-        private readonly string _message;
-
-        public Exception(string message = "Exception of type 'System.Exception' was thrown.") => _message = message;
-
         public virtual string Message => _message;
     }
 
@@ -257,16 +304,10 @@ namespace System
         }
     }
 
-    public readonly unsafe ref struct ReadOnlySpan<T>
+    public readonly unsafe ref struct ReadOnlySpan<T>(T[] array, int start, int length)
     {
-        internal readonly ByReference<T> _pointer;
-        private readonly int _length;
-
-        public ReadOnlySpan(T[] array, int start, int length)
-        {
-            _pointer = new ByReference<T>(ref Unsafe.Add(ref array[0], start));
-            _length = length;
-        }
+        internal readonly ByReference<T> _pointer = new ByReference<T>(ref Unsafe.Add(ref array[0], start));
+        private readonly int _length = length;
 
         public int Length
         {
@@ -341,10 +382,7 @@ namespace System
             }
         }
 
-        public static bool IsNullOrEmpty(string value)
-        {
-            return (value == null || 0u >= (uint)value.Length) ? true : false;
-        }
+        public static bool IsNullOrEmpty(string value) => (value == null || 0u >= (uint)value.Length) ? true : false;
 
         public unsafe static string Concat(string a, string b)
         {
@@ -418,9 +456,44 @@ namespace System
         }
     }
 
-    public abstract class Array
+    public abstract unsafe class Array
     {
         public int Length;
+
+        public int Rank
+        {
+            get
+            {
+                EEType* type = EEType;
+                uint boundsSize = type->BaseSize - (uint)(sizeof(IntPtr) * 3);
+                int rank = (int)(boundsSize / (uint)(sizeof(int) * 2));
+                return rank > 0 ? rank : 1;
+            }
+        }
+
+        public int GetLength(int dimension)
+        {
+            int rank = Rank;
+            if ((uint)dimension >= (uint)rank)
+                throw new IndexOutOfRangeException();
+
+            if (rank == 1)
+                return Length;
+
+            fixed (int* bounds = &Length)
+            {
+                return bounds[2 + dimension];
+            }
+        }
+
+        public int GetLowerBound(int dimension)
+        {
+            if ((uint)dimension >= (uint)Rank)
+                throw new IndexOutOfRangeException();
+            return 0;
+        }
+
+        public int GetUpperBound(int dimension) => GetLength(dimension) - 1;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -533,7 +606,7 @@ namespace System
 
         internal static bool EqualsImpl(Delegate first, Delegate second)
         {
-            if (Object.ReferenceEquals(first, second))
+            if (ReferenceEquals(first, second))
                 return true;
             if (first == null || second == null || !InternalEqualTypes(first, second))
                 return false;
@@ -560,17 +633,17 @@ namespace System
                 return true;
             }
 
-            if (!Object.ReferenceEquals(first.m_helperObject, second.m_helperObject) ||
+            if (!ReferenceEquals(first.m_helperObject, second.m_helperObject) ||
                 first.m_extraFunctionPointerOrData != second.m_extraFunctionPointerOrData ||
                 first.m_functionPointer != second.m_functionPointer)
             {
                 return false;
             }
 
-            if (Object.ReferenceEquals(first.m_firstParameter, first))
-                return Object.ReferenceEquals(second.m_firstParameter, second);
+            if (ReferenceEquals(first.m_firstParameter, first))
+                return ReferenceEquals(second.m_firstParameter, second);
 
-            return Object.ReferenceEquals(first.m_firstParameter, second.m_firstParameter);
+            return ReferenceEquals(first.m_firstParameter, second.m_firstParameter);
         }
 
         private static int GetInvocationCount(Delegate value)
@@ -710,9 +783,8 @@ namespace System
 
     public enum AttributeTargets { }
 
-    public sealed class AttributeUsageAttribute : Attribute
+    public sealed class AttributeUsageAttribute(AttributeTargets validOn) : Attribute
     {
-        public AttributeUsageAttribute(AttributeTargets validOn) { }
         public bool AllowMultiple { get; set; }
         public bool Inherited { get; set; }
     }
@@ -724,9 +796,8 @@ namespace System
 
     namespace Reflection
     {
-        public sealed class DefaultMemberAttribute : Attribute
+        public sealed class DefaultMemberAttribute(string memberName) : Attribute
         {
-            public DefaultMemberAttribute(string memberName) { }
         }
     }
 
@@ -776,33 +847,26 @@ namespace System
             void UnsafeOnCompleted(Action continuation);
         }
 
-        public class StateMachineAttribute : Attribute
+        public class StateMachineAttribute(Type stateMachineType) : Attribute
         {
-            public StateMachineAttribute(Type stateMachineType) => StateMachineType = stateMachineType;
-
-            public Type StateMachineType { get; }
+            public Type StateMachineType { get; } = stateMachineType;
         }
 
-        public sealed class AsyncStateMachineAttribute : StateMachineAttribute
+        public sealed class AsyncStateMachineAttribute(Type stateMachineType) : StateMachineAttribute(stateMachineType)
         {
-            public AsyncStateMachineAttribute(Type stateMachineType) : base(stateMachineType) { }
         }
 
-        public sealed class AsyncMethodBuilderAttribute : Attribute
+        public sealed class AsyncMethodBuilderAttribute(Type builderType) : Attribute
         {
-            public AsyncMethodBuilderAttribute(Type builderType) => BuilderType = builderType;
-
-            public Type BuilderType { get; }
+            public Type BuilderType { get; } = builderType;
         }
 
-        public sealed class CompilerFeatureRequiredAttribute : Attribute
+        public sealed class CompilerFeatureRequiredAttribute(string featureName) : Attribute
         {
-            public CompilerFeatureRequiredAttribute(string featureName) { }
         }
 
-        public sealed class MethodImplAttribute : Attribute
+        public sealed class MethodImplAttribute(MethodImplOptions methodImplOptions) : Attribute
         {
-            public MethodImplAttribute(MethodImplOptions methodImplOptions) { }
         }
 
         public enum MethodImplOptions
@@ -1025,12 +1089,27 @@ namespace System.Collections
 
 namespace System.Collections.Generic
 {
-    public interface IEnumerable<out T> : System.Collections.IEnumerable
+    public interface IEqualityComparer<in T>
+    {
+        bool Equals(T x, T y);
+        int GetHashCode(T obj);
+    }
+
+    public readonly struct KeyValuePair<TKey, TValue>(TKey key, TValue value)
+    {
+        private readonly TKey _key = key;
+        private readonly TValue _value = value;
+
+        public TKey Key => _key;
+        public TValue Value => _value;
+    }
+
+    public interface IEnumerable<out T> : IEnumerable
     {
         new IEnumerator<T> GetEnumerator();
     }
 
-    public interface IEnumerator<out T> : IDisposable, System.Collections.IEnumerator
+    public interface IEnumerator<out T> : IDisposable, IEnumerator
     {
         new T Current { get; }
     }
@@ -1170,10 +1249,7 @@ namespace System.Threading.Tasks
             return true;
         }
 
-        internal void GetResult()
-        {
-            Wait();
-        }
+        internal void GetResult() => Wait();
 
         protected void ThrowIfFaulted()
         {
@@ -1211,7 +1287,7 @@ namespace System.Threading.Tasks
         internal bool TrySetResult(TResult result)
         {
             _result = result;
-            return base.TrySetResult();
+            return TrySetResult();
         }
 
         internal TResult GetResultValue()
@@ -1329,25 +1405,16 @@ namespace System.Runtime.InteropServices
         public CharSet CharSet;
     }
 
-    public sealed class FieldOffsetAttribute : Attribute
+    public sealed class FieldOffsetAttribute(int offset) : Attribute
     {
-        public FieldOffsetAttribute(int offset)
-        {
-            Value = offset;
-        }
-
-        public int Value { get; }
+        public int Value { get; } = offset;
     }
 
-    public sealed class DllImportAttribute : Attribute
+    public sealed class DllImportAttribute(string dllName) : Attribute
     {
         public CallingConvention CallingConvention;
 
         public string EntryPoint;
-
-        public DllImportAttribute(string dllName)
-        {
-        }
     }
 
     internal enum LayoutKind
@@ -1383,14 +1450,12 @@ namespace System
 
     namespace Runtime
     {
-        internal sealed class RuntimeExportAttribute : Attribute
+        internal sealed class RuntimeExportAttribute(string entry) : Attribute
         {
-            public RuntimeExportAttribute(string entry) { }
         }
 
-        public sealed class RuntimeImportAttribute : Attribute
+        public sealed class RuntimeImportAttribute(string dllName, string entry) : Attribute
         {
-            public RuntimeImportAttribute(string dllName, string entry) { }
         }
 
     }
@@ -1732,8 +1797,19 @@ namespace System.Runtime
                 }
                 else if (kind == EhClauseFilter)
                 {
-                    ReadVarUInt(ref cursor);
-                    ReadVarUInt(ref cursor);
+                    uint handlerOffset = ReadVarUInt(ref cursor);
+                    uint filterOffset = ReadVarUInt(ref cursor);
+
+                    if (codeOffset >= tryStart && codeOffset < tryEnd &&
+                        InternalCalls.RhpCallFilterFunclet(
+                            exception,
+                            (IntPtr)(methodStart + filterOffset),
+                            exInfo.StackPointer,
+                            exInfo.FramePointer))
+                    {
+                        exInfo.Handler = methodStart + handlerOffset;
+                        return true;
+                    }
                 }
                 else
                 {
@@ -1744,10 +1820,7 @@ namespace System.Runtime
             return false;
         }
 
-        private static byte* GetUnwindInfo(byte* imageBase, RuntimeFunction* function)
-        {
-            return imageBase + function->UnwindData;
-        }
+        private static byte* GetUnwindInfo(byte* imageBase, RuntimeFunction* function) => imageBase + function->UnwindData;
 
         private static byte GetFunctionBlockFlags(byte* unwind)
         {
@@ -1898,21 +1971,18 @@ namespace System.Runtime
             return returnAddress != 0;
         }
 
-        private static ulong GetRegister(ref ExInfo exInfo, byte register)
+        private static ulong GetRegister(ref ExInfo exInfo, byte register) => register switch
         {
-            return register switch
-            {
-                3 => exInfo.Rbx,
-                5 => (ulong)exInfo.FramePointer,
-                6 => exInfo.Rsi,
-                7 => exInfo.Rdi,
-                12 => exInfo.R12,
-                13 => exInfo.R13,
-                14 => exInfo.R14,
-                15 => exInfo.R15,
-                _ => 0
-            };
-        }
+            3 => exInfo.Rbx,
+            5 => (ulong)exInfo.FramePointer,
+            6 => exInfo.Rsi,
+            7 => exInfo.Rdi,
+            12 => exInfo.R12,
+            13 => exInfo.R13,
+            14 => exInfo.R14,
+            15 => exInfo.R15,
+            _ => 0
+        };
 
         private static void SetRegister(ref ExInfo exInfo, byte register, ulong value)
         {
@@ -1961,6 +2031,14 @@ namespace System.Runtime
         {
             for (; ; );
         }
+
+        [RuntimeImport("*", "RhpCallFilterFunclet")]
+        [MethodImpl(MethodImplOptions.InternalCall)]
+        internal static extern bool RhpCallFilterFunclet(
+            object exception,
+            IntPtr filter,
+            byte* stackPointer,
+            byte* framePointer);
 
         [RuntimeImport("*", "GcAllocate")]
         [MethodImpl(MethodImplOptions.InternalCall)]
@@ -2199,6 +2277,12 @@ namespace System.Runtime
             return (EETypeElementType)(((ushort)type->Flags & (ushort)EETypeFlags.ElementTypeMask) >> (int)EETypeFlags.ElementTypeShift);
         }
 
+        private static EEInterfaceInfo* GetInterfaceMap(EEType* type)
+            => (EEInterfaceInfo*)(GetVTable(type) + type->NumVtableSlots);
+
+        private static IntPtr* GetVTable(EEType* type)
+            => (IntPtr*)((byte*)type + sizeof(EEType));
+
         [RuntimeExport("RhTypeCast_CheckCastClass")]
         public static unsafe object CheckCastClass(EEType* pTargetEEType, object obj)
         {
@@ -2211,6 +2295,35 @@ namespace System.Runtime
             {
                 throw new InvalidCastException();
             }
+
+            return result;
+        }
+
+        [RuntimeExport("RhTypeCast_IsInstanceOfInterface")]
+        public static unsafe object IsInstanceOfInterface(EEType* pTargetType, object obj)
+        {
+            if (obj == null || pTargetType == null)
+                return null;
+
+            for (EEType* currentType = obj.EEType; currentType != null; currentType = GetBaseType(currentType))
+            {
+                EEInterfaceInfo* interfaces = GetInterfaceMap(currentType);
+                for (ushort index = 0; index < currentType->NumInterfaces; index++)
+                {
+                    if (interfaces[index].InterfaceType == pTargetType)
+                        return obj;
+                }
+            }
+
+            return null;
+        }
+
+        [RuntimeExport("RhTypeCast_CheckCastInterface")]
+        public static unsafe object CheckCastInterface(EEType* pTargetEEType, object obj)
+        {
+            object result = IsInstanceOfInterface(pTargetEEType, obj);
+            if (result == null && obj != null)
+                throw new InvalidCastException();
 
             return result;
         }
@@ -2463,10 +2576,7 @@ namespace Internal.Runtime
 
             [Intrinsic]
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            internal static ref T AddByteOffset<T>(ref T source, nuint byteOffset)
-            {
-                return ref AddByteOffset(ref source, (ulong)(void*)byteOffset);
-            }
+            internal static ref T AddByteOffset<T>(ref T source, nuint byteOffset) => ref AddByteOffset(ref source, (ulong)(void*)byteOffset);
 
             [RuntimeImport("*", "memcpy")]
             [MethodImpl(MethodImplOptions.InternalCall)]
@@ -2483,10 +2593,7 @@ namespace Internal.Runtime
         {
             private static readonly object s_staticLock = new object();
 
-            private static void MonitorEnter(object obj, ref bool lockTaken)
-            {
-                System.Threading.Monitor.Enter(obj, ref lockTaken);
-            }
+            private static void MonitorEnter(object obj, ref bool lockTaken) => System.Threading.Monitor.Enter(obj, ref lockTaken);
 
             private static void MonitorExit(object obj, ref bool lockTaken)
             {
@@ -2497,10 +2604,7 @@ namespace Internal.Runtime
                 lockTaken = false;
             }
 
-            private static void MonitorEnterStatic(IntPtr pEEType, ref bool lockTaken)
-            {
-                System.Threading.Monitor.Enter(s_staticLock, ref lockTaken);
-            }
+            private static void MonitorEnterStatic(IntPtr pEEType, ref bool lockTaken) => System.Threading.Monitor.Enter(s_staticLock, ref lockTaken);
 
             private static void MonitorExitStatic(IntPtr pEEType, ref bool lockTaken)
             {
@@ -2719,46 +2823,57 @@ namespace Internal.Runtime
 
 namespace Internal.Runtime.CompilerHelpers
 {
+    internal static class LdTokenHelpers
+    {
+        private static RuntimeTypeHandle GetRuntimeTypeHandle(IntPtr pEEType) => new RuntimeTypeHandle();
+
+        private static RuntimeMethodHandle GetRuntimeMethodHandle(IntPtr pHandleSignature) => new RuntimeMethodHandle();
+
+        private static RuntimeFieldHandle GetRuntimeFieldHandle(IntPtr pHandleSignature) => new RuntimeFieldHandle();
+
+        private static Type GetRuntimeType(IntPtr pEEType) => System.Type.GetTypeFromHandle(new RuntimeTypeHandle());
+    }
+
     // Entry point used by ILC for array constructors emitted as newobj.
     internal static unsafe class ArrayHelpers
     {
         private static uint SzArrayBaseSize => (uint)(sizeof(IntPtr) * 3);
 
-        public static System.Array NewObjArray(IntPtr pEEType, int nDimensions, int* pDimensions)
+        public static Array NewObjArray(IntPtr pEEType, int nDimensions, int* pDimensions)
         {
             if (pDimensions == null || nDimensions <= 0)
-                throw new System.ArgumentException();
+                throw new ArgumentException();
 
-            Internal.Runtime.EEType* eeType = (Internal.Runtime.EEType*)(void*)pEEType;
+            EEType* eeType = (EEType*)(void*)pEEType;
             if (eeType == null || eeType->BaseSize < SzArrayBaseSize)
-                throw new System.ArgumentException();
+                throw new ArgumentException();
 
             if (eeType->BaseSize == SzArrayBaseSize)
             {
                 int length = pDimensions[0];
                 if (length < 0)
-                    throw new System.OverflowException();
+                    throw new OverflowException();
 
-                object resultObject = System.Runtime.InternalCalls.RhpNewArray(eeType, length);
-                System.Array result = Internal.Runtime.CompilerServices.Unsafe.As<object, System.Array>(ref resultObject);
+                object resultObject = InternalCalls.RhpNewArray(eeType, length);
+                Array result = Unsafe.As<object, Array>(ref resultObject);
                 if (result == null || nDimensions == 1)
                     return result;
 
                 // Jagged arrays carry one dimension for each nested SZ array.
-                Internal.Runtime.EEType* elementType = GetArrayElementType(eeType);
+                EEType* elementType = GetArrayElementType(eeType);
                 object resultReference = result;
-                byte* resultAddress = (byte*)(void*)Internal.Runtime.CompilerServices.Unsafe.As<object, IntPtr>(ref resultReference);
-                byte* elementAddress = resultAddress + eeType->BaseSize - sizeof(Internal.Runtime.ObjHeader);
+                byte* resultAddress = (byte*)(void*)Unsafe.As<object, IntPtr>(ref resultReference);
+                byte* elementAddress = resultAddress + eeType->BaseSize - sizeof(ObjHeader);
 
                 for (int i = 0; i < length; i++)
                 {
-                    System.Array nested = NewObjArray(
+                    Array nested = NewObjArray(
                         (IntPtr)(void*)elementType,
                         nDimensions - 1,
                         pDimensions + 1);
                     object nestedObject = nested;
                     *(IntPtr*)(elementAddress + i * eeType->ComponentSize) =
-                        Internal.Runtime.CompilerServices.Unsafe.As<object, IntPtr>(ref nestedObject);
+                        Unsafe.As<object, IntPtr>(ref nestedObject);
                 }
 
                 return result;
@@ -2767,7 +2882,7 @@ namespace Internal.Runtime.CompilerHelpers
             uint boundsSize = eeType->BaseSize - SzArrayBaseSize;
             int rank = (int)(boundsSize / (uint)(sizeof(int) * 2));
             if (rank <= 0 || rank != nDimensions && rank * 2 != nDimensions)
-                throw new System.ArgumentException();
+                throw new ArgumentException();
 
             // The alternate constructor form supplies lower-bound/length pairs.
             // This runtime supports only zero lower bounds.
@@ -2776,7 +2891,7 @@ namespace Internal.Runtime.CompilerHelpers
                 for (int i = 0; i < rank; i++)
                 {
                     if (pDimensions[i * 2] != 0)
-                        throw new System.NotSupportedException();
+                        throw new NotSupportedException();
 
                     pDimensions[i] = pDimensions[i * 2 + 1];
                 }
@@ -2787,19 +2902,19 @@ namespace Internal.Runtime.CompilerHelpers
             {
                 int length = pDimensions[i];
                 if (length < 0)
-                    throw new System.OverflowException();
+                    throw new OverflowException();
 
                 totalLength *= (ulong)length;
                 if (totalLength > (~0U >> 1))
-                    throw new System.OverflowException();
+                    throw new OverflowException();
             }
 
-            object arrayObject = System.Runtime.InternalCalls.RhpNewArray(eeType, (int)totalLength);
-            System.Array array = Internal.Runtime.CompilerServices.Unsafe.As<object, System.Array>(ref arrayObject);
+            object arrayObject = InternalCalls.RhpNewArray(eeType, (int)totalLength);
+            Array array = Unsafe.As<object, Array>(ref arrayObject);
             if (array == null)
                 return null;
 
-            byte* arrayAddress = (byte*)(void*)Internal.Runtime.CompilerServices.Unsafe.As<object, IntPtr>(ref arrayObject);
+            byte* arrayAddress = (byte*)(void*)Unsafe.As<object, IntPtr>(ref arrayObject);
             int* bounds = (int*)(arrayAddress + sizeof(IntPtr) * 2);
             for (int i = 0; i < rank; i++)
                 bounds[i] = pDimensions[i];
@@ -2807,12 +2922,446 @@ namespace Internal.Runtime.CompilerHelpers
             return array;
         }
 
-        private static Internal.Runtime.EEType* GetArrayElementType(Internal.Runtime.EEType* eeType)
+        private static EEType* GetArrayElementType(EEType* eeType)
         {
-            if ((eeType->Flags & Internal.Runtime.EETypeFlags.RelatedTypeViaIATFlag) != 0)
+            if ((eeType->Flags & EETypeFlags.RelatedTypeViaIATFlag) != 0)
                 return *eeType->RelatedType.RelatedParameterTypeViaIAT;
 
             return eeType->RelatedType.RelatedParameterType;
+        }
+    }
+}
+namespace System.Linq
+{
+    public static class Enumerable
+    {
+        public static bool Any<TSource>(this TSource[] source)
+        {
+            if (source == null)
+                throw new ArgumentNullException();
+            return source.Length != 0;
+        }
+
+        public static bool Any<TSource>(this TSource[] source, Func<TSource, bool> predicate)
+        {
+            if (source == null || predicate == null)
+                throw new ArgumentNullException();
+            for (int i = 0; i < source.Length; i++)
+                if (predicate(source[i]))
+                    return true;
+            return false;
+        }
+
+        public static int Count<TSource>(this TSource[] source)
+        {
+            if (source == null)
+                throw new ArgumentNullException();
+            return source.Length;
+        }
+
+        public static int Count<TSource>(this TSource[] source, Func<TSource, bool> predicate)
+        {
+            if (source == null || predicate == null)
+                throw new ArgumentNullException();
+            int count = 0;
+            for (int i = 0; i < source.Length; i++)
+                if (predicate(source[i]))
+                    count++;
+            return count;
+        }
+
+        public static TSource First<TSource>(this TSource[] source)
+        {
+            if (source == null)
+                throw new ArgumentNullException();
+            if (source.Length == 0)
+                throw new InvalidOperationException();
+            return source[0];
+        }
+
+        public static TSource FirstOrDefault<TSource>(this TSource[] source)
+        {
+            if (source == null)
+                throw new ArgumentNullException();
+            return source.Length == 0 ? default : source[0];
+        }
+
+        public static TSource FirstOrDefault<TSource>(this TSource[] source, Func<TSource, bool> predicate)
+        {
+            if (source == null || predicate == null)
+                throw new ArgumentNullException();
+            for (int i = 0; i < source.Length; i++)
+                if (predicate(source[i]))
+                    return source[i];
+            return default;
+        }
+
+        public static IEnumerable<TSource> Where<TSource>(this TSource[] source, Func<TSource, bool> predicate)
+        {
+            if (source == null || predicate == null)
+                throw new ArgumentNullException();
+            return new ArrayWhereEnumerable<TSource>(source, predicate);
+        }
+
+        public static IEnumerable<TResult> Select<TSource, TResult>(this TSource[] source, Func<TSource, TResult> selector)
+        {
+            if (source == null || selector == null)
+                throw new ArgumentNullException();
+            return new ArraySelectEnumerable<TSource, TResult>(source, selector);
+        }
+
+        public static bool Contains<TSource>(this TSource[] source, TSource value)
+        {
+            if (source == null)
+                throw new ArgumentNullException();
+            for (int i = 0; i < source.Length; i++)
+                if (Equals(source[i], value))
+                    return true;
+            return false;
+        }
+
+        public static List<TSource> ToList<TSource>(this TSource[] source)
+        {
+            if (source == null)
+                throw new ArgumentNullException();
+            List<TSource> result = new List<TSource>(source.Length);
+            for (int i = 0; i < source.Length; i++)
+                result.Add(source[i]);
+            return result;
+        }
+
+        public static TSource[] ToArray<TSource>(this TSource[] source)
+        {
+            if (source == null)
+                throw new ArgumentNullException();
+            TSource[] result = new TSource[source.Length];
+            for (int i = 0; i < source.Length; i++)
+                result[i] = source[i];
+            return result;
+        }
+
+        public static bool Any<TSource>(this IEnumerable<TSource> source)
+        {
+            if (source == null)
+                throw new ArgumentNullException();
+            IEnumerator<TSource> enumerator = source.GetEnumerator();
+            try { return enumerator.MoveNext(); }
+            finally { enumerator.Dispose(); }
+        }
+
+        public static bool Any<TSource>(this IEnumerable<TSource> source, Func<TSource, bool> predicate)
+        {
+            if (source == null || predicate == null)
+                throw new ArgumentNullException();
+            IEnumerator<TSource> enumerator = source.GetEnumerator();
+            try
+            {
+                while (enumerator.MoveNext())
+                    if (predicate(enumerator.Current))
+                        return true;
+                return false;
+            }
+            finally { enumerator.Dispose(); }
+        }
+
+        public static int Count<TSource>(this IEnumerable<TSource> source)
+        {
+            if (source == null)
+                throw new ArgumentNullException();
+            int count = 0;
+            IEnumerator<TSource> enumerator = source.GetEnumerator();
+            try
+            {
+                while (enumerator.MoveNext())
+                    count++;
+            }
+            finally { enumerator.Dispose(); }
+            return count;
+        }
+
+        public static int Count<TSource>(this IEnumerable<TSource> source, Func<TSource, bool> predicate)
+        {
+            if (source == null || predicate == null)
+                throw new ArgumentNullException();
+            int count = 0;
+            IEnumerator<TSource> enumerator = source.GetEnumerator();
+            try
+            {
+                while (enumerator.MoveNext())
+                    if (predicate(enumerator.Current))
+                        count++;
+            }
+            finally { enumerator.Dispose(); }
+            return count;
+        }
+
+        public static TSource First<TSource>(this IEnumerable<TSource> source)
+        {
+            if (source == null)
+                throw new ArgumentNullException();
+            IEnumerator<TSource> enumerator = source.GetEnumerator();
+            try
+            {
+                if (enumerator.MoveNext())
+                    return enumerator.Current;
+            }
+            finally { enumerator.Dispose(); }
+            throw new InvalidOperationException();
+        }
+
+        public static TSource FirstOrDefault<TSource>(this IEnumerable<TSource> source)
+        {
+            if (source == null)
+                throw new ArgumentNullException();
+            IEnumerator<TSource> enumerator = source.GetEnumerator();
+            try { return enumerator.MoveNext() ? enumerator.Current : default; }
+            finally { enumerator.Dispose(); }
+        }
+
+        public static TSource FirstOrDefault<TSource>(this IEnumerable<TSource> source, Func<TSource, bool> predicate)
+        {
+            if (source == null || predicate == null)
+                throw new ArgumentNullException();
+            IEnumerator<TSource> enumerator = source.GetEnumerator();
+            try
+            {
+                while (enumerator.MoveNext())
+                    if (predicate(enumerator.Current))
+                        return enumerator.Current;
+                return default;
+            }
+            finally { enumerator.Dispose(); }
+        }
+
+        public static IEnumerable<TSource> Where<TSource>(this IEnumerable<TSource> source, Func<TSource, bool> predicate)
+        {
+            if (source == null || predicate == null)
+                throw new ArgumentNullException();
+            return new WhereEnumerable<TSource>(source, predicate);
+        }
+
+        public static IEnumerable<TResult> Select<TSource, TResult>(this IEnumerable<TSource> source, Func<TSource, TResult> selector)
+        {
+            if (source == null || selector == null)
+                throw new ArgumentNullException();
+            return new SelectEnumerable<TSource, TResult>(source, selector);
+        }
+
+        public static bool Contains<TSource>(this IEnumerable<TSource> source, TSource value)
+        {
+            if (source == null)
+                throw new ArgumentNullException();
+            IEnumerator<TSource> enumerator = source.GetEnumerator();
+            try
+            {
+                while (enumerator.MoveNext())
+                    if (Equals(enumerator.Current, value))
+                        return true;
+                return false;
+            }
+            finally { enumerator.Dispose(); }
+        }
+
+        public static List<TSource> ToList<TSource>(this IEnumerable<TSource> source)
+        {
+            if (source == null)
+                throw new ArgumentNullException();
+            List<TSource> result = new List<TSource>();
+            IEnumerator<TSource> enumerator = source.GetEnumerator();
+            try
+            {
+                while (enumerator.MoveNext())
+                    result.Add(enumerator.Current);
+            }
+            finally { enumerator.Dispose(); }
+            return result;
+        }
+
+        public static TSource[] ToArray<TSource>(this IEnumerable<TSource> source)
+            => ToList(source).ToArray();
+
+        private sealed class ArrayWhereEnumerable<TSource> : IEnumerable<TSource>
+        {
+            private readonly TSource[] _source;
+            private readonly Func<TSource, bool> _predicate;
+
+            internal ArrayWhereEnumerable(TSource[] source, Func<TSource, bool> predicate)
+            {
+                _source = source;
+                _predicate = predicate;
+            }
+
+            public IEnumerator<TSource> GetEnumerator()
+                => new ArrayWhereEnumerator<TSource>(_source, _predicate);
+            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        }
+
+        private sealed class ArrayWhereEnumerator<TSource> : IEnumerator<TSource>
+        {
+            private readonly TSource[] _source;
+            private readonly Func<TSource, bool> _predicate;
+            private int _index;
+            private TSource _current;
+
+            internal ArrayWhereEnumerator(TSource[] source, Func<TSource, bool> predicate)
+            {
+                _source = source;
+                _predicate = predicate;
+                _index = 0;
+                _current = default;
+            }
+
+            public TSource Current => _current;
+            object IEnumerator.Current => _current;
+
+            public bool MoveNext()
+            {
+                while (_index < _source.Length)
+                {
+                    TSource value = _source[_index++];
+                    if (_predicate(value))
+                    {
+                        _current = value;
+                        return true;
+                    }
+                }
+                _current = default;
+                return false;
+            }
+
+            public void Reset()
+            {
+                _index = 0;
+                _current = default;
+            }
+
+            public void Dispose() { }
+        }
+
+        private sealed class ArraySelectEnumerable<TSource, TResult> : IEnumerable<TResult>
+        {
+            private readonly TSource[] _source;
+            private readonly Func<TSource, TResult> _selector;
+
+            internal ArraySelectEnumerable(TSource[] source, Func<TSource, TResult> selector)
+            {
+                _source = source;
+                _selector = selector;
+            }
+
+            public IEnumerator<TResult> GetEnumerator()
+                => new ArraySelectEnumerator<TSource, TResult>(_source, _selector);
+            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        }
+
+        private sealed class ArraySelectEnumerator<TSource, TResult> : IEnumerator<TResult>
+        {
+            private readonly TSource[] _source;
+            private readonly Func<TSource, TResult> _selector;
+            private int _index;
+            private TResult _current;
+
+            internal ArraySelectEnumerator(TSource[] source, Func<TSource, TResult> selector)
+            {
+                _source = source;
+                _selector = selector;
+                _index = 0;
+                _current = default;
+            }
+
+            public TResult Current => _current;
+            object IEnumerator.Current => Current;
+            public bool MoveNext()
+            {
+                if (_index >= _source.Length)
+                {
+                    _current = default;
+                    return false;
+                }
+
+                _current = _selector(_source[_index++]);
+                return true;
+            }
+            public void Reset()
+            {
+                _index = 0;
+                _current = default;
+            }
+            public void Dispose() { }
+        }
+
+        private sealed class WhereEnumerable<TSource> : IEnumerable<TSource>
+        {
+            private readonly IEnumerable<TSource> _source;
+            private readonly Func<TSource, bool> _predicate;
+
+            internal WhereEnumerable(IEnumerable<TSource> source, Func<TSource, bool> predicate)
+            {
+                _source = source;
+                _predicate = predicate;
+            }
+
+            public IEnumerator<TSource> GetEnumerator()
+                => new WhereEnumerator<TSource>(_source.GetEnumerator(), _predicate);
+            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        }
+
+        private sealed class WhereEnumerator<TSource> : IEnumerator<TSource>
+        {
+            private readonly IEnumerator<TSource> _source;
+            private readonly Func<TSource, bool> _predicate;
+
+            internal WhereEnumerator(IEnumerator<TSource> source, Func<TSource, bool> predicate)
+            {
+                _source = source;
+                _predicate = predicate;
+            }
+
+            public TSource Current => _source.Current;
+            object IEnumerator.Current => Current;
+            public bool MoveNext()
+            {
+                while (_source.MoveNext())
+                    if (_predicate(_source.Current))
+                        return true;
+                return false;
+            }
+            public void Reset() => _source.Reset();
+            public void Dispose() => _source.Dispose();
+        }
+
+        private sealed class SelectEnumerable<TSource, TResult> : IEnumerable<TResult>
+        {
+            private readonly IEnumerable<TSource> _source;
+            private readonly Func<TSource, TResult> _selector;
+
+            internal SelectEnumerable(IEnumerable<TSource> source, Func<TSource, TResult> selector)
+            {
+                _source = source;
+                _selector = selector;
+            }
+
+            public IEnumerator<TResult> GetEnumerator()
+                => new SelectEnumerator<TSource, TResult>(_source.GetEnumerator(), _selector);
+            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        }
+
+        private sealed class SelectEnumerator<TSource, TResult> : IEnumerator<TResult>
+        {
+            private readonly IEnumerator<TSource> _source;
+            private readonly Func<TSource, TResult> _selector;
+
+            internal SelectEnumerator(IEnumerator<TSource> source, Func<TSource, TResult> selector)
+            {
+                _source = source;
+                _selector = selector;
+            }
+
+            public TResult Current => _selector(_source.Current);
+            object IEnumerator.Current => Current;
+            public bool MoveNext() => _source.MoveNext();
+            public void Reset() => _source.Reset();
+            public void Dispose() => _source.Dispose();
         }
     }
 }

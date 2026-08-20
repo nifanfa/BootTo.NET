@@ -19,7 +19,8 @@ Use `dotnet publish --tl:off -c Release ConsoleApp1` to publish and run with liv
 - [Running on real hardware](#running-on-real-hardware)
 - [Debugging with QEMU](#debugging-with-qemu)
 
-<img width="1282" height="839" alt="QQ_1787098965779" src="https://github.com/user-attachments/assets/79cb6705-0e18-40cf-adaa-6ee414ddfec6" />
+# Tested and working on real hardware
+<img width="1280" height="702" alt="d7b1ceeba65ec34d3c0600ed842a86ff_720" src="https://github.com/user-attachments/assets/2d0dfe09-6878-4739-9d61-02507890fe31" />
 
 ## NES Emulator
 > **Key Mapping:** `Q` -> A | `E` -> B | `Z` -> Select | `C` -> Start | `W` `S` `A` `D` -> Directional Pad
