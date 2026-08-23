@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace System
+﻿namespace System
 {
     public partial class String
     {
@@ -97,8 +91,8 @@ namespace System
         private static string FormatValue(object value, string specifier)
         {
             if (value == null)
-                return string.Empty;
-            if (string.IsNullOrEmpty(specifier))
+                return Empty;
+            if (IsNullOrEmpty(specifier))
                 return value.ToString();
 
             char type = specifier[0];

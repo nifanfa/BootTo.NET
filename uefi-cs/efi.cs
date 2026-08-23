@@ -34,6 +34,7 @@ global using static EFI_NETWORK_INTERFACE_TYPE;
 
 using Internal.Runtime.CompilerHelpers;
 using System;
+using System.Reflection.PortableExecutable;
 
 public unsafe partial class efi
 {
@@ -48,9 +49,9 @@ public unsafe partial class efi
         EFI_LOADED_IMAGE_PROTOCOL* loadedimage = null;
         gBS->HandleProtocol(gImageHandle, (EFI_GUID*)EFI_LOADED_IMAGE_PROTOCOL_GUID, (void**)&loadedimage);
         byte* imageBase = (byte*)loadedimage->ImageBase;
-        DOSHeader* doshdr = (DOSHeader*)imageBase;
-        NtHeaders64* nthdr = (NtHeaders64*)(imageBase + doshdr->e_lfanew);
-        SectionHeader* sections = ((SectionHeader*)(imageBase + doshdr->e_lfanew + sizeof(NtHeaders64)));
+        NativeDosHeader* doshdr = (NativeDosHeader*)imageBase;
+        NativeNtHeaders64* nthdr = (NativeNtHeaders64*)(imageBase + doshdr->e_lfanew);
+        NativeSectionHeader* sections = ((NativeSectionHeader*)(imageBase + doshdr->e_lfanew + sizeof(NativeNtHeaders64)));
         IntPtr moduleSec = IntPtr.Zero;
         for (int i = 0; i < nthdr->FileHeader.NumberOfSections; i++)
         {

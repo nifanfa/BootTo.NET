@@ -1,5 +1,5 @@
 ; Capture all general-purpose registers that can contain managed references.
-; Microsoft x64 ABI: RCX points at GC_EFI.RegisterSnapshot.
+; Microsoft x64 ABI: RCX points at GarbageCollector.RegisterSnapshot.
 
 OPTION PROLOGUE:NONE
 OPTION EPILOGUE:NONE

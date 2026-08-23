@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Text;
-using System.Linq;
 
 Console.WriteLine($"Hello world, Time: {DateTime.Now}");
 unsafe

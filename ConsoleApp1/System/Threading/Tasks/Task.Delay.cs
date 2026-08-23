@@ -4,9 +4,9 @@ namespace System.Threading.Tasks
     {
         public static Task Delay(int millisecondsDelay)
         {
-            if (millisecondsDelay < System.Threading.Timeout.Infinite)
+            if (millisecondsDelay < Timeout.Infinite)
                 throw new Exception("The delay must be -1 or a non-negative value.");
-            if (millisecondsDelay == System.Threading.Timeout.Infinite)
+            if (millisecondsDelay == Timeout.Infinite)
                 return new Task();
             if (millisecondsDelay == 0)
                 return CompletedTask;

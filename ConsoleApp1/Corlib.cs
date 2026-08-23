@@ -1,9 +1,9 @@
 ﻿using Internal.Runtime;
-using System.Collections;
-using System.Collections.Generic;
 using Internal.Runtime.CompilerHelpers;
 using Internal.Runtime.CompilerServices;
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Runtime;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -56,6 +56,7 @@ namespace System
 
         internal uint GetRawDataSize() => EEType->BaseSize - (uint)sizeof(ObjHeader) - (uint)sizeof(EEType*);
     }
+
     public struct Void { }
 
     public struct Boolean
@@ -255,6 +256,12 @@ namespace System
     public class ArgumentException : Exception
     {
         public ArgumentException() : base("Value does not fall within the expected range.") { }
+    }
+
+    public class BadImageFormatException : Exception
+    {
+        public BadImageFormatException() : base("The image is invalid.") { }
+        public BadImageFormatException(string message) : base(message) { }
     }
 
     internal sealed class ArgumentNullException : Exception
@@ -1438,13 +1445,17 @@ namespace System.Runtime.InteropServices
 
     public class Marshal
     {
-        [RuntimeImport("*", "AllocCoTaskMem")]
+        [RuntimeImport("*", "MarshalAllocHGlobal")]
         [MethodImpl(MethodImplOptions.InternalCall)]
-        public static extern IntPtr AllocCoTaskMem(int cb);
+        public static extern nint AllocHGlobal(int cb);
 
-        [RuntimeImport("*", "FreeCoTaskMem")]
+        [RuntimeImport("*", "MarshalFreeHGlobal")]
         [MethodImpl(MethodImplOptions.InternalCall)]
-        public static extern void FreeCoTaskMem(IntPtr ptr);
+        public static extern void FreeHGlobal(IntPtr hglobal);
+
+        public static IntPtr AllocCoTaskMem(int cb) => AllocHGlobal(cb);
+
+        public static void FreeCoTaskMem(IntPtr ptr) => FreeHGlobal(ptr);
     }
 
     sealed class StructLayoutAttribute : Attribute
@@ -2064,10 +2075,10 @@ namespace System.Runtime
     internal static unsafe class InternalCalls
     {
         [RuntimeExport("__fail_fast")]
-        internal static void __fail_fast()
-        {
-            for (; ; );
-        }
+        internal static void __fail_fast() => throw new Exception("__fail_fast");
+
+        [RuntimeExport("RhpFallbackFailFast")]
+        internal static void RhpFallbackFailFast() => throw new Exception("RhpFallbackFailFast");
 
         [RuntimeExport("RhpReversePInvoke")]
         internal static void RhpReversePInvoke(IntPtr frame) { }
@@ -2086,12 +2097,6 @@ namespace System.Runtime
 
         [RuntimeExport("RhpPInvokeReturn")]
         internal static void RhpPInvokeReturn(IntPtr frame) { }
-
-        [RuntimeExport("RhpFallbackFailFast")]
-        internal static void RhpFallbackFailFast()
-        {
-            for (; ; );
-        }
 
         [RuntimeImport("*", "RhpCallFilterFunclet")]
         [MethodImpl(MethodImplOptions.InternalCall)]
@@ -2892,7 +2897,7 @@ namespace Internal.Runtime.CompilerHelpers
 
         private static RuntimeFieldHandle GetRuntimeFieldHandle(IntPtr pHandleSignature) => new RuntimeFieldHandle();
 
-        private static Type GetRuntimeType(IntPtr pEEType) => System.Type.GetTypeFromHandle(new RuntimeTypeHandle());
+        private static Type GetRuntimeType(IntPtr pEEType) => Type.GetTypeFromHandle(new RuntimeTypeHandle());
     }
 
     // Entry point used by ILC for array constructors emitted as newobj.

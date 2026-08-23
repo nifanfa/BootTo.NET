@@ -1,4 +1,3 @@
-using System.Net;
 using System.Threading.Tasks;
 
 namespace System.Net.Sockets
@@ -26,6 +25,7 @@ namespace System.Net.Sockets
         private EFI_TCP4_CONNECTION_TOKEN connectionToken;
         private EFI_TCP4_CLOSE_TOKEN closeToken;
         private EFI_TCP4_CONFIG_DATA configuration;
+        private EFI_TCP4_OPTION controlOption;
 
         private TaskCompletionSource connectCompletion;
         private TaskCompletionSource<int> receiveCompletion;
@@ -37,6 +37,8 @@ namespace System.Net.Sockets
         private bool waitingForAddress;
         private bool connected;
         private readonly SocketPoller poller;
+
+        private const uint DefaultConnectionTimeoutSeconds = 30;
 
         public Socket(SocketType socketType, ProtocolType protocolType)
         {
@@ -77,16 +79,17 @@ namespace System.Net.Sockets
             configuration.AccessPoint.RemotePort = (ushort)port;
             configuration.AccessPoint.RemoteAddress = ToEfiIPv4Address(address);
 
-            fixed (EFI_TCP4_CONFIG_DATA* config = &configuration)
-                status = tcp->Configure(tcp, config);
+            status = ConfigureTcp();
 
             if ((ulong)status == EFI_NO_MAPPING)
             {
+                StartConnectTimeout();
                 waitingForAddress = true;
                 UpdatePollingRegistration();
             }
             else if ((ulong)status == EFI_SUCCESS)
             {
+                StartConnectTimeout();
                 SubmitConnect();
             }
             else
@@ -351,6 +354,23 @@ namespace System.Net.Sockets
                 CompleteConnect(status);
         }
 
+        private void StartConnectTimeout()
+            => Task.Delay((int)(DefaultConnectionTimeoutSeconds * 1000)).AddContinuation(ConnectTimedOut);
+
+        private void ConnectTimedOut()
+        {
+            if (connectCompletion == null)
+                return;
+
+            if (tcp != null && !waitingForAddress)
+            {
+                fixed (EFI_TCP4_CONNECTION_TOKEN* token = &connectionToken)
+                    tcp->Cancel(tcp, &token->CompletionToken);
+            }
+
+            CompleteConnect(EFI_TIMEOUT);
+        }
+
         private void PollAddressConfiguration()
         {
             EFI_IP4_MODE_DATA mode = new EFI_IP4_MODE_DATA();
@@ -364,8 +384,7 @@ namespace System.Net.Sockets
             if (!mode.IsConfigured)
                 return;
 
-            fixed (EFI_TCP4_CONFIG_DATA* config = &configuration)
-                status = tcp->Configure(tcp, config);
+            status = ConfigureTcp();
 
             if ((ulong)status == EFI_NO_MAPPING)
                 return;
@@ -379,6 +398,23 @@ namespace System.Net.Sockets
             SubmitConnect();
         }
 
+        private EFI_STATUS ConfigureTcp()
+        {
+            controlOption = new EFI_TCP4_OPTION();
+            controlOption.ConnectionTimeout = DefaultConnectionTimeoutSeconds;
+
+            EFI_STATUS status;
+            fixed (EFI_TCP4_OPTION* options = &controlOption)
+            fixed (EFI_TCP4_CONFIG_DATA* config = &configuration)
+            {
+                config->ControlOption = options;
+                status = tcp->Configure(tcp, config);
+                config->ControlOption = null;
+            }
+
+            return status;
+        }
+
         private bool IsSignaled(EFI_EVENT e)
             => (void*)e != null && (ulong)gBS->CheckEvent(e) == EFI_SUCCESS;
 
@@ -388,6 +424,8 @@ namespace System.Net.Sockets
             connectCompletion = null;
             waitingForAddress = false;
             connected = (ulong)status == EFI_SUCCESS;
+            if (!connected && (ulong)status == EFI_TIMEOUT)
+                ReleaseTcp();
             UpdatePollingRegistration();
 
             if (completion == null)

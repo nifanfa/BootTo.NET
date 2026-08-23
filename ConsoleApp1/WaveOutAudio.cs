@@ -1,7 +1,6 @@
-using System;
 using Internal.Runtime.CompilerServices;
+using System;
 using System.Runtime.InteropServices;
-using System.Threading.Tasks;
 
 // OpenCore AudioDxe publishes this versioned protocol from
 // OpenCorePkg/Include/Acidanthera/Protocol/AudioIo.h.
@@ -334,7 +333,7 @@ internal sealed unsafe partial class WaveOutAudio : IPcmSampleSink
         if ((ulong)status != EFI_SUCCESS || ports == null || portCount == 0)
         {
             if (ports != null)
-                EFI.GC.FreeNative(ports);
+                Marshal.FreeHGlobal((IntPtr)ports);
             return false;
         }
 
@@ -383,7 +382,7 @@ internal sealed unsafe partial class WaveOutAudio : IPcmSampleSink
             }
         }
 
-        EFI.GC.FreeNative(ports);
+        Marshal.FreeHGlobal((IntPtr)ports);
         // A codec can expose digital and unconnected pins before the physical
         // analog line-out. Prefer analog, but retain a generic fallback for
         // codecs (such as QEMU) that only report "Other".

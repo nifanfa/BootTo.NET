@@ -37,6 +37,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="MathHelpers.c" />
+    <ClCompile Include="CpuHelpers.c" />
     <ClCompile Include="string.c" />
     <ClCompile Include="printf.c" />
   </ItemGroup>

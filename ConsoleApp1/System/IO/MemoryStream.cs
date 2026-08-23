@@ -59,7 +59,7 @@ namespace System.IO
             }
         }
 
-        public int Position
+        public override long Position
         {
             get
             {
@@ -69,11 +69,46 @@ namespace System.IO
             set
             {
                 EnsureOpen();
-                if (value < 0)
+                if (value < 0 || value > int.MaxValue)
                     throw new ArgumentException();
 
-                _position = value;
+                _position = (int)value;
             }
+        }
+
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            EnsureOpen();
+            long position = origin switch
+            {
+                SeekOrigin.Begin => offset,
+                SeekOrigin.Current => _position + offset,
+                SeekOrigin.End => _length + offset,
+                _ => throw new ArgumentException()
+            };
+            if (position < 0 || position > int.MaxValue)
+                throw new ArgumentException();
+            _position = (int)position;
+            return position;
+        }
+
+        public override void SetLength(long value)
+        {
+            EnsureOpen();
+            EnsureWritable();
+            if (value < 0 || value > int.MaxValue)
+                throw new ArgumentException();
+
+            int length = (int)value;
+            EnsureCapacity(length);
+            if (length > _length)
+            {
+                for (int i = _length; i < length; i++)
+                    _buffer[i] = 0;
+            }
+            _length = length;
+            if (_position > length)
+                _position = length;
         }
 
         public override int Read(byte[] buffer, int offset, int count)

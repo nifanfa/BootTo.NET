@@ -3,7 +3,9 @@
 ## Debugging
 1. **Open Project**: Open the `BootTo.NET.sln` solution in Visual Studio.
 2. **Launch**: Select **QEMU** from the launch profile dropdown, or simply press **F5**.
-<img width="1232" height="387" alt="QQ_1787146565287" src="https://github.com/user-attachments/assets/671fb673-dab9-4685-a80b-f43171ff109e" />
+<p align="center">
+  <img alt="QQ_1787146565287" src="https://github.com/user-attachments/assets/671fb673-dab9-4685-a80b-f43171ff109e" />
+</p>
 
 ## Synopsis
 *When will hobby OS developers realize that we don't need to implement everything from scratch? With a clean environment providing basic network, graphics, filesystem, and USB support, there's no need to build it yourself—just load a DXE driver and go ahead with your 'OS'.*  
@@ -20,15 +22,16 @@ Use `dotnet publish --tl:off -c Release ConsoleApp1` to publish and run with liv
 - [Debugging with QEMU](#debugging-with-qemu)
 
 # Tested and working on real hardware
-<img width="1280" height="702" alt="d7b1ceeba65ec34d3c0600ed842a86ff_720" src="https://github.com/user-attachments/assets/2d0dfe09-6878-4739-9d61-02507890fe31" />
+<p align="center">
+  <img alt="d7b1ceeba65ec34d3c0600ed842a86ff_720" src="https://github.com/user-attachments/assets/2d0dfe09-6878-4739-9d61-02507890fe31" />
+</p>
 
 ## NES Emulator
 > **Key Mapping:** `Q` -> A | `E` -> B | `Z` -> Select | `C` -> Start | `W` `S` `A` `D` -> Directional Pad
-<img width="1282" height="839" alt="QQ_1787149465359" src="https://github.com/user-attachments/assets/6265a4b7-4225-4f45-a1ea-091b929ab840" />
+<p align="center">
+  <img alt="QQ_1787149465359" src="https://github.com/user-attachments/assets/6265a4b7-4225-4f45-a1ea-091b929ab840" />
+</p>
   
-## Nyan cat
-<img width="1282" height="839" alt="QQ_1786863585140" src="https://github.com/user-attachments/assets/4d7d2cce-847c-43b0-8f61-f5433d30cb28" />  
-
 ## Running on real hardware
 
 Format a USB drive as FAT32 and copy the contents of `Drive` to its root. To use UEFI network support on real hardware, enable it in the firmware settings.

@@ -10,6 +10,48 @@ using System.Runtime.InteropServices;
 
 internal unsafe class NativeLib
 {
+    [DllImport("*")]
+    public static extern double MathSqrt(double value);
+
+    [DllImport("*")]
+    public static extern double MathAbs(double value);
+
+    [DllImport("*")]
+    public static extern double MathMax(double left, double right);
+
+    [DllImport("*")]
+    public static extern double MathMin(double left, double right);
+
+    [DllImport("*")]
+    public static extern float MathAbsSingle(float value);
+
+    [DllImport("*")]
+    public static extern float MathMaxSingle(float left, float right);
+
+    [DllImport("*")]
+    public static extern float MathMinSingle(float left, float right);
+
+    [DllImport("*")]
+    public static extern double MathFloor(double value);
+
+    [DllImport("*")]
+    public static extern double MathCeiling(double value);
+
+    [DllImport("*")]
+    public static extern double MathTruncate(double value);
+
+    [DllImport("*")]
+    public static extern double MathRound(double value);
+
+    [DllImport("*")]
+    public static extern int SupportRdrand();
+
+    [DllImport("*")]
+    public static extern int IsTcg();
+
+    [DllImport("*")]
+    public static extern int Rdrand64(out ulong value);
+
     [DllImport("*", EntryPoint = "vsnprintf_")]
     public static extern int snprintf(byte* buffer, int count, void* format, params VariableArgument[] va);
 

@@ -14,9 +14,9 @@ namespace System.IO
         }
 
         public override int Length => (int)_fileSize;
-        public override bool CanRead => File != null;
+        public override bool CanRead => File != null && _canRead;
         public override bool CanSeek => File != null;
-        public override bool CanWrite => File != null;
+        public override bool CanWrite => File != null && _canWrite;
 
         EFI_FILE_HANDLE* Volume = null;
         EFI_FILE_HANDLE* File = null;
@@ -32,9 +32,29 @@ namespace System.IO
         private byte[] _writeBuffer;
         private ulong _fileSize;
         private bool _asyncSupported;
+        private bool _canRead;
+        private bool _canWrite;
 
         public FileStream(string path, FileMode mode)
+            : this(path, mode, FileAccess.ReadWrite, FileShare.None)
         {
+        }
+
+        public FileStream(string path, FileMode mode, FileAccess access)
+            : this(path, mode, access, FileShare.None)
+        {
+        }
+
+        public FileStream(string path, FileMode mode, FileAccess access, FileShare share)
+        {
+            if (string.IsNullOrEmpty(path) || (int)access < (int)FileAccess.Read || (int)access > (int)FileAccess.ReadWrite)
+                throw new ArgumentException();
+            if ((mode == FileMode.CreateNew || mode == FileMode.Create || mode == FileMode.Truncate || mode == FileMode.Append) &&
+                (access & FileAccess.Write) != FileAccess.Write)
+                throw new ArgumentException();
+
+            _canRead = (access & FileAccess.Read) == FileAccess.Read;
+            _canWrite = (access & FileAccess.Write) == FileAccess.Write;
             _poller = new FileStreamPoller(this);
 
             EFI_LOADED_IMAGE_PROTOCOL* loadedimage = null;
@@ -51,17 +71,32 @@ namespace System.IO
                     throw new IOException();
                 Volume = vol;
             }
+            if (mode == FileMode.CreateNew)
+            {
+                EFI_FILE_HANDLE* existing = null;
+                fixed (char* ptr = path)
+                {
+                    if (Volume->Open(Volume, &existing, ptr, EFI_FILE_MODE_READ, 0) == EFI_SUCCESS && existing != null)
+                    {
+                        existing->Close(existing);
+                        Volume->Close(Volume);
+                        Volume = null;
+                        throw new IOException();
+                    }
+                }
+            }
+
             {
                 EFI_FILE_HANDLE* file = null;
+                // FAT drivers commonly require read access for GetInfo/SetInfo even
+                // when the managed stream is exposed as write-only.
+                ulong openMode = EFI_FILE_MODE_READ;
+                if (_canWrite)
+                    openMode |= EFI_FILE_MODE_WRITE;
+                if (mode == FileMode.CreateNew || mode == FileMode.Create || mode == FileMode.OpenOrCreate || mode == FileMode.Append)
+                    openMode |= EFI_FILE_MODE_CREATE;
                 fixed (char* ptr = path)
-                    if (Volume->Open(Volume, &file, ptr, mode switch
-                    {
-                        FileMode.CreateNew => EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE | EFI_FILE_MODE_CREATE,
-                        FileMode.Create => EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE | EFI_FILE_MODE_CREATE,
-                        FileMode.Open => EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE,
-                        FileMode.OpenOrCreate => EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE | EFI_FILE_MODE_CREATE,
-                        _ => throw new NotSupportedException()
-                    }, 0) != EFI_SUCCESS || file == null)
+                    if (Volume->Open(Volume, &file, ptr, openMode, 0) != EFI_SUCCESS || file == null)
                         throw new IOException();
                 File = file;
             }
@@ -89,7 +124,7 @@ namespace System.IO
                 }
 
                 EFI_FILE_INFO* fileinfo = (EFI_FILE_INFO*)pfileinfo;
-                if (mode == FileMode.Create && fileinfo->FileSize != 0)
+                if ((mode == FileMode.Create || mode == FileMode.Truncate) && fileinfo->FileSize != 0)
                 {
                     fileinfo->FileSize = 0;
                     if (File->SetInfo(File, (EFI_GUID*)EFI_FILE_INFO_ID, fileinfosize, pfileinfo) != EFI_SUCCESS)
@@ -105,7 +140,73 @@ namespace System.IO
                 _fileSize = fileinfo->FileSize;
             }
 
+            if (mode == FileMode.Append && File->SetPosition(File, ulong.MaxValue) != EFI_SUCCESS)
+            {
+                File->Close(File);
+                Volume->Close(Volume);
+                File = null;
+                Volume = null;
+                throw new IOException();
+            }
+
             InitializeAsyncIO();
+        }
+
+        public override long Position
+        {
+            get
+            {
+                EnsureOpen();
+                ulong position = 0;
+                if (File->GetPosition(File, &position) != EFI_SUCCESS)
+                    throw new IOException();
+                return (long)position;
+            }
+            set
+            {
+                EnsureOpen();
+                if (value < 0 || File->SetPosition(File, (ulong)value) != EFI_SUCCESS)
+                    throw new IOException();
+            }
+        }
+
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            EnsureOpen();
+            long position = origin switch
+            {
+                SeekOrigin.Begin => offset,
+                SeekOrigin.Current => Position + offset,
+                SeekOrigin.End => (long)_fileSize + offset,
+                _ => throw new ArgumentException()
+            };
+            Position = position;
+            return position;
+        }
+
+        public override void SetLength(long value)
+        {
+            EnsureOpen();
+            if (!_canWrite || value < 0)
+                throw new IOException();
+
+            ulong fileinfosize = 0;
+            if (File->GetInfo(File, (EFI_GUID*)EFI_FILE_INFO_ID, &fileinfosize, null) != EFI_BUFFER_TOO_SMALL)
+                throw new IOException();
+
+            byte[] fileinfobuffer = new byte[fileinfosize];
+            fixed (byte* pfileinfo = fileinfobuffer)
+            {
+                if (File->GetInfo(File, (EFI_GUID*)EFI_FILE_INFO_ID, &fileinfosize, pfileinfo) != EFI_SUCCESS)
+                    throw new IOException();
+                ((EFI_FILE_INFO*)pfileinfo)->FileSize = (ulong)value;
+                if (File->SetInfo(File, (EFI_GUID*)EFI_FILE_INFO_ID, fileinfosize, pfileinfo) != EFI_SUCCESS)
+                    throw new IOException();
+            }
+
+            _fileSize = (ulong)value;
+            if (Position > value)
+                Position = value;
         }
 
         public override int Read(byte[] buffer)
@@ -129,7 +230,7 @@ namespace System.IO
         {
             if (buffer == null)
                 return Task.FromException<int>(new ArgumentNullException());
-            if (File == null)
+            if (File == null || !_canRead)
                 return Task.FromException<int>(new IOException());
             if (_readCompletion != null)
                 return Task.FromException<int>(new IOException());
@@ -179,7 +280,7 @@ namespace System.IO
         {
             if (buffer == null)
                 return Task.FromException<int>(new ArgumentNullException());
-            if (File == null)
+            if (File == null || !_canWrite)
                 return Task.FromException<int>(new IOException());
             if (_writeCompletion != null)
                 return Task.FromException<int>(new IOException());
@@ -278,6 +379,8 @@ namespace System.IO
                 }
 
                 _asyncSupported = false;
+                _canRead = false;
+                _canWrite = false;
             }
 
             if (failure != null)
@@ -457,6 +560,12 @@ namespace System.IO
                 throw new ArgumentNullException();
             if (offset < 0 || count < 0 || offset > buffer.Length - count)
                 throw new ArgumentException();
+        }
+
+        private void EnsureOpen()
+        {
+            if (File == null)
+                throw new IOException();
         }
     }
 }

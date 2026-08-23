@@ -40,7 +40,7 @@ internal sealed unsafe class WavPlayer
         }
 
         WaveOutAudio audio = new WaveOutAudio(OutputSampleRate);
-        
+
         try
         {
             byte[] buffer = new byte[InputChunkBytes];

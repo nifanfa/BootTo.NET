@@ -1,6 +1,6 @@
 namespace System.Text
 {
-    internal unsafe class UTF8Encoding : Encoding
+    public unsafe class UTF8Encoding : Encoding
     {
         private const uint ReplacementCharacter = 0xFFFD;
 

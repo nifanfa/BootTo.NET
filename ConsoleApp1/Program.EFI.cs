@@ -1,6 +1,7 @@
 using Playground.NES;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.IO;
 using System.IO.Ports;
 using System.Runtime;
@@ -26,7 +27,7 @@ partial class Program
     unsafe static EFI_STATUS EfiMain(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* systemTable)
     {
         ulong stackMarker = 0;
-        EFI.GC.InitializeStack(&stackMarker);
+        GarbageCollector.InitializeStack(&stackMarker);
 
         InitializeLib(imageHandle, systemTable);
 
@@ -91,19 +92,6 @@ partial class Program
 #endif
 
 #if true
-        EFI_GRAPHICS_OUTPUT_PROTOCOL* Graphics = null;
-        EFI_STATUS GraphicsStatus = gBS->LocateProtocol(
-            (EFI_GUID*)EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID,
-            null,
-            (void**)&Graphics);
-        if ((ulong)GraphicsStatus != EFI_SUCCESS ||
-            Graphics == null ||
-            Graphics->Mode == null ||
-            Graphics->Mode->Info == null)
-        {
-            return (ulong)GraphicsStatus == EFI_SUCCESS ? EFI_DEVICE_ERROR : GraphicsStatus;
-        }
-
         Console.WriteLine("+++++++++++++++++++++++++++");
         string[] files = Directory.GetFiles(@"\");
         for (int i = 0; i < files.Length; i++)
@@ -112,180 +100,8 @@ partial class Program
         }
         Console.Write("Please select NES ROM(number):");
         string file = files[Convert.ToInt32(Console.ReadLine())];
-        NesTest test = new NesTest(Graphics, file);
+        NesTest test = new NesTest(file);
         _ = test.Run();
-#endif
-
-#if false
-        #region NyanCat
-        {
-            EFI_GRAPHICS_OUTPUT_PROTOCOL* Graphics = null;
-            EFI_STATUS GraphicsStatus = gBS->LocateProtocol(
-                (EFI_GUID*)EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID,
-                null,
-                (void**)&Graphics);
-            if ((ulong)GraphicsStatus != EFI_SUCCESS ||
-                Graphics == null ||
-                Graphics->Mode == null ||
-                Graphics->Mode->Info == null)
-            {
-                return (ulong)GraphicsStatus == EFI_SUCCESS ? EFI_DEVICE_ERROR : GraphicsStatus;
-            }
-
-            int ScreenWidth = (int)Graphics->Mode->Info->HorizontalResolution;
-            int ScreenHeight = (int)Graphics->Mode->Info->VerticalResolution;
-            uint[] Frame = new uint[NyanCat.PixelCount];
-            uint[] Screen = new uint[ScreenWidth * ScreenHeight];
-
-            for (; ; )
-            {
-                for (int frameIndex = 0; frameIndex < NyanCat.FrameCount; frameIndex++)
-                {
-                    NyanCat.DecodeFrame(frameIndex, Frame);
-                    Resize(Screen, ScreenWidth, Frame, NyanCat.Width);
-
-                    fixed (uint* pixels = Screen)
-                    {
-                        Graphics->Blt(
-                            Graphics,
-                            (EFI_GRAPHICS_OUTPUT_BLT_PIXEL*)pixels,
-                            EfiBltBufferToVideo,
-                            0,
-                            0,
-                            0,
-                            0,
-                            (ulong)ScreenWidth,
-                            (ulong)ScreenHeight,
-                            0);
-                    }
-
-                    Thread.Sleep(NyanCat.FrameDelayMilliseconds);
-                }
-            }
-        }
-        #endregion
-#endif
-
-#if false
-        #region Cursor
-        {
-            int[] cursor = new int[]
-        {
-            1,0,0,0,0,0,0,0,0,0,0,0,
-            1,1,0,0,0,0,0,0,0,0,0,0,
-            1,0,1,0,0,0,0,0,0,0,0,0,
-            1,0,0,1,0,0,0,0,0,0,0,0,
-            1,0,0,0,1,0,0,0,0,0,0,0,
-            1,0,0,0,0,1,0,0,0,0,0,0,
-            1,0,0,0,0,0,1,0,0,0,0,0,
-            1,0,0,0,0,0,0,1,0,0,0,0,
-            1,0,0,0,0,0,0,0,1,0,0,0,
-            1,0,0,0,0,0,0,0,0,1,0,0,
-            1,0,0,0,0,0,0,0,0,0,1,0,
-            1,0,0,0,0,0,0,0,0,0,0,1,
-            1,0,0,0,0,0,0,1,1,1,1,1,
-            1,0,0,0,1,0,0,1,0,0,0,0,
-            1,0,0,1,0,1,0,0,1,0,0,0,
-            1,0,1,0,0,1,0,0,1,0,0,0,
-            1,1,0,0,0,0,1,0,0,1,0,0,
-            0,0,0,0,0,0,1,0,0,1,0,0,
-            0,0,0,0,0,0,0,1,1,0,0,0
-        };
-
-            EFI_SIMPLE_POINTER_PROTOCOL* simplePointer = null;
-            EFI_STATUS simplePointerStatus = gBS->LocateProtocol((EFI_GUID*)EFI_SIMPLE_POINTER_PROTOCOL_GUID, null, (void**)&simplePointer);
-            if ((ulong)simplePointerStatus != EFI_SUCCESS || simplePointer == null || simplePointer->Mode == null)
-            {
-                Console.WriteLine("EFI Simple Pointer Protocol is unavailable.");
-                return (ulong)simplePointerStatus == EFI_SUCCESS ? EFI_DEVICE_ERROR : simplePointerStatus;
-            }
-
-            GetFB(out var fb, out var width, out var height);
-            EFI_SIMPLE_POINTER_STATE simpleState;
-            const double PointerPixelsPerMillimeter = 4.0;
-            double remainingMovementX = 0;
-            double remainingMovementY = 0;
-
-            int CursorX = 640;
-            int CursorY = 400;
-            DrawCursor(fb, CursorX, CursorY);
-
-            for (; ; )
-            {
-                EFI_STATUS stateStatus = simplePointer->GetState(simplePointer, &simpleState);
-                if ((ulong)stateStatus != EFI_SUCCESS)
-                    continue;
-
-                remainingMovementX += ScalePointerMovement(simpleState.RelativeMovementX, simplePointer->Mode->ResolutionX);
-                remainingMovementY += ScalePointerMovement(simpleState.RelativeMovementY, simplePointer->Mode->ResolutionY);
-
-                int movementX = (int)remainingMovementX;
-                int movementY = (int)remainingMovementY;
-                remainingMovementX -= movementX;
-                remainingMovementY -= movementY;
-
-                int x = Clamp(CursorX + movementX, 0, (int)width - 1);
-                int y = Clamp(CursorY + movementY, 0, (int)height - 1);
-
-                if (CursorX != x || CursorY != y)
-                {
-                    DrawCursor(fb, CursorX, CursorY, true);
-                    CursorX = x;
-                    CursorY = y;
-                    DrawCursor(fb, CursorX, CursorY);
-                }
-            }
-
-            void DrawCursor(uint* fb, int x, int y, bool clear = false)
-            {
-                for (int h = 0; h < 19; h++)
-                {
-                    for (int w = 0; w < 12; w++)
-                    {
-                        if (cursor[h * 12 + w] == 0 || clear)
-                        {
-                            SetPixel(w + x, h + y, 0);
-                        }
-                        else if (cursor[h * 12 + w] == 1)
-                        {
-                            SetPixel(w + x, h + y, 0xFFFFFFFF);
-                        }
-                    }
-                }
-            }
-
-            void SetPixel(int x, int y, uint color)
-            {
-                if (x < 0 || y < 0 || x >= width || y >= height)
-                    return;
-
-                fb[width * y + x] = color;
-            }
-
-            double ScalePointerMovement(int movement, ulong resolution)
-            {
-                return resolution == 0
-                    ? movement
-                    : movement * PointerPixelsPerMillimeter / resolution;
-            }
-
-            int Clamp(int value, int min, int max)
-            {
-                if (value < min) return min;
-                if (value > max) return max;
-                return value;
-            }
-
-            void GetFB(out uint* fb, out uint width, out uint height)
-            {
-                EFI_GRAPHICS_OUTPUT_PROTOCOL* gop;
-                gBS->LocateProtocol((EFI_GUID*)EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID, null, (void**)&gop);
-                fb = (uint*)gop->Mode->FrameBufferBase;
-                width = gop->Mode->Info->HorizontalResolution;
-                height = gop->Mode->Info->VerticalResolution;
-            }
-        }
-        #endregion
 #endif
 
 #if false
@@ -351,17 +167,13 @@ partial class Program
     {
         Emulator nes = new Emulator();
 
-        unsafe EFI_GRAPHICS_OUTPUT_PROTOCOL* Graphics;
-        int ScreenWidth, ScreenHeight;
+        Graphics graphics;
 
         uint[] cachedDisplayBuffer;
 
-        public unsafe NesTest(EFI_GRAPHICS_OUTPUT_PROTOCOL* graphics, string rom)
+        public unsafe NesTest(string rom)
         {
-            Graphics = graphics;
-
-            ScreenWidth = (int)Graphics->Mode->Info->HorizontalResolution;
-            ScreenHeight = (int)Graphics->Mode->Info->VerticalResolution;
+            graphics = CreateGraphics();
 
             cachedDisplayBuffer = new uint[nes.gameRender.screenWidth * nes.gameRender.screenHeight];
 
@@ -379,6 +191,7 @@ partial class Program
                 }
                 Console.WriteLine();
             }
+            Console.Write(Convert.ToBoolean(IsTcg()) ? "Slow QEMU TCG detected. Enable Windows Hypervisor Platform." : string.Empty);
 
             nes.openROM(rom);
         }
@@ -402,8 +215,8 @@ partial class Program
 
                 if (nes.gameRender.screenUpdated)
                 {
-                    int baseX = (ScreenWidth / 2) - (nes.gameRender.screenWidth / 2);
-                    int baseY = (ScreenHeight / 2) - (nes.gameRender.screenHeight / 2);
+                    int baseX = (int)((graphics.VisibleClipBounds.Width / 2) - (nes.gameRender.screenWidth / 2));
+                    int baseY = (int)((graphics.VisibleClipBounds.Height / 2) - (nes.gameRender.screenHeight / 2));
 
                     for (int y = 0; y < nes.gameRender.screenHeight; y++)
                     {
@@ -415,7 +228,7 @@ partial class Program
                                 cachedDisplayBuffer[y * nes.gameRender.screenWidth + x] = color;
                                 unsafe
                                 {
-                                    Graphics->Blt(Graphics, (EFI_GRAPHICS_OUTPUT_BLT_PIXEL*)&color, EfiBltBufferToVideo, 0,0, (ulong)(baseX + x), (ulong)(baseY + y), 1, 1, 0);
+                                    graphics.DrawPoint(baseX + x, baseY + y, Color.FromArgb(color));
                                 }
                             }
                         }
@@ -565,10 +378,10 @@ partial class Program
 
     unsafe static EFI_STATUS LoadDriver(string path)
     {
-        if (!System.IO.File.Exists(path))
+        if (!File.Exists(path))
             return EFI_NOT_FOUND;
 
-        byte[] image = System.IO.File.ReadAllBytes(path);
+        byte[] image = File.ReadAllBytes(path);
         EFI_HANDLE driverHandle = (void*)null;
         EFI_STATUS status;
         fixed (byte* imageBuffer = image)
