@@ -116,21 +116,35 @@ internal static unsafe class UefiFileSystem
 
                 fixed (byte* data = buffer)
                 {
-                    EFI_FILE_INFO* info = (EFI_FILE_INFO*)data;
-                    bool isDirectory = (info->Attribute & EFI_FILE_DIRECTORY) != 0;
-                    if (directoriesOnly ? isDirectory : !isDirectory)
+                    byte* current = data;
+                    ulong remaining = size;
+                    while (remaining >= (ulong)sizeof(ulong))
                     {
-                        char* name = (char*)((byte*)info + sizeof(EFI_FILE_INFO) - sizeof(char));
-                        int nameLength = 0;
-                        while (nameLength < 2048 && name[nameLength] != '\0')
-                            nameLength++;
-                        if (nameLength > 0 && name[0] != '.' && !(name[0] == '.' && name[1] == '\0'))
+                        EFI_FILE_INFO* info = (EFI_FILE_INFO*)current;
+                        ulong recordSize = info->Size;
+                        char* name = info->FileName;
+                        ulong nameOffset = (ulong)((byte*)name - current);
+                        if (recordSize < nameOffset + (ulong)sizeof(char) || recordSize > remaining)
+                            break;
+
+                        bool isDirectory = (info->Attribute & EFI_FILE_DIRECTORY) != 0;
+                        if (directoriesOnly ? isDirectory : !isDirectory)
                         {
-                            char[] nameBuffer = new char[nameLength];
-                            for (int i = 0; i < nameLength; i++)
-                                nameBuffer[i] = name[i];
-                            result.Add(new string(nameBuffer));
+                            ulong nameCapacity = (recordSize - nameOffset) / (ulong)sizeof(char);
+                            int nameLength = 0;
+                            while ((ulong)nameLength < nameCapacity && name[nameLength] != '\0')
+                                nameLength++;
+                            if (nameLength > 0 && name[0] != '.' && !(nameLength > 1 && name[1] == '\0'))
+                            {
+                                char[] nameBuffer = new char[nameLength];
+                                for (int i = 0; i < nameLength; i++)
+                                    nameBuffer[i] = name[i];
+                                result.Add(new string(nameBuffer));
+                            }
                         }
+
+                        current += recordSize;
+                        remaining -= recordSize;
                     }
                 }
             }
