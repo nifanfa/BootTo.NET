@@ -322,26 +322,142 @@
         public static void Write(string s)
         {
             lock (s_syncRoot)
-            {
-                for (int i = 0; i < s.Length; i++)
-                    WriteImpl(s[i]);
-            }
+                WriteStringImpl(s);
         }
 
         public static void WriteLine(string s)
         {
             lock (s_syncRoot)
             {
-                for (int i = 0; i < s.Length; i++)
-                    WriteImpl(s[i]);
+                WriteStringImpl(s);
                 WriteLineImpl();
             }
         }
+
+        public static void Write(bool value) => Write(value ? "True" : "False");
+        public static void Write(byte value) => Write(value.ToString());
+        public static void Write(sbyte value) => Write(value.ToString());
+        public static void Write(short value) => Write(value.ToString());
+        public static void Write(ushort value) => Write(value.ToString());
+        public static void Write(int value) => Write(value.ToString());
+        public static void Write(uint value) => Write(value.ToString());
+        public static void Write(long value) => Write(value.ToString());
+        public static void Write(ulong value) => Write(value.ToString());
+        public static void Write(float value) => Write(value.ToString());
+        public static void Write(double value) => Write(value.ToString());
+        public static void Write(object value) => Write(value?.ToString() ?? string.Empty);
+
+        public static void Write(char[] buffer)
+        {
+            if (buffer == null)
+                return;
+
+            Write(buffer, 0, buffer.Length);
+        }
+
+        public static void Write(char[] buffer, int index, int count)
+        {
+            if (buffer == null)
+                throw new ArgumentNullException();
+            ValidateCharArrayRange(buffer, index, count);
+
+            lock (s_syncRoot)
+            {
+                for (int i = 0; i < count; i++)
+                    WriteImpl(buffer[index + i]);
+            }
+        }
+
+        public static void Write(string format, object arg0)
+            => Write(String.Format(format, arg0));
+
+        public static void Write(string format, object arg0, object arg1)
+            => Write(String.Format(format, arg0, arg1));
+
+        public static void Write(string format, object arg0, object arg1, object arg2)
+            => Write(String.Format(format, arg0, arg1, arg2));
+
+        public static void Write(string format, params object[] args)
+            => Write(String.Format(format, args));
 
         public static void WriteLine()
         {
             lock (s_syncRoot)
                 WriteLineImpl();
+        }
+
+        public static void WriteLine(char c)
+        {
+            lock (s_syncRoot)
+            {
+                WriteImpl(c);
+                WriteLineImpl();
+            }
+        }
+
+        public static void WriteLine(bool value) => WriteLine(value ? "True" : "False");
+        public static void WriteLine(byte value) => WriteLine(value.ToString());
+        public static void WriteLine(sbyte value) => WriteLine(value.ToString());
+        public static void WriteLine(short value) => WriteLine(value.ToString());
+        public static void WriteLine(ushort value) => WriteLine(value.ToString());
+        public static void WriteLine(int value) => WriteLine(value.ToString());
+        public static void WriteLine(uint value) => WriteLine(value.ToString());
+        public static void WriteLine(long value) => WriteLine(value.ToString());
+        public static void WriteLine(ulong value) => WriteLine(value.ToString());
+        public static void WriteLine(float value) => WriteLine(value.ToString());
+        public static void WriteLine(double value) => WriteLine(value.ToString());
+        public static void WriteLine(object value) => WriteLine(value?.ToString() ?? string.Empty);
+
+        public static void WriteLine(char[] buffer)
+        {
+            if (buffer == null)
+            {
+                WriteLine();
+                return;
+            }
+
+            WriteLine(buffer, 0, buffer.Length);
+        }
+
+        public static void WriteLine(char[] buffer, int index, int count)
+        {
+            if (buffer == null)
+                throw new ArgumentNullException();
+            ValidateCharArrayRange(buffer, index, count);
+
+            lock (s_syncRoot)
+            {
+                for (int i = 0; i < count; i++)
+                    WriteImpl(buffer[index + i]);
+                WriteLineImpl();
+            }
+        }
+
+        public static void WriteLine(string format, object arg0)
+            => WriteLine(String.Format(format, arg0));
+
+        public static void WriteLine(string format, object arg0, object arg1)
+            => WriteLine(String.Format(format, arg0, arg1));
+
+        public static void WriteLine(string format, object arg0, object arg1, object arg2)
+            => WriteLine(String.Format(format, arg0, arg1, arg2));
+
+        public static void WriteLine(string format, params object[] args)
+            => WriteLine(String.Format(format, args));
+
+        private static void WriteStringImpl(string s)
+        {
+            if (s == null)
+                return;
+
+            for (int i = 0; i < s.Length; i++)
+                WriteImpl(s[i]);
+        }
+
+        private static void ValidateCharArrayRange(char[] buffer, int index, int count)
+        {
+            if (index < 0 || count < 0 || index > buffer.Length - count)
+                throw new ArgumentException();
         }
 
         private static void WriteLineImpl()
@@ -367,6 +483,37 @@
 
         public static System.Threading.Tasks.Task<ConsoleKeyInfo> ReadKeyAsync()
             => new ReadKeyOperation().Start();
+
+        public static string ReadLine()
+        {
+            Text.StringBuilder line = new Text.StringBuilder();
+            while (true)
+            {
+                ConsoleKeyInfo key = ReadKey();
+                if (key.Key == ConsoleKey.Enter || key.KeyChar == '\r' || key.KeyChar == '\n')
+                {
+                    WriteLine();
+                    return line.ToString();
+                }
+
+                if (key.Key == ConsoleKey.Backspace || key.KeyChar == '\b')
+                {
+                    if (line.Length > 0)
+                    {
+                        line.Length--;
+                        Write("\b \b");
+                    }
+                    continue;
+                }
+
+                char character = key.KeyChar;
+                if (character < ' ' || character == '\x7F')
+                    continue;
+
+                line.Append(character);
+                Write(character);
+            }
+        }
 
         public static System.Threading.Tasks.Task<ConsoleKeyEvent> ReadKeyEventAsync()
         {

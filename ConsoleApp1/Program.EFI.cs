@@ -104,7 +104,15 @@ partial class Program
             return (ulong)GraphicsStatus == EFI_SUCCESS ? EFI_DEVICE_ERROR : GraphicsStatus;
         }
 
-        NesTest test = new NesTest(Graphics, @"\Contra (USA).nes");
+        Console.WriteLine("+++++++++++++++++++++++++++");
+        string[] files = Directory.GetFiles(@"\");
+        for (int i = 0; i < files.Length; i++)
+        {
+            Console.WriteLine($"{i}){files[i]}");
+        }
+        Console.Write("Please select NES ROM(number):");
+        string file = files[Convert.ToInt32(Console.ReadLine())];
+        NesTest test = new NesTest(Graphics, file);
         _ = test.Run();
 #endif
 

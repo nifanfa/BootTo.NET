@@ -88,7 +88,21 @@ namespace System.IO
                     throw new IOException();
                 }
 
-                _fileSize = ((EFI_FILE_INFO*)pfileinfo)->FileSize;
+                EFI_FILE_INFO* fileinfo = (EFI_FILE_INFO*)pfileinfo;
+                if (mode == FileMode.Create && fileinfo->FileSize != 0)
+                {
+                    fileinfo->FileSize = 0;
+                    if (File->SetInfo(File, (EFI_GUID*)EFI_FILE_INFO_ID, fileinfosize, pfileinfo) != EFI_SUCCESS)
+                    {
+                        File->Close(File);
+                        Volume->Close(Volume);
+                        File = null;
+                        Volume = null;
+                        throw new IOException();
+                    }
+                }
+
+                _fileSize = fileinfo->FileSize;
             }
 
             InitializeAsyncIO();

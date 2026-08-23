@@ -8,7 +8,7 @@
 ## Synopsis
 *When will hobby OS developers realize that we don't need to implement everything from scratch? With a clean environment providing basic network, graphics, filesystem, and USB support, there's no need to build it yourself—just load a DXE driver and go ahead with your 'OS'.*  
 
-Publishing uses the repository-local `qemu-img` to create `ConsoleApp1.vhd`, then starts the repository-local QEMU x64 emulator. QEMU, its Windows runtime dependencies, and the EDK2 UEFI firmware are included in `qemu`; no system QEMU installation and no administrator privileges are required.
+Publishing updates the boot files in `Drive`, then starts the repository-local QEMU x64 emulator with that directory exposed directly as a writable virtual FAT disk. QEMU, its Windows runtime dependencies, and the EDK2 UEFI firmware are included in `qemu`; no system QEMU installation and no administrator privileges are required.
 
 Use `dotnet publish --tl:off -c Release ConsoleApp1` to publish and run with live build output. Pass `-p:RunQemu=false` to publish without starting QEMU.
 
@@ -39,6 +39,6 @@ Format a USB drive as FAT32 and copy the contents of `Drive` to its root. To use
 
 ## Debugging with QEMU
 
-After publishing, `CopyEFI` updates `Drive/EFI/BOOT/BOOTX64.efi`, `CreateVHD` converts that directory into a dynamic VHD without mounting it, and `RunQemu` boots the VHD with the bundled EDK2 firmware. Pass `-p:RunQemu=false` to create the VHD without starting the emulator, or also pass `-p:CreateVHD=false` to skip VHD creation.
+After publishing, `CopyEFI` updates `Drive/EFI/BOOT/BOOTX64.efi`, and `RunQemu` exposes `Drive` directly as a writable virtual FAT disk and boots it with the bundled EDK2 firmware. Pass `-p:RunQemu=false` to publish without starting the emulator.
 
 The SDL window uses QEMU's default `Left Ctrl+Left Alt+G` shortcut to release mouse and keyboard input. On Windows, select the English input method for the QEMU window because an active IME can intercept this shortcut.

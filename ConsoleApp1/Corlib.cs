@@ -58,7 +58,10 @@ namespace System
     }
     public struct Void { }
 
-    public struct Boolean { }
+    public struct Boolean
+    {
+        public override string ToString() => this ? "True" : "False";
+    }
     public partial struct Char
     {
         public const char MinValue = (char)0;
@@ -214,17 +217,6 @@ namespace System
     {
         public static Type GetTypeFromHandle(RuntimeTypeHandle handle) => new Type();
     }
-    public static class Convert
-    {
-        public static int ToUInt16(bool boolean) => boolean ? 1 : 0;
-        public static int ToInt16(bool boolean) => boolean ? 1 : 0;
-        public static int ToInt16(byte b) => b;
-        public static bool ToBoolean(int integer) => integer != 0;
-        public static byte ToByte(int v) => (byte)v;
-        public static byte ToByte(uint v) => (byte)v;
-        public static int ToInt32(byte b) => b;
-        public static int ToInt32(int b) => b;
-    }
     public delegate void EventHandler(object? sender, EventArgs e);
     public class EventArgs
     {
@@ -347,6 +339,13 @@ namespace System
     {
         public EEType* Value;
 
+        // EETypePtrOf<T> is replaced by the CoreRT intrinsic with an EEType
+        // pointer passed through this constructor.
+        internal EETypePtr(IntPtr value)
+        {
+            Value = (EEType*)(void*)value;
+        }
+
         [Intrinsic]
         internal extern static EETypePtr EETypePtrOf<T>();
     }
@@ -360,10 +359,17 @@ namespace System
 
     public struct Nullable<T> where T : struct { }
 
+    public static partial class Convert
+    {
+        public static string ToString(object value) => value?.ToString() ?? string.Empty;
+    }
+
     public sealed partial class String
     {
         public int Length;
         internal char FirstChar;
+
+        public override string ToString() => this;
 
         [Intrinsic]
         public static readonly string Empty = "";
@@ -386,31 +392,86 @@ namespace System
 
         public unsafe static string Concat(string a, string b)
         {
-            int Length = a.Length + b.Length;
-            char* ptr = stackalloc char[Length];
-            int currentIndex = 0;
-            for (int i = 0; i < a.Length; i++)
-            {
-                ptr[currentIndex] = a[i];
-                currentIndex++;
-            }
-            for (int i = 0; i < b.Length; i++)
-            {
-                ptr[currentIndex] = b[i];
-                currentIndex++;
-            }
-            return new string(ptr, 0, Length);
+            return ConcatStrings(a, b);
         }
 
         public static string Concat(string a, string b, string c) => Concat(Concat(a, b), c);
 
         public static string Concat(string a, string b, string c, string d) => Concat(Concat(a, b), Concat(c, d));
 
-        public static string Concat(params string[] vs)
+        public static string Concat(object value)
+            => Convert.ToString(value);
+
+        public static string Concat(object value0, object value1)
+            => Concat(Convert.ToString(value0), Convert.ToString(value1));
+
+        public static string Concat(object value0, object value1, object value2)
+            => Concat(Convert.ToString(value0), Convert.ToString(value1), Convert.ToString(value2));
+
+        public static string Concat(object[] values)
         {
-            string s = Empty;
-            for (int i = 0; i < vs.Length; i++) s += vs[i];
-            return s;
+            if (values == null)
+                throw new ArgumentNullException();
+
+            if (values.Length == 0)
+                return Empty;
+
+            string[] strings = new string[values.Length];
+            for (int i = 0; i < values.Length; i++)
+                strings[i] = Convert.ToString(values[i]);
+
+            return ConcatStrings(strings);
+        }
+
+        public static string Concat(params string[] values) => ConcatStrings(values);
+
+        private static unsafe string ConcatStrings(string[] values)
+        {
+            if (values == null)
+                throw new ArgumentNullException();
+
+            int length = 0;
+            for (int i = 0; i < values.Length; i++)
+            {
+                string value = values[i];
+                if (value != null)
+                    length += value.Length;
+            }
+
+            if (length == 0)
+                return Empty;
+
+            char* buffer = stackalloc char[length];
+            int offset = 0;
+            for (int i = 0; i < values.Length; i++)
+            {
+                string value = values[i];
+                if (value == null)
+                    continue;
+
+                for (int j = 0; j < value.Length; j++)
+                    buffer[offset++] = value[j];
+            }
+
+            return new string(buffer, 0, length);
+        }
+
+        private static unsafe string ConcatStrings(string a, string b)
+        {
+            int aLength = a == null ? 0 : a.Length;
+            int bLength = b == null ? 0 : b.Length;
+            int length = aLength + bLength;
+            if (length == 0)
+                return Empty;
+
+            char* buffer = stackalloc char[length];
+            int offset = 0;
+            for (int i = 0; i < aLength; i++)
+                buffer[offset++] = a[i];
+            for (int i = 0; i < bLength; i++)
+                buffer[offset++] = b[i];
+
+            return new string(buffer, 0, length);
         }
 
         public extern unsafe String(char* ptr);
@@ -443,7 +504,7 @@ namespace System
             EETypePtr et = EETypePtr.EETypePtrOf<string>();
 
             char* start = ptr + index;
-            object data = InternalCalls.RhNewString(et.EEType, length);
+            object data = InternalCalls.RhNewString(et.Value, length);
             string s = Unsafe.As<object, string>(ref data);
 
             fixed (char* c = &s.FirstChar)
@@ -2933,7 +2994,7 @@ namespace Internal.Runtime.CompilerHelpers
 }
 namespace System.Linq
 {
-    public static class Enumerable
+    public static partial class Enumerable
     {
         public static bool Any<TSource>(this TSource[] source)
         {
@@ -3018,16 +3079,6 @@ namespace System.Linq
                 if (Equals(source[i], value))
                     return true;
             return false;
-        }
-
-        public static List<TSource> ToList<TSource>(this TSource[] source)
-        {
-            if (source == null)
-                throw new ArgumentNullException();
-            List<TSource> result = new List<TSource>(source.Length);
-            for (int i = 0; i < source.Length; i++)
-                result.Add(source[i]);
-            return result;
         }
 
         public static TSource[] ToArray<TSource>(this TSource[] source)
@@ -3161,24 +3212,6 @@ namespace System.Linq
             }
             finally { enumerator.Dispose(); }
         }
-
-        public static List<TSource> ToList<TSource>(this IEnumerable<TSource> source)
-        {
-            if (source == null)
-                throw new ArgumentNullException();
-            List<TSource> result = new List<TSource>();
-            IEnumerator<TSource> enumerator = source.GetEnumerator();
-            try
-            {
-                while (enumerator.MoveNext())
-                    result.Add(enumerator.Current);
-            }
-            finally { enumerator.Dispose(); }
-            return result;
-        }
-
-        public static TSource[] ToArray<TSource>(this IEnumerable<TSource> source)
-            => ToList(source).ToArray();
 
         private sealed class ArrayWhereEnumerable<TSource> : IEnumerable<TSource>
         {
