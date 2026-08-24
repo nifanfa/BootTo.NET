@@ -1,4 +1,3 @@
-using Internal.Runtime.CompilerServices;
 using System;
 using System.Runtime.InteropServices;
 
@@ -35,16 +34,12 @@ internal unsafe struct EFI_HDA_CODEC_INFO_PROTOCOL
     public readonly delegate* unmanaged<EFI_HDA_CODEC_INFO_PROTOCOL*, char**, EFI_STATUS> GetName;
 }
 
-internal interface IPcmSampleSink
-{
-    bool TryWriteSample(short left, short right);
-}
-
-internal sealed unsafe partial class WaveOutAudio : IPcmSampleSink
+internal static unsafe class WaveOutAudio
 {
     internal sealed class PcmInputConverter
     {
         private const int InputBytesPerSample = 2;
+        private const double TargetSampleRate = 44100.0;
 
         private int _sourceChannels;
         private int _sourceSampleRate;
@@ -62,8 +57,7 @@ internal sealed unsafe partial class WaveOutAudio : IPcmSampleSink
             int offset,
             int count,
             int channels,
-            int sampleRate,
-            IPcmSampleSink sink)
+            int sampleRate)
         {
             Configure(channels, sampleRate);
 
@@ -83,7 +77,7 @@ internal sealed unsafe partial class WaveOutAudio : IPcmSampleSink
 
                 if (!_hasPrevious)
                 {
-                    if (!sink.TryWriteSample(currentLeft, currentRight))
+                    if (!TryWriteSample(currentLeft, currentRight))
                         break;
 
                     _previousLeft = currentLeft;
@@ -102,7 +96,7 @@ internal sealed unsafe partial class WaveOutAudio : IPcmSampleSink
                     double phase = _phase - _inputIndex;
                     short left = Interpolate(_previousLeft, currentLeft, phase);
                     short right = Interpolate(_previousRight, currentRight, phase);
-                    if (!sink.TryWriteSample(left, right))
+                    if (!TryWriteSample(left, right))
                     {
                         stopped = true;
                         break;
@@ -123,7 +117,7 @@ internal sealed unsafe partial class WaveOutAudio : IPcmSampleSink
             return sourceOffset - offset;
         }
 
-        internal void Flush(IPcmSampleSink sink)
+        internal void Flush()
         {
             if (!_hasPrevious)
                 return;
@@ -131,13 +125,25 @@ internal sealed unsafe partial class WaveOutAudio : IPcmSampleSink
             long endIndex = _inputIndex + 1;
             while (_phase < endIndex)
             {
-                if (!sink.TryWriteSample(_previousLeft, _previousRight))
+                if (!TryWriteSample(_previousLeft, _previousRight))
                     return;
                 _phase += _step;
             }
 
             if (_phase >= endIndex)
                 _hasPrevious = false;
+        }
+
+        internal void Reset()
+        {
+            _sourceChannels = 0;
+            _sourceSampleRate = 0;
+            _hasPrevious = false;
+            _previousLeft = 0;
+            _previousRight = 0;
+            _phase = 0;
+            _step = 0;
+            _inputIndex = 0;
         }
 
         private void Configure(int channels, int sampleRate)
@@ -149,7 +155,7 @@ internal sealed unsafe partial class WaveOutAudio : IPcmSampleSink
             _sourceSampleRate = sampleRate;
             _hasPrevious = false;
             _phase = 0;
-            _step = sampleRate / 44100.0;
+            _step = sampleRate / TargetSampleRate;
             _inputIndex = -1;
         }
 
@@ -303,19 +309,17 @@ internal sealed unsafe partial class WaveOutAudio : IPcmSampleSink
     // 25% volume
     private const sbyte InitialGainDecibels = -12;
 
-    // The asynchronous callback receives only a native context pointer. Keep
-    // the managed owner rooted for the lifetime of the outstanding DMA.
-    private static WaveOutAudio s_activeInstance;
-
-    private EFI_AUDIO_IO_PROTOCOL* audio;
-    private readonly byte[] m_ringBuffer = new byte[RingCapacity];
-    private readonly PcmRingState m_ring = new PcmRingState(
+    private static EFI_AUDIO_IO_PROTOCOL* audio;
+    private static readonly byte[] m_ringBuffer = new byte[RingCapacity];
+    private static readonly PcmRingState m_ring = new PcmRingState(
         RingCapacity,
         SubmissionBytes,
         SubmissionBytes);
-    private readonly PcmInputConverter m_converter = new PcmInputConverter();
-    private int m_driverInFlight;
-    private bool m_failed;
+    private static readonly PcmInputConverter m_converter = new PcmInputConverter();
+    private static int m_driverInFlight;
+    private static bool m_failed = true;
+
+    internal static bool IsAvailable => audio != null && !m_failed;
 
     private static bool TryGetOutput(
         EFI_AUDIO_IO_PROTOCOL* candidate,
@@ -414,8 +418,22 @@ internal sealed unsafe partial class WaveOutAudio : IPcmSampleSink
         Console.WriteLine("Audio codec: " + codecName);
     }
 
-    public WaveOutAudio(int sampleRate)
+    internal static void Initialize(int sampleRate)
     {
+        if (sampleRate <= 0)
+        {
+            m_failed = true;
+            return;
+        }
+
+        if (audio != null && audio->StopPlayback != null)
+            audio->StopPlayback(audio);
+        audio = null;
+        m_ring.Reset();
+        m_converter.Reset();
+        m_driverInFlight = 0;
+        m_failed = false;
+
         EFI_GUID protocolGuid = new EFI_GUID(
             0xA6C4E42D, 0x5F77, 0x4F37, 0xB4, 0x16, 0xD3, 0xA2, 0x9C, 0xE8, 0x67, 0x51);
 
@@ -428,7 +446,10 @@ internal sealed unsafe partial class WaveOutAudio : IPcmSampleSink
             &handleCount,
             &handles);
         if ((ulong)status != EFI_SUCCESS || handles == null || handleCount == 0)
+        {
+            m_failed = true;
             return;
+        }
 
         EFI_AUDIO_IO_PROTOCOL* selectedAudio = null;
         EFI_HANDLE selectedHandle = null;
@@ -466,7 +487,10 @@ internal sealed unsafe partial class WaveOutAudio : IPcmSampleSink
         audio = selectedAudio;
         byte outputIndex = selectedOutputIndex;
         if (audio == null || outputIndex == byte.MaxValue)
+        {
+            m_failed = true;
             return;
+        }
 
         PrintCodecName(selectedHandle);
         status = audio->SetupPlayback(
@@ -478,18 +502,19 @@ internal sealed unsafe partial class WaveOutAudio : IPcmSampleSink
             AudioIoChannelStereo,
             0);
         if ((ulong)status != EFI_SUCCESS)
+        {
+            audio = null;
+            m_failed = true;
             return;
+        }
 
-        s_activeInstance = this;
     }
 
-    private void StartNext(bool allowShortBuffer)
+    private static void StartNext(bool allowShortBuffer)
     {
         while (!m_failed &&
                m_ring.TryStartNext(allowShortBuffer, out int offset, out int length))
         {
-            WaveOutAudio owner = this;
-            IntPtr context = Unsafe.As<WaveOutAudio, IntPtr>(ref owner);
             EFI_STATUS status;
             fixed (byte* ptr = m_ringBuffer)
             {
@@ -499,7 +524,7 @@ internal sealed unsafe partial class WaveOutAudio : IPcmSampleSink
                     (ulong)length,
                     0,
                     &PlaybackTransferStopped,
-                    (void*)context);
+                    null);
             }
 
             if ((ulong)status != EFI_SUCCESS)
@@ -530,19 +555,16 @@ internal sealed unsafe partial class WaveOutAudio : IPcmSampleSink
     [UnmanagedCallersOnly]
     static void PlaybackTransferStopped(EFI_AUDIO_IO_PROTOCOL* audio, void* context)
     {
-        IntPtr pointer = (IntPtr)context;
-        WaveOutAudio owner = Unsafe.As<IntPtr, WaveOutAudio>(ref pointer);
-
-        if (owner.m_driverInFlight <= 0)
+        if (m_driverInFlight <= 0)
             return;
 
-        owner.m_driverInFlight--;
+        m_driverInFlight--;
         // The driver has consumed one FIFO period. Submit any staging data
         // that was held back by the native ring capacity.
-        owner.StartNext(false);
+        StartNext(false);
     }
 
-    public bool TryWriteSample(short left, short right)
+    private static bool TryWriteSample(short left, short right)
     {
         if (m_failed || m_ring.WritableByteCount < OutputBytesPerFrame)
             return false;
@@ -559,7 +581,7 @@ internal sealed unsafe partial class WaveOutAudio : IPcmSampleSink
         return m_ring.TryCommitWrite(OutputBytesPerFrame);
     }
 
-    internal int WritePcm(byte[] buffer, int offset, int count, int channels, int sampleRate)
+    internal static int WritePcm(byte[] buffer, int offset, int count, int channels, int sampleRate)
     {
         if (m_failed || buffer == null || offset < 0 || count < 0 ||
             offset > buffer.Length - count || (channels != 1 && channels != 2) ||
@@ -578,8 +600,7 @@ internal sealed unsafe partial class WaveOutAudio : IPcmSampleSink
                 offset + consumedTotal,
                 count - consumedTotal,
                 channels,
-                sampleRate,
-                this);
+                sampleRate);
             consumedTotal += consumed;
 
             // Do not start a short block from the producer path. This gives
@@ -599,5 +620,28 @@ internal sealed unsafe partial class WaveOutAudio : IPcmSampleSink
         }
 
         return consumedTotal;
+    }
+
+    internal static bool CompletePlayback()
+    {
+        if (!IsAvailable)
+            return false;
+
+        while (!m_failed && m_converter.HasPendingInput)
+        {
+            m_converter.Flush();
+            StartNext(true);
+            if (m_converter.HasPendingInput)
+                gBS->Stall(1000);
+        }
+
+        StartNext(true);
+        while (!m_failed && (m_ring.BufferedByteCount != 0 || m_driverInFlight != 0))
+        {
+            StartNext(true);
+            gBS->Stall(1000);
+        }
+
+        return !m_failed;
     }
 }

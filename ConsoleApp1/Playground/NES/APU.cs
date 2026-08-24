@@ -44,8 +44,6 @@ namespace Playground.NES
         public int PeakSampleMagnitude { get; private set; }
         // Little-endian signed 16-bit mono PCM at PcmSampleRate.
         // The callback is invoked with complete PCM blocks, not individual samples.
-        internal WaveOutAudio PcmOutput { get; set; }
-
         public APU()
             : this(null)
         {
@@ -130,9 +128,7 @@ namespace Playground.NES
             if (pcmBufferOffset == 0)
                 return;
 
-            WaveOutAudio output = PcmOutput;
-            if (output != null)
-                output.WritePcm(pcmBuffer, 0, pcmBufferOffset, PcmChannels, PcmSampleRate);
+            WaveOutAudio.WritePcm(pcmBuffer, 0, pcmBufferOffset, PcmChannels, PcmSampleRate);
             pcmBufferOffset = 0;
         }
 
@@ -245,9 +241,7 @@ namespace Playground.NES
             pcmBuffer[pcmBufferOffset++] = (byte)((LastSample >> 8) & 0xFF);
             if (pcmBufferOffset == pcmBuffer.Length)
             {
-                WaveOutAudio output = PcmOutput;
-                if (output != null)
-                    output.WritePcm(pcmBuffer, 0, pcmBuffer.Length, PcmChannels, PcmSampleRate);
+                WaveOutAudio.WritePcm(pcmBuffer, 0, pcmBuffer.Length, PcmChannels, PcmSampleRate);
                 pcmBufferOffset = 0;
             }
         }

@@ -11,7 +11,6 @@ namespace Playground.NES
         Mappers mappers;
         CPU cpu;
         APU apu;
-        WaveOutAudio audio;
         public GameRender gameRender;
         Input input;
         PPU ppu;
@@ -136,19 +135,15 @@ namespace Playground.NES
 
         public void resetGame()
         {
-            if (audio != null)
-            {
-                if (apu != null)
-                    apu.FlushPcm();
-            }
+            if (apu != null)
+                apu.FlushPcm();
 
             registers = new Registers();
             input = new Input();
             mappers = new Mappers();
             memory = new MemoryMap(registers, input, this, mappers);
             apu = new APU(memory.ReadPRG);
-            audio = new WaveOutAudio(APU.PcmSampleRate);
-            apu.PcmOutput = audio;
+            WaveOutAudio.Initialize(APU.PcmSampleRate);
             memory.AttachAPU(apu);
             ppu = new PPU(memory, this);
             cpu = new CPU(memory, input, ppu, registers);

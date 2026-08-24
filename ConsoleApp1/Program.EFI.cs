@@ -88,7 +88,7 @@ partial class Program
 
 #if false
         Console.WriteLine("Enjoy the song! gonna last about 2 minutes...");
-        WavPlayer.Play(@"\Nokia - Breath.wav");
+        new System.Media.SoundPlayer(@"\Nokia - Breath.wav").PlaySync();
 #endif
 
 #if true
