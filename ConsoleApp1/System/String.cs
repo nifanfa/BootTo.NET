@@ -2,6 +2,22 @@
 {
     public partial class String
     {
+        public string Substring(int startIndex)
+            => Substring(startIndex, Length - startIndex);
+
+        public string Substring(int startIndex, int length)
+        {
+            if (startIndex < 0 || length < 0 || startIndex > Length - length)
+                throw new ArgumentException();
+            if (length == 0)
+                return Empty;
+
+            char[] result = new char[length];
+            for (int i = 0; i < length; i++)
+                result[i] = this[startIndex + i];
+            return new string(result);
+        }
+
         public static string Format(string format, object arg0)
             => Format(format, new object[] { arg0 });
 

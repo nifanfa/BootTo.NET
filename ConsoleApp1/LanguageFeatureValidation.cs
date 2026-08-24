@@ -122,6 +122,17 @@ public static partial class LanguageFeatureValidation
             FeatureName.Length != RuntimeValue(25) || FeatureName[0] != s_character)
             Fail("primitive types or const");
 
+        string firstString = new string(new char[] { 'v', 'a', 'l', 'u', 'e' });
+        string secondString = new string(new char[] { 'v', 'a', 'l', 'u', 'e' });
+        string differentString = new string(new char[] { 'o', 't', 'h', 'e', 'r' });
+        string nullString = null;
+        if (!(firstString == secondString) || firstString != secondString ||
+            firstString == differentString || firstString == nullString ||
+            !(nullString == null) || !firstString.Equals((object)secondString) ||
+            !string.Equals(firstString, secondString) ||
+            firstString.GetHashCode() != secondString.GetHashCode())
+            Fail("string equality");
+
         Type intType = typeof(int);
         Type stringType = typeof(string);
         Type localType = typeof(FeatureObject);
@@ -338,6 +349,91 @@ public static partial class LanguageFeatureValidation
 
         if (!caught || !resource.IsDisposed)
             Fail("try, catch, finally, or using");
+
+        Exception expected = new Exception("rethrow validation");
+        Exception rethrown = null;
+        try
+        {
+            RethrowException(expected);
+        }
+        catch (Exception exception)
+        {
+            rethrown = exception;
+        }
+
+        if (rethrown != expected)
+            Fail("exception rethrow");
+
+        if (CatchSameFrameRethrow(expected) != expected)
+            Fail("same-frame exception rethrow");
+
+        Exception nestedRethrown = null;
+        try
+        {
+            RethrowAfterNestedCatch(expected, new Exception("nested exception"));
+        }
+        catch (Exception exception)
+        {
+            nestedRethrown = exception;
+        }
+
+        if (nestedRethrown != expected)
+            Fail("nested exception rethrow");
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static void RethrowException(Exception exception)
+    {
+        try
+        {
+            throw exception;
+        }
+        catch (Exception)
+        {
+            throw;
+        }
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static Exception CatchSameFrameRethrow(Exception exception)
+    {
+        Exception caught = null;
+        try
+        {
+            try
+            {
+                throw exception;
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+        catch (Exception rethrown)
+        {
+            caught = rethrown;
+        }
+        return caught;
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static void RethrowAfterNestedCatch(Exception outer, Exception inner)
+    {
+        try
+        {
+            throw outer;
+        }
+        catch (Exception)
+        {
+            try
+            {
+                throw inner;
+            }
+            catch (Exception)
+            {
+            }
+            throw;
+        }
     }
 
     private static async Task VerifyAsync()

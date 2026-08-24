@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.IO.Ports;
+using System.Linq;
+using System.Net;
 using System.Runtime;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -154,6 +156,13 @@ partial class Program
         #region Socket Test2
         SocketTest2 test = new SocketTest2();
         _ = test.Run();
+        #endregion
+#endif
+
+#if false
+        #region WebClient Test
+        WebClientTest test = new WebClientTest();
+        test.Run().GetAwaiter().GetResult();
         #endregion
 #endif
 
@@ -312,6 +321,15 @@ partial class Program
                 printf("Buffer received: %s\r\n"u8, buffer);
             }
             socket.Close();
+        }
+    }
+
+    class WebClientTest
+    {
+        public async Task Run()
+        {
+            WebClient client = new WebClient();
+            Console.WriteLine(client.DownloadString("http://httpforever.com"));
         }
     }
 

@@ -305,7 +305,12 @@ namespace System
 
     public readonly unsafe ref struct ReadOnlySpan<T>(T[] array, int start, int length)
     {
-        internal readonly ByReference<T> _pointer = new ByReference<T>(ref Unsafe.Add(ref array[0], start));
+        // An empty span has no element at index zero, but its reference still
+        // needs a valid representation because Encoding and parsers routinely
+        // construct spans over empty arrays.
+        internal readonly ByReference<T> _pointer = new ByReference<T>(ref (array.Length == 0
+            ? ref Unsafe.AsRef<T>((void*)0)
+            : ref Unsafe.Add(ref array[0], start)));
         private readonly int _length = length;
 
         public int Length
@@ -377,6 +382,43 @@ namespace System
         internal char FirstChar;
 
         public override string ToString() => this;
+
+        public override bool Equals(object obj)
+        {
+            if (ReferenceEquals(this, obj))
+                return true;
+            return obj is string && Equals(this, (string)obj);
+        }
+
+        public bool Equals(string value) => Equals(this, value);
+
+        public static bool Equals(string a, string b)
+        {
+            if (ReferenceEquals(a, b))
+                return true;
+            if (a is null || b is null || a.Length != b.Length)
+                return false;
+
+            for (int i = 0; i < a.Length; i++)
+                if (a[i] != b[i])
+                    return false;
+            return true;
+        }
+
+        public static bool operator ==(string a, string b) => Equals(a, b);
+
+        public static bool operator !=(string a, string b) => !Equals(a, b);
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = 5381;
+                for (int i = 0; i < Length; i++)
+                    hash = ((hash << 5) + hash) ^ this[i];
+                return hash;
+            }
+        }
 
         [Intrinsic]
         public static readonly string Empty = "";
@@ -1705,12 +1747,21 @@ namespace System.Runtime
 
     internal static unsafe class EH
     {
+        private struct ActiveExceptionState
+        {
+            internal object Exception;
+            internal ExInfo ExInfo;
+            internal uint ClauseIndex;
+        }
+
         // A PE x64 RUNTIME_FUNCTION contains three 32-bit RVAs.
         internal static int RuntimeFunctionSize => sizeof(RuntimeFunction);
 
         internal static byte* s_imageBase;
         internal static RuntimeFunction* s_exceptionTable;
         internal static int s_runtimeFunctionCount;
+        private static readonly ActiveExceptionState[] s_activeExceptions = new ActiveExceptionState[64];
+        private static int s_activeExceptionCount;
 
         private const byte UnwindFlagHandlerMask = 0x03;
         private const byte FunctionKindMask = 0x03;
@@ -1743,15 +1794,86 @@ namespace System.Runtime
             if (s_imageBase != null &&
                 s_exceptionTable != null &&
                 s_runtimeFunctionCount > 0 &&
-                TryFindHandler(exception, ref exInfo))
+                TryFindHandler(exception, ref exInfo, 0, out uint clauseIndex))
+            {
+                PushActiveException(exception, ref exInfo, clauseIndex);
                 return;
+            }
 
             Console.WriteLine("Unhandled exception: " + ((Exception)exception).Message);
             exInfo.Handler = null;
         }
 
-        private static bool TryFindHandler(object exception, ref ExInfo exInfo)
+        // CoreRT passes the active ExInfo to RhRethrow. The reduced runtime
+        // keeps the equivalent logical context in a single-threaded stack.
+        [RuntimeExport("RhRethrow")]
+        private static object RhRethrow(ref ExInfo exInfo)
         {
+            if (s_activeExceptionCount == 0)
+            {
+                object missingException = new Exception();
+                Console.WriteLine("Unhandled exception: " + ((Exception)missingException).Message);
+                exInfo.Handler = null;
+                return missingException;
+            }
+
+            int activeIndex = s_activeExceptionCount - 1;
+            ActiveExceptionState active = s_activeExceptions[activeIndex];
+            object exception = active.Exception;
+
+            // A catch funclet is physically called by RhpThrowEx, so walking
+            // from RhpRethrow's return address would enter the native bridge.
+            // Resume from the logical frame saved when this catch was chosen.
+            exInfo = active.ExInfo;
+
+            if (s_imageBase != null &&
+                s_exceptionTable != null &&
+                s_runtimeFunctionCount > 0 &&
+                TryFindHandler(exception, ref exInfo, active.ClauseIndex + 1, out uint clauseIndex))
+            {
+                s_activeExceptions[activeIndex].Exception = exception;
+                s_activeExceptions[activeIndex].ExInfo = exInfo;
+                s_activeExceptions[activeIndex].ClauseIndex = clauseIndex;
+                return exception;
+            }
+
+            Console.WriteLine("Unhandled exception: " + ((Exception)exception).Message);
+            exInfo.Handler = null;
+            return exception;
+        }
+
+        [RuntimeExport("RhEndCatch")]
+        private static void RhEndCatch()
+        {
+            if (s_activeExceptionCount == 0)
+                return;
+
+            int index = --s_activeExceptionCount;
+            s_activeExceptions[index] = default;
+        }
+
+        private static void PushActiveException(object exception, ref ExInfo exInfo, uint clauseIndex)
+        {
+            if (s_activeExceptionCount == s_activeExceptions.Length)
+            {
+                Console.WriteLine("Unhandled exception: exception nesting is too deep.");
+                exInfo.Handler = null;
+                return;
+            }
+
+            int index = s_activeExceptionCount++;
+            s_activeExceptions[index].Exception = exception;
+            s_activeExceptions[index].ExInfo = exInfo;
+            s_activeExceptions[index].ClauseIndex = clauseIndex;
+        }
+
+        private static bool TryFindHandler(
+            object exception,
+            ref ExInfo exInfo,
+            uint firstClauseIndex,
+            out uint handlerClauseIndex)
+        {
+            handlerClauseIndex = uint.MaxValue;
             RuntimeFunction* current = FindRuntimeFunction(
                 s_exceptionTable,
                 s_runtimeFunctionCount,
@@ -1760,6 +1882,7 @@ namespace System.Runtime
             if (current == null)
                 return false;
 
+            bool firstFrame = true;
             for (int depth = 0; depth < 64 && current != null; depth++)
             {
                 RuntimeFunction* root = FindRootFunction(
@@ -1770,12 +1893,15 @@ namespace System.Runtime
                     return false;
 
                 if (TryFindTypedHandler(s_imageBase, root,
-                    exception, ref exInfo))
+                    exception, ref exInfo,
+                    firstFrame ? firstClauseIndex : 0,
+                    out handlerClauseIndex))
                     return true;
 
                 if (!UnwindFrame(s_imageBase, current, ref exInfo))
                     break;
 
+                firstFrame = false;
                 current = FindRuntimeFunction(
                     s_exceptionTable,
                     s_runtimeFunctionCount,
@@ -1827,8 +1953,11 @@ namespace System.Runtime
             byte* imageBase,
             RuntimeFunction* root,
             object exception,
-            ref ExInfo exInfo)
+            ref ExInfo exInfo,
+            uint firstClauseIndex,
+            out uint handlerClauseIndex)
         {
+            handlerClauseIndex = uint.MaxValue;
             byte* unwind = GetUnwindInfo(imageBase, root);
             byte* cursor = GetEhInfoCursor(unwind, imageBase);
 
@@ -1853,12 +1982,14 @@ namespace System.Runtime
                     uint typeRva = *(uint*)cursor;
                     cursor += sizeof(uint);
 
-                    if (codeOffset >= tryStart && codeOffset < tryEnd)
+                    if (clauseIndex >= firstClauseIndex &&
+                        codeOffset >= tryStart && codeOffset < tryEnd)
                     {
                         EEType* targetType = (EEType*)(imageBase + typeRva);
                         if (TypeCast.IsInstanceOfClass(targetType, exception) != null)
                         {
                             exInfo.Handler = methodStart + handlerOffset;
+                            handlerClauseIndex = clauseIndex;
                             return true;
                         }
                     }
@@ -1872,7 +2003,8 @@ namespace System.Runtime
                     uint handlerOffset = ReadVarUInt(ref cursor);
                     uint filterOffset = ReadVarUInt(ref cursor);
 
-                    if (codeOffset >= tryStart && codeOffset < tryEnd &&
+                    if (clauseIndex >= firstClauseIndex &&
+                        codeOffset >= tryStart && codeOffset < tryEnd &&
                         InternalCalls.RhpCallFilterFunclet(
                             exception,
                             (IntPtr)(methodStart + filterOffset),
@@ -1880,6 +2012,7 @@ namespace System.Runtime
                             exInfo.FramePointer))
                     {
                         exInfo.Handler = methodStart + handlerOffset;
+                        handlerClauseIndex = clauseIndex;
                         return true;
                     }
                 }
