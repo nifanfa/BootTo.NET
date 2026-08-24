@@ -24,9 +24,9 @@ namespace System.IO
         public virtual void Write(char[] buffer, int index, int count)
         {
             if (buffer == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The write buffer cannot be null.");
             if (index < 0 || count < 0 || index > buffer.Length - count)
-                throw new ArgumentException();
+                throw new ArgumentException("The write buffer offset and count do not describe a valid range.");
             for (int i = 0; i < count; i++)
                 Write(buffer[index + i]);
         }

@@ -36,16 +36,16 @@ namespace System
         public Guid(byte[] bytes)
         {
             if (bytes == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The GUID byte array cannot be null.");
             if (bytes.Length != 16)
-                throw new ArgumentException();
+                throw new ArgumentException("A GUID must be constructed from exactly 16 bytes.");
             this = FromBytes(bytes, 0);
         }
 
         public Guid(ReadOnlySpan<byte> bytes)
         {
             if (bytes.Length != 16)
-                throw new ArgumentException();
+                throw new ArgumentException("A GUID span must contain exactly 16 bytes.");
             byte[] value = bytes;
             this = FromBytes(value, 0);
         }
@@ -54,7 +54,7 @@ namespace System
         {
             Guid parsed;
             if (!TryParse(value, out parsed))
-                throw new FormatException();
+                throw new FormatException("The string is not a valid GUID.");
             this = parsed;
         }
 
@@ -71,7 +71,7 @@ namespace System
         {
             Guid result;
             if (!TryParse(value, out result))
-                throw new FormatException();
+                throw new FormatException("The string is not a valid GUID.");
             return result;
         }
 
@@ -145,7 +145,7 @@ namespace System
             if (string.IsNullOrEmpty(format))
                 format = "D";
             if (format.Length != 1)
-                throw new FormatException();
+                throw new FormatException("The GUID format specifier must be a single character.");
 
             char specifier = format[0];
             if (specifier == 'N' || specifier == 'n')
@@ -158,7 +158,7 @@ namespace System
                 return FormatD(true, '(');
             if (specifier == 'X' || specifier == 'x')
                 return FormatX();
-            throw new FormatException();
+            throw new FormatException("The GUID format specifier is not supported.");
         }
 
         public override bool Equals(object value) => value is Guid && Equals((Guid)value);

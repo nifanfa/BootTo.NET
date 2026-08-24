@@ -49,9 +49,9 @@ namespace System.IO
         public StreamReader(Stream stream, Encoding encoding, bool detectEncodingFromByteOrderMarks, int bufferSize, bool leaveOpen)
         {
             if (stream == null || encoding == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The stream and encoding cannot be null.");
             if (bufferSize <= 0)
-                throw new ArgumentException();
+                throw new ArgumentException("The reader buffer size must be positive.");
 
             _stream = stream;
             _encoding = encoding;
@@ -72,9 +72,9 @@ namespace System.IO
         {
             EnsureOpen();
             if (buffer == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The read buffer cannot be null.");
             if (index < 0 || count < 0 || index > buffer.Length - count)
-                throw new ArgumentException();
+                throw new ArgumentException("The read buffer offset and count do not describe a valid range.");
 
             int available = _value.Length - _position;
             int read = count < available ? count : available;
@@ -134,7 +134,7 @@ namespace System.IO
         private void EnsureOpen()
         {
             if (_closed)
-                throw new IOException();
+                throw new IOException("The stream reader is closed.");
         }
 
         private static string Slice(string value, int start, int length)

@@ -10,7 +10,7 @@ namespace System.IO
         public static string ChangeExtension(string path, string extension)
         {
             if (path == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The path cannot be null.");
 
             int end = TrimTrailingSeparators(path);
             int separator = LastSeparator(path, end);
@@ -29,7 +29,7 @@ namespace System.IO
         public static string Combine(string path1, string path2)
         {
             if (path1 == null || path2 == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("Path components cannot be null.");
             if (path1.Length == 0)
                 return path2;
             if (path2.Length == 0)
@@ -49,7 +49,7 @@ namespace System.IO
         public static string GetDirectoryName(string path)
         {
             if (path == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The path cannot be null.");
             int end = TrimTrailingSeparators(path);
             if (end == 0)
                 return path.Length == 0 ? null : Slice(path, 0, 1);
@@ -65,7 +65,7 @@ namespace System.IO
         public static string GetFileName(string path)
         {
             if (path == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The path cannot be null.");
             int end = TrimTrailingSeparators(path);
             int separator = LastSeparator(path, end);
             return Slice(path, separator + 1, end - separator - 1);
@@ -77,7 +77,7 @@ namespace System.IO
         public static string GetExtension(string path)
         {
             if (path == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The path cannot be null.");
             int end = TrimTrailingSeparators(path);
             int separator = LastSeparator(path, end);
             int dot = LastIndexOf(path, '.', end);
@@ -89,7 +89,7 @@ namespace System.IO
         public static string GetPathRoot(string path)
         {
             if (path == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The path cannot be null.");
             if (path.Length == 0)
                 return null;
             if (IsSeparator(path[0]))
@@ -116,7 +116,7 @@ namespace System.IO
         public static string GetFullPath(string path)
         {
             if (string.IsNullOrEmpty(path))
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The path cannot be null or empty.");
             return path;
         }
 

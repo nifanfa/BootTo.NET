@@ -22,9 +22,9 @@ namespace System.Net
         public static Task<IPAddress[]> GetHostAddressesAsync(string hostNameOrAddress)
         {
             if (hostNameOrAddress == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The host name cannot be null.");
             if (hostNameOrAddress.Length == 0)
-                throw new ArgumentException();
+                throw new ArgumentException("The host name cannot be empty.");
 
             IPAddress address;
             if (IPAddress.TryParse(hostNameOrAddress, out address))
@@ -98,7 +98,7 @@ namespace System.Net
             if (hostLength > 0 && hostName[hostLength - 1] == '.')
                 hostLength--;
             if (hostLength == 0 || hostLength > 253)
-                throw new ArgumentException();
+                throw new ArgumentException("The host name must contain between 1 and 253 characters.");
 
             int labelLength = 0;
             for (int i = 0; i < hostLength; i++)
@@ -107,21 +107,21 @@ namespace System.Net
                 if (character == '.')
                 {
                     if (labelLength == 0 || labelLength > 63)
-                        throw new ArgumentException();
+                        throw new ArgumentException("Each DNS label must contain between 1 and 63 characters.");
                     labelLength = 0;
                     continue;
                 }
 
                 if (character <= ' ' || character > 0x7f)
-                    throw new ArgumentException();
+                    throw new ArgumentException("The host name contains a character that is not valid in DNS.");
                 labelLength++;
             }
             if (labelLength == 0 || labelLength > 63)
-                throw new ArgumentException();
+                throw new ArgumentException("The final DNS label must contain between 1 and 63 characters.");
 
             int wireNameLength = hostLength + 2;
             if (wireNameLength > 255)
-                throw new ArgumentException();
+                throw new ArgumentException("The encoded DNS name exceeds the 255-byte protocol limit.");
 
             byte[] query = new byte[12 + wireNameLength + 4];
             WriteUInt16(query, 0, queryId);

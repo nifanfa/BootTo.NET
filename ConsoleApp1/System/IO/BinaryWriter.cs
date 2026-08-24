@@ -23,7 +23,7 @@ namespace System.IO
         public BinaryWriter(Stream output, Encoding encoding, bool leaveOpen)
         {
             if (output == null || encoding == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The output stream and encoding cannot be null.");
             _stream = output;
             _encoding = encoding;
             _leaveOpen = leaveOpen;
@@ -77,7 +77,7 @@ namespace System.IO
         public void Write(byte[] buffer)
         {
             if (buffer == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The byte buffer cannot be null.");
             Write(buffer, 0, buffer.Length);
         }
 
@@ -85,16 +85,16 @@ namespace System.IO
         {
             EnsureOpen();
             if (buffer == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The byte buffer cannot be null.");
             if (index < 0 || count < 0 || index > buffer.Length - count)
-                throw new ArgumentException();
+                throw new ArgumentException("The byte buffer offset and count do not describe a valid range.");
             _stream.Write(buffer, index, count);
         }
 
         public void Write(char[] chars)
         {
             if (chars == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The character buffer cannot be null.");
             Write(new string(chars));
         }
 
@@ -102,7 +102,7 @@ namespace System.IO
         {
             EnsureOpen();
             if (value == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The string value cannot be null.");
             byte[] bytes = _encoding.GetBytes(value);
             Write7BitEncodedInt(bytes.Length);
             Write(bytes, 0, bytes.Length);
@@ -146,7 +146,7 @@ namespace System.IO
         private void EnsureOpen()
         {
             if (_closed)
-                throw new IOException();
+                throw new IOException("The binary writer is closed.");
         }
     }
 }

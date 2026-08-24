@@ -20,14 +20,14 @@ namespace System
         public static int Abs(int value)
         {
             if (value == int.MinValue)
-                throw new OverflowException();
+                throw new OverflowException("The absolute value of Int32.MinValue cannot be represented as an Int32.");
             return value < 0 ? -value : value;
         }
 
         public static long Abs(long value)
         {
             if (value == long.MinValue)
-                throw new OverflowException();
+                throw new OverflowException("The absolute value of Int64.MinValue cannot be represented as an Int64.");
             return value < 0 ? -value : value;
         }
 
@@ -44,14 +44,14 @@ namespace System
         public static int Sign(float value)
         {
             if (IsNaN(value))
-                throw new ArgumentException();
+                throw new ArgumentException("The sign of NaN is undefined.");
             return value < 0 ? -1 : (value > 0 ? 1 : 0);
         }
 
         public static int Sign(double value)
         {
             if (IsNaN(value))
-                throw new ArgumentException();
+                throw new ArgumentException("The sign of NaN is undefined.");
             return value < 0 ? -1 : (value > 0 ? 1 : 0);
         }
 
@@ -80,28 +80,28 @@ namespace System
         public static int Clamp(int value, int min, int max)
         {
             if (min > max)
-                throw new ArgumentException();
+                throw new ArgumentException("The minimum value cannot exceed the maximum value.");
             return value < min ? min : (value > max ? max : value);
         }
 
         public static long Clamp(long value, long min, long max)
         {
             if (min > max)
-                throw new ArgumentException();
+                throw new ArgumentException("The minimum value cannot exceed the maximum value.");
             return value < min ? min : (value > max ? max : value);
         }
 
         public static float Clamp(float value, float min, float max)
         {
             if (IsNaN(value) || IsNaN(min) || IsNaN(max) || min > max)
-                throw new ArgumentException();
+                throw new ArgumentException("Clamp requires finite bounds and a minimum that does not exceed the maximum.");
             return value < min ? min : (value > max ? max : value);
         }
 
         public static double Clamp(double value, double min, double max)
         {
             if (IsNaN(value) || IsNaN(min) || IsNaN(max) || min > max)
-                throw new ArgumentException();
+                throw new ArgumentException("Clamp requires finite bounds and a minimum that does not exceed the maximum.");
             return value < min ? min : (value > max ? max : value);
         }
 
@@ -124,7 +124,7 @@ namespace System
         public static double Round(double value, MidpointRounding mode)
         {
             if (mode != MidpointRounding.ToEven && mode != MidpointRounding.AwayFromZero)
-                throw new ArgumentException();
+                throw new ArgumentException("The midpoint rounding mode is not supported.");
             if (!IsFinite(value) || value == 0)
                 return value;
 
@@ -151,7 +151,7 @@ namespace System
         public static double Round(double value, int digits, MidpointRounding mode)
         {
             if (digits < 0 || digits > 15)
-                throw new ArgumentException();
+                throw new ArgumentException("The number of rounding digits must be between 0 and 15.");
             if (digits == 0)
                 return Round(value, mode);
             double scale = Pow10(digits);

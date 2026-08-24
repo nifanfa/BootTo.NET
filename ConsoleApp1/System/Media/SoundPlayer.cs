@@ -61,14 +61,14 @@ namespace System.Media
             if (input == null)
             {
                 if (string.IsNullOrEmpty(_soundLocation))
-                    throw new InvalidOperationException();
+                    throw new InvalidOperationException("No sound location or stream has been configured.");
 
                 input = new FileStream(_soundLocation, FileMode.Open, FileAccess.Read, FileShare.Read);
                 ownsStream = true;
             }
             else if (!input.CanRead)
             {
-                throw new InvalidOperationException();
+                throw new InvalidOperationException("The sound stream is not readable.");
             }
 
             try
@@ -78,11 +78,11 @@ namespace System.Media
 
                 WavFormat format;
                 if (!TryParse(input, out format))
-                    throw new InvalidOperationException();
+                    throw new InvalidOperationException("The sound data is not a supported PCM WAV file.");
 
                 WaveOutAudio.Initialize(OutputSampleRate);
                 if (!WaveOutAudio.IsAvailable)
-                    throw new InvalidOperationException();
+                    throw new InvalidOperationException("No UEFI audio output is available.");
 
                 byte[] buffer = new byte[InputChunkBytes];
                 int remaining = format.DataLength;
@@ -100,12 +100,12 @@ namespace System.Media
 
                     int consumed = WaveOutAudio.WritePcm(buffer, 0, bytesRead, format.Channels, format.SampleRate);
                     if (consumed != bytesRead)
-                        throw new InvalidOperationException();
+                        throw new InvalidOperationException("The audio device accepted fewer PCM bytes than requested.");
                     remaining -= consumed;
                 }
 
                 if (remaining != 0 || !WaveOutAudio.CompletePlayback())
-                    throw new InvalidOperationException();
+                    throw new InvalidOperationException("Audio playback did not consume the complete WAV data stream.");
             }
             finally
             {

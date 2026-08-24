@@ -23,7 +23,7 @@ namespace System.IO
         public BinaryReader(Stream input, Encoding encoding, bool leaveOpen)
         {
             if (input == null || encoding == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The input stream and encoding cannot be null.");
             _stream = input;
             _encoding = encoding;
             _leaveOpen = leaveOpen;
@@ -37,7 +37,7 @@ namespace System.IO
             EnsureOpen();
             int value = _stream.ReadByte();
             if (value < 0)
-                throw new IOException();
+                throw new IOException("The stream ended before a byte could be read.");
             return (byte)value;
         }
 
@@ -81,7 +81,7 @@ namespace System.IO
         public char[] ReadChars(int count)
         {
             if (count < 0)
-                throw new ArgumentException();
+                throw new ArgumentException("The character count cannot be negative.");
             char[] result = new char[count];
             for (int i = 0; i < count; i++)
                 result[i] = ReadChar();
@@ -92,7 +92,7 @@ namespace System.IO
         {
             EnsureOpen();
             if (count < 0)
-                throw new ArgumentException();
+                throw new ArgumentException("The byte count cannot be negative.");
             byte[] result = new byte[count];
             int total = 0;
             while (total < count)
@@ -141,7 +141,7 @@ namespace System.IO
                     return result;
                 shift += 7;
             }
-            throw new FormatException();
+            throw new FormatException("The encoded 7-bit integer is too long.");
         }
 
         private byte[] ReadExactly(int count)
@@ -152,7 +152,7 @@ namespace System.IO
             {
                 int read = _stream.Read(result, total, count - total);
                 if (read == 0)
-                    throw new IOException();
+                    throw new IOException("The stream ended before the requested data was read.");
                 total += read;
             }
             return result;
@@ -161,7 +161,7 @@ namespace System.IO
         private void EnsureOpen()
         {
             if (_closed)
-                throw new IOException();
+                throw new IOException("The binary reader is closed.");
         }
     }
 }

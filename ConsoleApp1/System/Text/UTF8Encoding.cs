@@ -7,7 +7,7 @@ namespace System.Text
         public override byte[] GetBytes(string text)
         {
             if (text == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The text to encode cannot be null.");
             if (text.Length == 0)
                 return new byte[0];
 

@@ -11,7 +11,7 @@ namespace System.Drawing
         internal Graphics(EFI_GRAPHICS_OUTPUT_PROTOCOL* graphics)
         {
             if (graphics == null || graphics->Mode == null || graphics->Mode->Info == null || graphics->Blt == null)
-                throw new ArgumentException();
+                throw new ArgumentException("The graphics protocol is incomplete or unavailable.");
             _graphics = graphics;
         }
 
@@ -45,7 +45,7 @@ namespace System.Drawing
                 1,
                 0);
             if ((ulong)status != EFI_SUCCESS)
-                throw new InvalidOperationException();
+                throw new InvalidOperationException("The graphics protocol could not draw the pixel.");
         }
 
         public void Dispose()
@@ -56,7 +56,7 @@ namespace System.Drawing
         private void EnsureOpen()
         {
             if (_graphics == null || _graphics->Mode == null || _graphics->Mode->Info == null)
-                throw new InvalidOperationException();
+                throw new InvalidOperationException("The graphics object has been disposed or is unavailable.");
         }
 
         private RectangleF GetDisplayBounds()
@@ -81,7 +81,7 @@ namespace System.Drawing
                 gop->Mode == null ||
                 gop->Mode->Info == null)
             {
-                throw new NotSupportedException();
+                throw new NotSupportedException("The UEFI graphics output protocol is unavailable.");
             }
             return new Graphics(gop);
         }

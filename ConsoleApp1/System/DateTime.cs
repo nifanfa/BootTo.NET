@@ -142,14 +142,14 @@ namespace System
         public static bool IsLeapYear(int year)
         {
             if (year < 1 || year > 9999)
-                throw new ArgumentException();
+                throw new ArgumentException("The year must be between 1 and 9999.");
             return (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
         }
 
         public static int DaysInMonth(int year, int month)
         {
             if (month < 1 || month > 12)
-                throw new ArgumentException();
+                throw new ArgumentException("The month must be between 1 and 12.");
             int[] days = new int[] { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
             if (month == 2 && IsLeapYear(year))
                 return 29;
@@ -211,7 +211,7 @@ namespace System
         {
             if (year < 1 || year > 9999 || month < 1 || month > 12 || day < 1 || day > DaysInMonth(year, month) ||
                 hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59 || millisecond < 0 || millisecond > 999)
-                throw new ArgumentException();
+                throw new ArgumentException("The date or time components are outside their valid ranges.");
         }
     }
 }

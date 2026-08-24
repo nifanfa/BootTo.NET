@@ -89,18 +89,18 @@ namespace System
         private static byte ReadByte(byte[] value, int index)
         {
             if (value == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The byte array cannot be null.");
             if (index < 0 || index >= value.Length)
-                throw new ArgumentException();
+                throw new ArgumentException("The byte index is outside the array.");
             return value[index];
         }
 
         private static void ValidateRange(byte[] value, int startIndex, int length)
         {
             if (value == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The byte array cannot be null.");
             if (startIndex < 0 || length < 0 || startIndex > value.Length - length)
-                throw new ArgumentException();
+                throw new ArgumentException("The byte array range is invalid.");
         }
 
         private static char Hex(byte value) => (char)(value < 10 ? '0' + value : 'A' + value - 10);

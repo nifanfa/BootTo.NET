@@ -27,7 +27,7 @@ namespace System
                 return true;
             if (end - start == 5 && EqualsIgnoreCase(value, start, "False"))
                 return false;
-            throw new FormatException();
+            throw new FormatException("The value must be either 'True' or 'False'.");
         }
 
         public static bool ToBoolean(object value)
@@ -46,7 +46,7 @@ namespace System
             if (value is ulong) return ToBoolean((ulong)value);
             if (value is float) return ToBoolean((float)value);
             if (value is double) return ToBoolean((double)value);
-            throw new InvalidCastException();
+            throw new InvalidCastException("The value cannot be converted to Boolean.");
         }
 
         public static byte ToByte(bool value) => value ? (byte)1 : (byte)0;
@@ -79,7 +79,7 @@ namespace System
             if (value is sbyte) return ToByte((sbyte)value);
             if (value is float) return ToByte((float)value);
             if (value is double) return ToByte((double)value);
-            throw new InvalidCastException();
+            throw new InvalidCastException("The value cannot be converted to Byte.");
         }
 
         public static sbyte ToSByte(bool value) => value ? (sbyte)1 : (sbyte)0;
@@ -154,7 +154,7 @@ namespace System
             if (value is ulong) return ToInt32((ulong)value);
             if (value is float) return ToInt32((float)value);
             if (value is double) return ToInt32((double)value);
-            throw new InvalidCastException();
+            throw new InvalidCastException("The value cannot be converted to Int32.");
         }
 
         public static uint ToUInt32(bool value) => value ? 1u : 0u;
@@ -205,9 +205,9 @@ namespace System
         public static char ToChar(string value)
         {
             if (value == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The string to convert to Char cannot be null.");
             if (value.Length != 1)
-                throw new FormatException();
+                throw new FormatException("The string to convert to Char must contain exactly one character.");
             return value[0];
         }
 
@@ -219,7 +219,7 @@ namespace System
             if (value is byte) return ToChar((byte)value);
             if (value is ushort) return ToChar((ushort)value);
             if (value is string) return ToChar((string)value);
-            throw new InvalidCastException();
+            throw new InvalidCastException("The value cannot be converted to Char.");
         }
 
         public static float ToSingle(bool value) => value ? 1f : 0f;
@@ -265,7 +265,7 @@ namespace System
         private static long ParseSigned(string value)
         {
             if (value == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The signed numeric string cannot be null.");
 
             int index = SkipWhiteSpace(value, 0);
             bool negative = false;
@@ -276,7 +276,7 @@ namespace System
             }
 
             if (index == value.Length)
-                throw new FormatException();
+                throw new FormatException("The signed numeric string contains no digits.");
 
             ulong limit = negative ? 0x8000000000000000UL : 0x7FFFFFFFFFFFFFFFUL;
             ulong result = 0;
@@ -285,14 +285,14 @@ namespace System
             {
                 uint digit = (uint)(value[index++] - '0');
                 if (result > (limit - digit) / 10)
-                    throw new OverflowException();
+                    throw new OverflowException("The signed numeric value is outside the Int64 range.");
                 result = result * 10 + digit;
                 digits++;
             }
 
             index = SkipWhiteSpace(value, index);
             if (digits == 0 || index != value.Length)
-                throw new FormatException();
+                throw new FormatException("The signed numeric string is not valid.");
             if (negative)
                 return result == 0x8000000000000000UL ? long.MinValue : -(long)result;
             return (long)result;
@@ -301,13 +301,13 @@ namespace System
         private static ulong ParseUnsigned(string value)
         {
             if (value == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The unsigned numeric string cannot be null.");
 
             int index = SkipWhiteSpace(value, 0);
             if (index < value.Length && value[index] == '+')
                 index++;
             if (index == value.Length)
-                throw new FormatException();
+                throw new FormatException("The unsigned numeric string contains no digits.");
 
             ulong result = 0;
             int digits = 0;
@@ -315,21 +315,21 @@ namespace System
             {
                 uint digit = (uint)(value[index++] - '0');
                 if (result > (ulong.MaxValue - digit) / 10)
-                    throw new OverflowException();
+                    throw new OverflowException("The unsigned numeric value is outside the UInt64 range.");
                 result = result * 10 + digit;
                 digits++;
             }
 
             index = SkipWhiteSpace(value, index);
             if (digits == 0 || index != value.Length)
-                throw new FormatException();
+                throw new FormatException("The unsigned numeric string is not valid.");
             return result;
         }
 
         private static double ParseDouble(string value)
         {
             if (value == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The floating-point string cannot be null.");
 
             int index = SkipWhiteSpace(value, 0);
             bool negative = false;
@@ -358,7 +358,7 @@ namespace System
                 }
             }
             if (digits == 0)
-                throw new FormatException();
+                throw new FormatException("The floating-point string contains no digits.");
 
             int exponent = 0;
             bool exponentNegative = false;
@@ -379,12 +379,12 @@ namespace System
                     exponentDigits++;
                 }
                 if (exponentDigits == 0)
-                    throw new FormatException();
+                    throw new FormatException("The exponent contains no digits.");
             }
 
             index = SkipWhiteSpace(value, index);
             if (index != value.Length)
-                throw new FormatException();
+                throw new FormatException("The floating-point string contains invalid trailing characters.");
             while (exponent-- > 0)
                 result = exponentNegative ? result * 0.1 : result * 10;
             return negative ? -result : result;

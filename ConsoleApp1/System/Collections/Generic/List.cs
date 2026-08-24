@@ -15,7 +15,7 @@ namespace System.Collections.Generic
         public List(int capacity)
         {
             if (capacity < 0)
-                throw new IndexOutOfRangeException();
+                throw new IndexOutOfRangeException("The list capacity cannot be negative.");
 
             _items = new T[capacity];
         }
@@ -23,7 +23,7 @@ namespace System.Collections.Generic
         public List(T[] items)
         {
             if (items == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source items cannot be null.");
 
             _items = new T[items.Length];
             for (int i = 0; i < items.Length; i++)
@@ -40,7 +40,7 @@ namespace System.Collections.Generic
             set
             {
                 if (value < _size)
-                    throw new IndexOutOfRangeException();
+                    throw new IndexOutOfRangeException("The list capacity cannot be less than Count.");
 
                 if (value != _items.Length)
                     Resize(value);
@@ -70,7 +70,7 @@ namespace System.Collections.Generic
         public void AddRange(T[] items)
         {
             if (items == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source items cannot be null.");
 
             EnsureCapacity(_size + items.Length);
             for (int i = 0; i < items.Length; i++)
@@ -82,7 +82,7 @@ namespace System.Collections.Generic
         public void Insert(int index, T item)
         {
             if ((uint)index > (uint)_size)
-                throw new IndexOutOfRangeException();
+                throw new IndexOutOfRangeException("The insertion index is outside the list.");
 
             EnsureCapacity(_size + 1);
             for (int i = _size; i > index; i--)
@@ -150,7 +150,7 @@ namespace System.Collections.Generic
         private void ValidateIndex(int index)
         {
             if ((uint)index >= (uint)_size)
-                throw new IndexOutOfRangeException();
+                throw new IndexOutOfRangeException("The list index is outside the collection.");
         }
 
         public struct Enumerator : IEnumerator<T>

@@ -33,17 +33,17 @@ namespace System.Reflection.PortableExecutable
         public PEHeaders(Stream peStream, int size, bool isLoadedImage)
         {
             if (peStream == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The PE stream cannot be null.");
             if (!peStream.CanRead || !peStream.CanSeek)
-                throw new ArgumentException();
+                throw new ArgumentException("The PE stream must support reading and seeking.");
 
             long remaining = peStream.Length - peStream.Position;
             if (remaining < 0 || remaining > int.MaxValue || size < 0 || (size != 0 && size > remaining))
-                throw new ArgumentException();
+                throw new ArgumentException("The requested PE image size is outside the stream bounds.");
 
             int actualSize = size == 0 ? (int)remaining : size;
             if (actualSize <= 0)
-                throw new ArgumentException();
+                throw new ArgumentException("The PE image cannot be empty.");
 
             _isLoadedImage = isLoadedImage;
             var reader = new PEBinaryReader(peStream, actualSize);

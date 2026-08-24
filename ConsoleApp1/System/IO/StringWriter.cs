@@ -14,7 +14,7 @@ namespace System.IO
 
         public StringWriter(StringBuilder builder)
         {
-            _builder = builder ?? throw new ArgumentNullException();
+            _builder = builder ?? throw new ArgumentNullException("The string builder cannot be null.");
         }
 
         public override Encoding Encoding => Encoding.UTF8;
@@ -54,7 +54,7 @@ namespace System.IO
         private void EnsureOpen()
         {
             if (_closed)
-                throw new IOException();
+                throw new IOException("The string writer is closed.");
         }
     }
 }

@@ -87,7 +87,7 @@ namespace System.Collections.Concurrent
         public TValue GetOrAdd(TKey key, Func<TKey, TValue> valueFactory)
         {
             if (valueFactory == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The value factory cannot be null.");
 
             lock (this)
             {
@@ -102,7 +102,7 @@ namespace System.Collections.Concurrent
         public TValue AddOrUpdate(TKey key, TValue addValue, Func<TKey, TValue, TValue> updateValueFactory)
         {
             if (updateValueFactory == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The update value factory cannot be null.");
 
             lock (this)
             {

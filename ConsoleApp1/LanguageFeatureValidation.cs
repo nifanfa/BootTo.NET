@@ -320,7 +320,7 @@ public static partial class LanguageFeatureValidation
         s_filterMode = 0;
         try
         {
-            throw new InvalidOperationException();
+            throw new InvalidOperationException("Validation exception used to test exception filters.");
         }
         catch (Exception) when (RejectExceptionFilter())
         {

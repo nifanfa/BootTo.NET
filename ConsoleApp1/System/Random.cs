@@ -19,7 +19,7 @@ namespace System
         public virtual int Next(int maxValue)
         {
             if (maxValue < 0)
-                throw new ArgumentException();
+                throw new ArgumentException("The maximum random value cannot be negative.");
             if (maxValue == 0)
                 return 0;
             return (int)((ulong)NextUInt() * (ulong)maxValue >> 32);
@@ -28,7 +28,7 @@ namespace System
         public virtual int Next(int minValue, int maxValue)
         {
             if (minValue > maxValue)
-                throw new ArgumentException();
+                throw new ArgumentException("The minimum random value cannot exceed the maximum.");
             long range = (long)maxValue - minValue;
             if (range == 0)
                 return minValue;
@@ -41,7 +41,7 @@ namespace System
         public virtual long NextInt64(long maxValue)
         {
             if (maxValue < 0)
-                throw new ArgumentException();
+                throw new ArgumentException("The maximum random value cannot be negative.");
             if (maxValue == 0)
                 return 0;
             return (long)(NextUInt64() % (ulong)maxValue);
@@ -50,7 +50,7 @@ namespace System
         public virtual long NextInt64(long minValue, long maxValue)
         {
             if (minValue > maxValue)
-                throw new ArgumentException();
+                throw new ArgumentException("The minimum random value cannot exceed the maximum.");
             ulong range = (ulong)(maxValue - minValue);
             if (range == 0)
                 return minValue;
@@ -62,16 +62,16 @@ namespace System
         public virtual void NextBytes(byte[] buffer)
         {
             if (buffer == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The random byte buffer cannot be null.");
             NextBytes(buffer, 0, buffer.Length);
         }
 
         public virtual void NextBytes(byte[] buffer, int index, int count)
         {
             if (buffer == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The random byte buffer cannot be null.");
             if (index < 0 || count < 0 || index > buffer.Length - count)
-                throw new ArgumentException();
+                throw new ArgumentException("The random byte buffer range is invalid.");
             for (int i = 0; i < count; i++)
                 buffer[index + i] = (byte)NextUInt();
         }
@@ -88,7 +88,7 @@ namespace System
             if (s_hardwareRdrand < 0)
                 s_hardwareRdrand = SupportRdrand();
             if (s_hardwareRdrand == 0)
-                throw new NotSupportedException();
+                throw new NotSupportedException("The processor does not support the RDRAND instruction.");
         }
 
         private static ulong NextHardwareRandom()
@@ -100,7 +100,7 @@ namespace System
                     return value;
             }
 
-            throw new InvalidOperationException();
+            throw new InvalidOperationException("The hardware random number generator did not return a value.");
         }
     }
 }

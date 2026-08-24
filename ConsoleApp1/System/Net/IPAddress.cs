@@ -9,7 +9,7 @@ namespace System.Net
         public IPAddress(long address)
         {
             if (address < 0 || address > uint.MaxValue)
-                throw new ArgumentException();
+                throw new ArgumentException("The IPv4 address value must be between 0 and UInt32.MaxValue.");
 
             _address = (uint)address;
         }
@@ -17,9 +17,9 @@ namespace System.Net
         public IPAddress(byte[] address)
         {
             if (address == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The IPv4 address bytes cannot be null.");
             if (address.Length != 4)
-                throw new ArgumentException();
+                throw new ArgumentException("An IPv4 address must contain exactly four bytes.");
 
             _address = (uint)(address[0] |
                 ((uint)address[1] << 8) |
@@ -54,7 +54,7 @@ namespace System.Net
         {
             IPAddress address;
             if (!TryParse(ipString, out address))
-                throw new FormatException();
+                throw new FormatException("The string is not a valid IPv4 address.");
             return address;
         }
 

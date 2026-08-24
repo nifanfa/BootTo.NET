@@ -110,9 +110,9 @@ namespace System.Net.Sockets
         public Task ConnectAsync(IPAddress address, int port)
         {
             if (address == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The remote address cannot be null.");
             if ((uint)port > ushort.MaxValue)
-                throw new ArgumentException();
+                throw new ArgumentException("The remote port must be between 0 and 65535.");
             if (socketType == SocketType.Dgram)
                 return ConnectUdpAsync(address, port);
             if (connected)
@@ -251,9 +251,9 @@ namespace System.Net.Sockets
         public void Bind(IPAddress address, int port)
         {
             if (address == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The local address cannot be null.");
             if ((uint)port > ushort.MaxValue)
-                throw new ArgumentException();
+                throw new ArgumentException("The local port must be between 0 and 65535.");
             if (bound || connected || listening)
                 throw new SocketException(EFI_ALREADY_STARTED);
 
@@ -281,7 +281,7 @@ namespace System.Net.Sockets
             if (socketType != SocketType.Stream)
                 throw new SocketException(EFI_UNSUPPORTED);
             if (backlog < 0)
-                throw new ArgumentException();
+                throw new ArgumentException("The listen backlog cannot be negative.");
             if (listening)
                 throw new SocketException(EFI_ALREADY_STARTED);
             if (!bound)
@@ -331,9 +331,9 @@ namespace System.Net.Sockets
         public Task<int> SendToAsync(byte[] buffer, IPAddress address, int port)
         {
             if (address == null)
-                return Task.FromException<int>(new ArgumentNullException());
+                return Task.FromException<int>(new ArgumentNullException("The destination address cannot be null."));
             if ((uint)port > ushort.MaxValue)
-                return Task.FromException<int>(new ArgumentException());
+                return Task.FromException<int>(new ArgumentException("The destination port must be between 0 and 65535."));
             if (socketType != SocketType.Dgram)
                 return Task.FromException<int>(new SocketException(EFI_UNSUPPORTED));
             return SendUdpAsync(buffer, address, port);
@@ -352,7 +352,7 @@ namespace System.Net.Sockets
             if (socketType != SocketType.Dgram)
                 return Task.FromException<SocketReceiveResult>(new SocketException(EFI_UNSUPPORTED));
             if (buffer == null)
-                return Task.FromException<SocketReceiveResult>(new Exception("The receive buffer cannot be null."));
+                return Task.FromException<SocketReceiveResult>(new ArgumentNullException("The receive buffer cannot be null."));
             if (receiveFromCompletion != null || udpReceiveCompletion != null)
                 return Task.FromException<SocketReceiveResult>(new SocketException(EFI_ACCESS_DENIED));
             if (!bound)
@@ -474,9 +474,9 @@ namespace System.Net.Sockets
         private Task<int> SendUdpAsync(byte[] buffer, IPAddress address, int port)
         {
             if (buffer == null)
-                return Task.FromException<int>(new Exception("The send buffer cannot be null."));
+                return Task.FromException<int>(new ArgumentNullException("The send buffer cannot be null."));
             if (address == null || (uint)port > ushort.MaxValue)
-                return Task.FromException<int>(new ArgumentException());
+                return Task.FromException<int>(new ArgumentException("The destination address or port is invalid."));
             if (!bound)
             {
                 try
@@ -523,7 +523,7 @@ namespace System.Net.Sockets
         private Task<int> ReceiveUdpAsync(byte[] buffer)
         {
             if (buffer == null)
-                return Task.FromException<int>(new Exception("The receive buffer cannot be null."));
+                return Task.FromException<int>(new ArgumentNullException("The receive buffer cannot be null."));
             if (udpReceiveCompletion != null || receiveFromCompletion != null || udpCloseCompletion != null)
                 return Task.FromException<int>(new SocketException(EFI_ACCESS_DENIED));
             if (!bound)
@@ -1286,7 +1286,10 @@ namespace System.Net.Sockets
 
     public sealed class SocketException : Exception
     {
-        public SocketException(EFI_STATUS status) : base("The UEFI socket operation failed.")
+        public SocketException(EFI_STATUS status) : base("The UEFI socket operation failed with status " + (ulong)status + ".")
+            => Status = status;
+
+        public SocketException(EFI_STATUS status, string message) : base(message)
             => Status = status;
 
         public EFI_STATUS Status { get; }

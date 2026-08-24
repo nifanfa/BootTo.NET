@@ -48,9 +48,9 @@ namespace System.IO.Ports
             StopBits stopBits = StopBits.One)
         {
             if (portName == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The serial port name cannot be null.");
             if (baudRate <= 0 || dataBits < 5 || dataBits > 8)
-                throw new ArgumentException();
+                throw new ArgumentException("The serial baud rate or data bits value is invalid.");
 
             PortName = portName;
             BaudRate = baudRate;
@@ -77,7 +77,7 @@ namespace System.IO.Ports
                 null,
                 (void**)&serial);
             if ((ulong)status != EFI_SUCCESS || serial == null)
-                throw new IOException();
+                throw new IOException("The UEFI serial I/O protocol is unavailable.");
 
             _serial = serial;
             _readPoller = new ReadPoller(this);
@@ -94,7 +94,7 @@ namespace System.IO.Ports
             {
                 _serial = null;
                 _readPoller = null;
-                throw new IOException();
+                throw new IOException("The serial port attributes could not be configured.");
             }
         }
 
@@ -111,17 +111,17 @@ namespace System.IO.Ports
             _serial = null;
 
             if (completion != null)
-                completion.TrySetException(new IOException());
+                completion.TrySetException(new IOException("The serial port was closed while a read was pending."));
         }
 
         public Task<int> ReadAsync(byte[] buffer)
         {
             if (buffer == null)
-                return Task.FromException<int>(new ArgumentNullException());
+                return Task.FromException<int>(new ArgumentNullException("The serial read buffer cannot be null."));
             if (!IsOpen)
-                return Task.FromException<int>(new IOException());
+                return Task.FromException<int>(new IOException("The serial port is not open."));
             if (_readCompletion != null)
-                return Task.FromException<int>(new IOException());
+                return Task.FromException<int>(new IOException("A serial read is already in progress."));
             if (buffer.Length == 0)
                 return Task.FromResult(0);
 
@@ -139,9 +139,9 @@ namespace System.IO.Ports
         public Task<int> WriteAsync(byte[] buffer)
         {
             if (buffer == null)
-                return Task.FromException<int>(new ArgumentNullException());
+                return Task.FromException<int>(new ArgumentNullException("The serial write buffer cannot be null."));
             if (!IsOpen)
-                return Task.FromException<int>(new IOException());
+                return Task.FromException<int>(new IOException("The serial port is not open."));
             if (buffer.Length == 0)
                 return Task.FromResult(0);
 
@@ -152,7 +152,7 @@ namespace System.IO.Ports
 
             return (ulong)status == EFI_SUCCESS
                 ? Task.FromResult((int)size)
-                : Task.FromException<int>(new IOException());
+                : Task.FromException<int>(new IOException("The serial write operation failed."));
         }
 
         public void Write(byte[] buffer)
@@ -202,7 +202,7 @@ namespace System.IO.Ports
             if ((ulong)status == EFI_SUCCESS)
                 completion.TrySetResult(count);
             else
-                completion.TrySetException(new IOException());
+                completion.TrySetException(new IOException("The serial read operation failed."));
         }
 
         private static EFI_PARITY_TYPE ToEfiParity(Parity parity)

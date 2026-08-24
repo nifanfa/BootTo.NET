@@ -16,7 +16,7 @@ namespace System.Collections.Generic
         public Queue(int capacity)
         {
             if (capacity < 0)
-                throw new IndexOutOfRangeException();
+                throw new IndexOutOfRangeException("The queue capacity cannot be negative.");
 
             _items = new T[capacity];
         }
@@ -34,7 +34,7 @@ namespace System.Collections.Generic
         public T Dequeue()
         {
             if (!TryDequeue(out T item))
-                throw new IndexOutOfRangeException();
+                throw new InvalidOperationException("Cannot dequeue from an empty queue.");
 
             return item;
         }
@@ -59,7 +59,7 @@ namespace System.Collections.Generic
         public T Peek()
         {
             if (!TryPeek(out T item))
-                throw new IndexOutOfRangeException();
+                throw new InvalidOperationException("Cannot peek at an empty queue.");
 
             return item;
         }

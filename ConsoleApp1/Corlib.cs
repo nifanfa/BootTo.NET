@@ -231,31 +231,37 @@ namespace System
     internal sealed class IndexOutOfRangeException : Exception
     {
         public IndexOutOfRangeException() : base("Index was outside the bounds of the array.") { }
+        public IndexOutOfRangeException(string message) : base(message) { }
     }
 
     internal sealed class InvalidProgramException : Exception
     {
         public InvalidProgramException() : base("Common Language Runtime detected an invalid program.") { }
+        public InvalidProgramException(string message) : base(message) { }
     }
 
     internal sealed class OverflowException : Exception
     {
         public OverflowException() : base("Arithmetic operation resulted in an overflow.") { }
+        public OverflowException(string message) : base(message) { }
     }
 
     internal sealed class TypeLoadException : Exception
     {
         public TypeLoadException() : base("Failure has occurred while loading a type.") { }
+        public TypeLoadException(string message) : base(message) { }
     }
 
     internal sealed class NotSupportedException : Exception
     {
         public NotSupportedException() : base("Specified method is not supported.") { }
+        public NotSupportedException(string message) : base(message) { }
     }
 
     public class ArgumentException : Exception
     {
         public ArgumentException() : base("Value does not fall within the expected range.") { }
+        public ArgumentException(string message) : base(message) { }
     }
 
     public class BadImageFormatException : Exception
@@ -267,26 +273,31 @@ namespace System
     internal sealed class ArgumentNullException : Exception
     {
         public ArgumentNullException() : base("Value cannot be null.") { }
+        public ArgumentNullException(string message) : base(message) { }
     }
 
     public class FormatException : Exception
     {
         public FormatException() : base("Input string was not in a correct format.") { }
+        public FormatException(string message) : base(message) { }
     }
 
     internal sealed class InvalidCastException : Exception
     {
         public InvalidCastException() : base("Specified cast is not valid.") { }
+        public InvalidCastException(string message) : base(message) { }
     }
 
     internal sealed class NullReferenceException : Exception
     {
         public NullReferenceException() : base("Object reference not set to an instance of an object.") { }
+        public NullReferenceException(string message) : base(message) { }
     }
 
     public class InvalidOperationException : Exception
     {
         public InvalidOperationException() : base("The operation is not valid due to the current state of the object.") { }
+        public InvalidOperationException(string message) : base(message) { }
     }
 
     public ref struct ByReference<T>
@@ -460,7 +471,7 @@ namespace System
         public static string Concat(object[] values)
         {
             if (values == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The object array passed to Concat cannot be null.");
 
             if (values.Length == 0)
                 return Empty;
@@ -477,7 +488,7 @@ namespace System
         private static unsafe string ConcatStrings(string[] values)
         {
             if (values == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The string array passed to Concat cannot be null.");
 
             int length = 0;
             for (int i = 0; i < values.Length; i++)
@@ -585,7 +596,7 @@ namespace System
         {
             int rank = Rank;
             if ((uint)dimension >= (uint)rank)
-                throw new IndexOutOfRangeException();
+                throw new IndexOutOfRangeException("The array dimension is outside the array rank.");
 
             if (rank == 1)
                 return Length;
@@ -599,7 +610,7 @@ namespace System
         public int GetLowerBound(int dimension)
         {
             if ((uint)dimension >= (uint)Rank)
-                throw new IndexOutOfRangeException();
+                throw new IndexOutOfRangeException("The array dimension is outside the array rank.");
             return 0;
         }
 
@@ -642,7 +653,7 @@ namespace System
             if (value == null)
                 return source;
             if (!InternalEqualTypes(source, value))
-                throw new ArgumentException();
+                throw new ArgumentException("The delegates must have compatible types.");
 
             return source.RemoveImpl(value);
         }
@@ -650,7 +661,7 @@ namespace System
         protected virtual Delegate CombineImpl(Delegate follow)
         {
             if (!InternalEqualTypes(this, follow))
-                throw new ArgumentException();
+                throw new ArgumentException("The delegates must have compatible types.");
 
             int currentCount = GetInvocationCount(this);
             int followCount = GetInvocationCount(follow);
@@ -1789,7 +1800,7 @@ namespace System.Runtime
         private static void RhThrowEx(object exception, ref ExInfo exInfo)
         {
             if (exception == null)
-                exception = new Exception();
+                exception = new Exception("The runtime raised an exception without an exception object.");
 
             if (s_imageBase != null &&
                 s_exceptionTable != null &&
@@ -1811,7 +1822,7 @@ namespace System.Runtime
         {
             if (s_activeExceptionCount == 0)
             {
-                object missingException = new Exception();
+                object missingException = new Exception("The runtime attempted to rethrow without an active exception.");
                 Console.WriteLine("Unhandled exception: " + ((Exception)missingException).Message);
                 exInfo.Handler = null;
                 return missingException;
@@ -2328,10 +2339,10 @@ namespace System.Runtime
         internal static ref byte RhUnbox2(EEType* pUnboxToEEType, object obj)
         {
             if (obj == null)
-                throw new NullReferenceException();
+                throw new NullReferenceException("Cannot unbox a null object.");
 
             if (!UnboxAnyTypeCompare(obj.EEType, pUnboxToEEType))
-                throw new InvalidCastException();
+                throw new InvalidCastException("The object type cannot be unboxed to the requested value type.");
 
             return ref obj.GetRawData();
         }
@@ -2492,7 +2503,7 @@ namespace System.Runtime
 
             if (result == null)
             {
-                throw new InvalidCastException();
+                throw new InvalidCastException("The object cannot be cast to the requested class type.");
             }
 
             return result;
@@ -2522,7 +2533,7 @@ namespace System.Runtime
         {
             object result = IsInstanceOfInterface(pTargetEEType, obj);
             if (result == null && obj != null)
-                throw new InvalidCastException();
+                throw new InvalidCastException("The object does not implement the requested interface.");
 
             return result;
         }
@@ -2543,7 +2554,7 @@ namespace System.Runtime
         {
             object result = IsInstanceOfArray(pTargetEEType, obj);
             if (result == null && obj != null)
-                throw new InvalidCastException();
+                throw new InvalidCastException("The object is not an instance of the requested array type.");
 
             return result;
         }
@@ -2817,11 +2828,16 @@ namespace Internal.Runtime
 
         public static class ThrowHelpers
         {
-            public static void ThrowInvalidProgramException(int id) => throw new InvalidProgramException();
-            public static void ThrowInvalidProgramExceptionWithArgument(int id, string methodName) => throw new InvalidProgramException();
-            public static void ThrowOverflowException() => throw new OverflowException();
-            public static void ThrowIndexOutOfRangeException() => throw new IndexOutOfRangeException();
-            public static void ThrowTypeLoadException(int id, string className, string typeName) => throw new TypeLoadException();
+            public static void ThrowInvalidProgramException(int id)
+                => throw new InvalidProgramException("The generated method is invalid.");
+            public static void ThrowInvalidProgramExceptionWithArgument(int id, string methodName)
+                => throw new InvalidProgramException("The generated method with an invalid argument was called.");
+            public static void ThrowOverflowException()
+                => throw new OverflowException("The generated operation overflowed its numeric range.");
+            public static void ThrowIndexOutOfRangeException()
+                => throw new IndexOutOfRangeException("The generated array index is outside the valid range.");
+            public static void ThrowTypeLoadException(int id, string className, string typeName)
+                => throw new TypeLoadException("The requested type could not be loaded.");
         }
 
         public static partial class StartupCodeHelpers
@@ -3041,17 +3057,17 @@ namespace Internal.Runtime.CompilerHelpers
         public static Array NewObjArray(IntPtr pEEType, int nDimensions, int* pDimensions)
         {
             if (pDimensions == null || nDimensions <= 0)
-                throw new ArgumentException();
+                throw new ArgumentException("Array dimensions must be provided and the rank must be positive.");
 
             EEType* eeType = (EEType*)(void*)pEEType;
             if (eeType == null || eeType->BaseSize < SzArrayBaseSize)
-                throw new ArgumentException();
+                throw new ArgumentException("The array type metadata is invalid.");
 
             if (eeType->BaseSize == SzArrayBaseSize)
             {
                 int length = pDimensions[0];
                 if (length < 0)
-                    throw new OverflowException();
+                    throw new OverflowException("An array length cannot be negative.");
 
                 object resultObject = InternalCalls.RhpNewArray(eeType, length);
                 Array result = Unsafe.As<object, Array>(ref resultObject);
@@ -3081,7 +3097,7 @@ namespace Internal.Runtime.CompilerHelpers
             uint boundsSize = eeType->BaseSize - SzArrayBaseSize;
             int rank = (int)(boundsSize / (uint)(sizeof(int) * 2));
             if (rank <= 0 || rank != nDimensions && rank * 2 != nDimensions)
-                throw new ArgumentException();
+                throw new ArgumentException("The array rank does not match the supplied dimensions.");
 
             // The alternate constructor form supplies lower-bound/length pairs.
             // This runtime supports only zero lower bounds.
@@ -3090,7 +3106,7 @@ namespace Internal.Runtime.CompilerHelpers
                 for (int i = 0; i < rank; i++)
                 {
                     if (pDimensions[i * 2] != 0)
-                        throw new NotSupportedException();
+                        throw new NotSupportedException("Non-zero lower array bounds are not supported.");
 
                     pDimensions[i] = pDimensions[i * 2 + 1];
                 }
@@ -3101,11 +3117,11 @@ namespace Internal.Runtime.CompilerHelpers
             {
                 int length = pDimensions[i];
                 if (length < 0)
-                    throw new OverflowException();
+                    throw new OverflowException("An array length cannot be negative.");
 
                 totalLength *= (ulong)length;
                 if (totalLength > (~0U >> 1))
-                    throw new OverflowException();
+                    throw new OverflowException("The requested array is too large for the runtime.");
             }
 
             object arrayObject = InternalCalls.RhpNewArray(eeType, (int)totalLength);
@@ -3137,14 +3153,14 @@ namespace System.Linq
         public static bool Any<TSource>(this TSource[] source)
         {
             if (source == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source array cannot be null.");
             return source.Length != 0;
         }
 
         public static bool Any<TSource>(this TSource[] source, Func<TSource, bool> predicate)
         {
             if (source == null || predicate == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source array and predicate cannot be null.");
             for (int i = 0; i < source.Length; i++)
                 if (predicate(source[i]))
                     return true;
@@ -3154,14 +3170,14 @@ namespace System.Linq
         public static int Count<TSource>(this TSource[] source)
         {
             if (source == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source array cannot be null.");
             return source.Length;
         }
 
         public static int Count<TSource>(this TSource[] source, Func<TSource, bool> predicate)
         {
             if (source == null || predicate == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source array and predicate cannot be null.");
             int count = 0;
             for (int i = 0; i < source.Length; i++)
                 if (predicate(source[i]))
@@ -3172,23 +3188,23 @@ namespace System.Linq
         public static TSource First<TSource>(this TSource[] source)
         {
             if (source == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source array cannot be null.");
             if (source.Length == 0)
-                throw new InvalidOperationException();
+                throw new InvalidOperationException("The source array contains no elements.");
             return source[0];
         }
 
         public static TSource FirstOrDefault<TSource>(this TSource[] source)
         {
             if (source == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source array cannot be null.");
             return source.Length == 0 ? default : source[0];
         }
 
         public static TSource FirstOrDefault<TSource>(this TSource[] source, Func<TSource, bool> predicate)
         {
             if (source == null || predicate == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source array and predicate cannot be null.");
             for (int i = 0; i < source.Length; i++)
                 if (predicate(source[i]))
                     return source[i];
@@ -3198,21 +3214,21 @@ namespace System.Linq
         public static IEnumerable<TSource> Where<TSource>(this TSource[] source, Func<TSource, bool> predicate)
         {
             if (source == null || predicate == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source array and predicate cannot be null.");
             return new ArrayWhereEnumerable<TSource>(source, predicate);
         }
 
         public static IEnumerable<TResult> Select<TSource, TResult>(this TSource[] source, Func<TSource, TResult> selector)
         {
             if (source == null || selector == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source array and selector cannot be null.");
             return new ArraySelectEnumerable<TSource, TResult>(source, selector);
         }
 
         public static bool Contains<TSource>(this TSource[] source, TSource value)
         {
             if (source == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source array cannot be null.");
             for (int i = 0; i < source.Length; i++)
                 if (Equals(source[i], value))
                     return true;
@@ -3222,7 +3238,7 @@ namespace System.Linq
         public static TSource[] ToArray<TSource>(this TSource[] source)
         {
             if (source == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source array cannot be null.");
             TSource[] result = new TSource[source.Length];
             for (int i = 0; i < source.Length; i++)
                 result[i] = source[i];
@@ -3232,7 +3248,7 @@ namespace System.Linq
         public static bool Any<TSource>(this IEnumerable<TSource> source)
         {
             if (source == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source sequence cannot be null.");
             IEnumerator<TSource> enumerator = source.GetEnumerator();
             try { return enumerator.MoveNext(); }
             finally { enumerator.Dispose(); }
@@ -3241,7 +3257,7 @@ namespace System.Linq
         public static bool Any<TSource>(this IEnumerable<TSource> source, Func<TSource, bool> predicate)
         {
             if (source == null || predicate == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source sequence and predicate cannot be null.");
             IEnumerator<TSource> enumerator = source.GetEnumerator();
             try
             {
@@ -3256,7 +3272,7 @@ namespace System.Linq
         public static int Count<TSource>(this IEnumerable<TSource> source)
         {
             if (source == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source sequence cannot be null.");
             int count = 0;
             IEnumerator<TSource> enumerator = source.GetEnumerator();
             try
@@ -3271,7 +3287,7 @@ namespace System.Linq
         public static int Count<TSource>(this IEnumerable<TSource> source, Func<TSource, bool> predicate)
         {
             if (source == null || predicate == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source sequence and predicate cannot be null.");
             int count = 0;
             IEnumerator<TSource> enumerator = source.GetEnumerator();
             try
@@ -3287,7 +3303,7 @@ namespace System.Linq
         public static TSource First<TSource>(this IEnumerable<TSource> source)
         {
             if (source == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source sequence cannot be null.");
             IEnumerator<TSource> enumerator = source.GetEnumerator();
             try
             {
@@ -3295,13 +3311,13 @@ namespace System.Linq
                     return enumerator.Current;
             }
             finally { enumerator.Dispose(); }
-            throw new InvalidOperationException();
+            throw new InvalidOperationException("The source sequence contains no elements.");
         }
 
         public static TSource FirstOrDefault<TSource>(this IEnumerable<TSource> source)
         {
             if (source == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source sequence cannot be null.");
             IEnumerator<TSource> enumerator = source.GetEnumerator();
             try { return enumerator.MoveNext() ? enumerator.Current : default; }
             finally { enumerator.Dispose(); }
@@ -3310,7 +3326,7 @@ namespace System.Linq
         public static TSource FirstOrDefault<TSource>(this IEnumerable<TSource> source, Func<TSource, bool> predicate)
         {
             if (source == null || predicate == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source sequence and predicate cannot be null.");
             IEnumerator<TSource> enumerator = source.GetEnumerator();
             try
             {
@@ -3325,21 +3341,21 @@ namespace System.Linq
         public static IEnumerable<TSource> Where<TSource>(this IEnumerable<TSource> source, Func<TSource, bool> predicate)
         {
             if (source == null || predicate == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source sequence and predicate cannot be null.");
             return new WhereEnumerable<TSource>(source, predicate);
         }
 
         public static IEnumerable<TResult> Select<TSource, TResult>(this IEnumerable<TSource> source, Func<TSource, TResult> selector)
         {
             if (source == null || selector == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source sequence and selector cannot be null.");
             return new SelectEnumerable<TSource, TResult>(source, selector);
         }
 
         public static bool Contains<TSource>(this IEnumerable<TSource> source, TSource value)
         {
             if (source == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source sequence cannot be null.");
             IEnumerator<TSource> enumerator = source.GetEnumerator();
             try
             {

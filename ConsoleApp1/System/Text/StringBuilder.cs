@@ -13,7 +13,7 @@ namespace System.Text
         public StringBuilder(int capacity)
         {
             if (capacity < 0)
-                throw new ArgumentException();
+                throw new ArgumentException("The StringBuilder capacity cannot be negative.");
 
             _buffer = new char[capacity == 0 ? 1 : capacity];
         }
@@ -21,7 +21,7 @@ namespace System.Text
         public StringBuilder(string value)
         {
             if (value == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The initial string cannot be null.");
 
             _buffer = new char[value.Length == 0 ? 1 : value.Length];
             Append(value);
@@ -30,7 +30,7 @@ namespace System.Text
         public StringBuilder(string value, int capacity)
         {
             if (value == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The initial string cannot be null.");
             if (capacity < value.Length)
                 capacity = value.Length;
 
@@ -44,7 +44,7 @@ namespace System.Text
             set
             {
                 if (value < 0)
-                    throw new ArgumentException();
+                    throw new ArgumentException("The StringBuilder length cannot be negative.");
                 EnsureCapacity(value);
                 if (value > _length)
                 {
@@ -61,7 +61,7 @@ namespace System.Text
             set
             {
                 if (value < _length)
-                    throw new ArgumentException();
+                    throw new ArgumentException("The StringBuilder capacity cannot be less than Length.");
                 if (value == 0)
                     value = 1;
                 if (value != _buffer.Length)
@@ -98,7 +98,7 @@ namespace System.Text
         public StringBuilder Append(char value, int repeatCount)
         {
             if (repeatCount < 0)
-                throw new ArgumentException();
+                throw new ArgumentException("The repeat count cannot be negative.");
             EnsureCapacity(_length + repeatCount);
             for (int i = 0; i < repeatCount; i++)
                 _buffer[_length++] = value;
@@ -120,7 +120,7 @@ namespace System.Text
             if (value == null)
                 return this;
             if (startIndex < 0 || count < 0 || startIndex > value.Length - count)
-                throw new ArgumentException();
+                throw new ArgumentException("The source string range is invalid.");
             EnsureCapacity(_length + count);
             for (int i = 0; i < count; i++)
                 _buffer[_length++] = value[startIndex + i];
@@ -139,7 +139,7 @@ namespace System.Text
             if (value == null)
                 return this;
             if (startIndex < 0 || count < 0 || startIndex > value.Length - count)
-                throw new ArgumentException();
+                throw new ArgumentException("The source character array range is invalid.");
             EnsureCapacity(_length + count);
             for (int i = 0; i < count; i++)
                 _buffer[_length++] = value[startIndex + i];
@@ -170,7 +170,7 @@ namespace System.Text
         public StringBuilder Remove(int startIndex, int length)
         {
             if (startIndex < 0 || length < 0 || startIndex > _length - length)
-                throw new ArgumentException();
+                throw new ArgumentException("The StringBuilder range is invalid.");
             for (int i = startIndex; i < _length - length; i++)
                 _buffer[i] = _buffer[i + length];
             _length -= length;
@@ -199,7 +199,7 @@ namespace System.Text
         public string ToString(int startIndex, int length)
         {
             if (startIndex < 0 || length < 0 || startIndex > _length - length)
-                throw new ArgumentException();
+                throw new ArgumentException("The StringBuilder range is invalid.");
             char[] result = new char[length];
             for (int i = 0; i < length; i++)
                 result[i] = _buffer[startIndex + i];
@@ -220,7 +220,7 @@ namespace System.Text
         private void ValidateIndex(int index)
         {
             if ((uint)index >= (uint)_length)
-                throw new IndexOutOfRangeException();
+                throw new IndexOutOfRangeException("The StringBuilder index is outside the current contents.");
         }
     }
 }

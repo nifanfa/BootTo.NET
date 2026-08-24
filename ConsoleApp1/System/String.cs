@@ -8,7 +8,7 @@
         public string Substring(int startIndex, int length)
         {
             if (startIndex < 0 || length < 0 || startIndex > Length - length)
-                throw new ArgumentException();
+                throw new ArgumentException("The substring start index and length are outside the string.");
             if (length == 0)
                 return Empty;
 
@@ -30,9 +30,9 @@
         public static string Format(string format, params object[] args)
         {
             if (format == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The format string cannot be null.");
             if (args == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The format arguments cannot be null.");
 
             System.Text.StringBuilder result = new System.Text.StringBuilder(format.Length + 16);
             int index = 0;
@@ -57,7 +57,7 @@
                     }
 
                     if (digits == 0 || argumentIndex >= args.Length)
-                        throw new FormatException();
+                        throw new FormatException("The format contains an invalid or out-of-range argument index.");
 
                     while (index < format.Length && format[index] == ' ')
                         index++;
@@ -70,7 +70,7 @@
                         while (index < format.Length && format[index] != '}')
                             index++;
                         if (index >= format.Length)
-                            throw new FormatException();
+                            throw new FormatException("The format item is missing its closing brace.");
                         if (index > specifierStart)
                         {
                             char[] specifierChars = new char[index - specifierStart];
@@ -81,7 +81,7 @@
                     }
 
                     if (index >= format.Length || format[index] != '}')
-                        throw new FormatException();
+                        throw new FormatException("The format item is missing its closing brace.");
                     index++;
                     result.Append(FormatValue(args[argumentIndex], specifier));
                     continue;
@@ -95,7 +95,7 @@
                         index++;
                         continue;
                     }
-                    throw new FormatException();
+                    throw new FormatException("The format contains an unmatched closing brace.");
                 }
 
                 result.Append(current);
@@ -118,7 +118,7 @@
                 for (int i = 1; i < specifier.Length; i++)
                 {
                     if (specifier[i] < '0' || specifier[i] > '9')
-                        throw new FormatException();
+                        throw new FormatException("The numeric format width is invalid.");
                     width = width * 10 + (specifier[i] - '0');
                 }
 
@@ -146,7 +146,7 @@
                 for (int i = 1; i < specifier.Length; i++)
                 {
                     if (specifier[i] < '0' || specifier[i] > '9')
-                        throw new FormatException();
+                        throw new FormatException("The numeric format width is invalid.");
                     width = width * 10 + (specifier[i] - '0');
                 }
                 string text = value.ToString();
@@ -169,7 +169,7 @@
                 return padded.ToString();
             }
 
-            throw new FormatException();
+            throw new FormatException("The format specifier is not supported.");
         }
 
         private static string FormatUnsigned(ulong value, bool upper, int width)

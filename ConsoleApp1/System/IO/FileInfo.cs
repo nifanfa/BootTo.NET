@@ -7,7 +7,7 @@ namespace System.IO
         public FileInfo(string fileName)
         {
             if (string.IsNullOrEmpty(fileName))
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The file name cannot be null or empty.");
             _fullName = fileName;
         }
 
@@ -40,7 +40,7 @@ namespace System.IO
             get
             {
                 if (!UefiFileSystem.TryGetInfo(_fullName, out UefiFileMetadata metadata))
-                    throw new IOException();
+                    throw new IOException("The file metadata could not be read.");
                 return (long)metadata.FileSize;
             }
         }
@@ -57,7 +57,7 @@ namespace System.IO
         public void Delete()
         {
             if (!UefiFileSystem.Delete(_fullName))
-                throw new IOException();
+                throw new IOException("The file could not be deleted.");
         }
 
         public FileStream OpenRead()
@@ -69,7 +69,7 @@ namespace System.IO
         private UefiFileMetadata GetMetadata()
         {
             if (!UefiFileSystem.TryGetInfo(_fullName, out UefiFileMetadata metadata))
-                throw new IOException();
+                throw new IOException("The file metadata could not be read.");
             return metadata;
         }
 

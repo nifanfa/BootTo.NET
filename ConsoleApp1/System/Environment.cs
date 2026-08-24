@@ -53,7 +53,7 @@ namespace System
         public Version(int major, int minor, int build, int revision)
         {
             if (major < 0 || minor < 0 || build < -1 || revision < -1)
-                throw new ArgumentException();
+                throw new ArgumentException("Version components cannot be negative, except Build and Revision may be -1.");
             _major = major;
             _minor = minor;
             _build = build;
@@ -101,7 +101,7 @@ namespace System
         public OperatingSystem(PlatformID platform, Version version, string servicePack)
         {
             _platform = platform;
-            _version = version ?? throw new ArgumentNullException();
+            _version = version ?? throw new ArgumentNullException("The operating system version cannot be null.");
             _servicePack = servicePack ?? string.Empty;
         }
 
@@ -130,7 +130,7 @@ namespace System
             set
             {
                 if (string.IsNullOrEmpty(value))
-                    throw new ArgumentException();
+                    throw new ArgumentException("The current directory cannot be null or empty.");
                 _currentDirectory = value;
             }
         }

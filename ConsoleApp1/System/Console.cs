@@ -168,9 +168,9 @@
                 &rows);
 
             if ((ulong)status != EFI_SUCCESS)
-                throw new System.IO.IOException();
+                throw new System.IO.IOException("The console output mode could not be queried.");
             if (columns > (ulong)int.MaxValue || rows > (ulong)int.MaxValue)
-                throw new OverflowException();
+                throw new OverflowException("The console dimensions exceed the supported integer range.");
 
             width = (int)columns;
             height = (int)rows;
@@ -179,7 +179,7 @@
         private static void SetBufferDimensions(int value, bool height)
         {
             if (value <= 0)
-                throw new ArgumentException();
+                throw new ArgumentException("The console dimensions must be positive.");
 
             lock (s_syncRoot)
             {
@@ -210,20 +210,20 @@
 
                     status = consoleOut->SetMode(consoleOut, (ulong)mode);
                     if ((ulong)status != EFI_SUCCESS)
-                        throw new System.IO.IOException();
+                        throw new System.IO.IOException("The console output mode could not be selected.");
                     s_lineWrapped = false;
                     return;
                 }
             }
 
-            throw new ArgumentException();
+            throw new ArgumentException("The requested console dimensions are not supported.");
         }
 
         private static SIMPLE_TEXT_OUTPUT_INTERFACE* GetConsoleOutput()
         {
             if ((void*)gST == null || (void*)gST->ConOut == null ||
                 (void*)gST->ConOut->Mode == null)
-                throw new InvalidOperationException();
+                throw new InvalidOperationException("The UEFI console output protocol is unavailable.");
 
             return gST->ConOut;
         }
@@ -358,7 +358,7 @@
         public static void Write(char[] buffer, int index, int count)
         {
             if (buffer == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The character buffer cannot be null.");
             ValidateCharArrayRange(buffer, index, count);
 
             lock (s_syncRoot)
@@ -422,7 +422,7 @@
         public static void WriteLine(char[] buffer, int index, int count)
         {
             if (buffer == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The character buffer cannot be null.");
             ValidateCharArrayRange(buffer, index, count);
 
             lock (s_syncRoot)
@@ -457,7 +457,7 @@
         private static void ValidateCharArrayRange(char[] buffer, int index, int count)
         {
             if (index < 0 || count < 0 || index > buffer.Length - count)
-                throw new ArgumentException();
+                throw new ArgumentException("The character buffer offset and count do not describe a valid range.");
         }
 
         private static void WriteLineImpl()

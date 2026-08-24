@@ -27,7 +27,7 @@ namespace System.IO
         public MemoryStream(byte[] buffer, bool writable)
         {
             if (buffer == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The initial buffer cannot be null.");
 
             _buffer = buffer;
             _length = buffer.Length;
@@ -39,7 +39,7 @@ namespace System.IO
         public MemoryStream(int capacity)
         {
             if (capacity < 0)
-                throw new ArgumentException();
+                throw new ArgumentException("The initial capacity cannot be negative.");
 
             _buffer = new byte[capacity];
             _expandable = true;
@@ -70,7 +70,7 @@ namespace System.IO
             {
                 EnsureOpen();
                 if (value < 0 || value > int.MaxValue)
-                    throw new ArgumentException();
+                    throw new ArgumentException("The stream position is outside the supported range.");
 
                 _position = (int)value;
             }
@@ -84,10 +84,10 @@ namespace System.IO
                 SeekOrigin.Begin => offset,
                 SeekOrigin.Current => _position + offset,
                 SeekOrigin.End => _length + offset,
-                _ => throw new ArgumentException()
+                _ => throw new ArgumentException("The seek origin is not supported.")
             };
             if (position < 0 || position > int.MaxValue)
-                throw new ArgumentException();
+                throw new ArgumentException("The resulting stream position is outside the supported range.");
             _position = (int)position;
             return position;
         }
@@ -97,7 +97,7 @@ namespace System.IO
             EnsureOpen();
             EnsureWritable();
             if (value < 0 || value > int.MaxValue)
-                throw new ArgumentException();
+                throw new ArgumentException("The stream length is outside the supported range.");
 
             int length = (int)value;
             EnsureCapacity(length);
@@ -147,7 +147,7 @@ namespace System.IO
 
             int required = _position + count;
             if (required < _position)
-                throw new ArgumentException();
+                throw new ArgumentException("The requested write would overflow the stream size.");
 
             EnsureCapacity(required);
 
@@ -205,7 +205,7 @@ namespace System.IO
                 return;
 
             if (!_expandable)
-                throw new NotSupportedException();
+                throw new NotSupportedException("The memory stream capacity cannot be expanded.");
 
             int capacity = _buffer.Length == 0 ? 256 : _buffer.Length * 2;
             if (capacity < required)
@@ -221,21 +221,21 @@ namespace System.IO
         private void EnsureOpen()
         {
             if (!_open)
-                throw new IOException();
+                throw new IOException("The memory stream is closed.");
         }
 
         private void EnsureWritable()
         {
             if (!_writable)
-                throw new NotSupportedException();
+                throw new NotSupportedException("The memory stream was created as read-only.");
         }
 
         private static void ValidateRange(byte[] buffer, int offset, int count)
         {
             if (buffer == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The buffer cannot be null.");
             if (offset < 0 || count < 0 || offset > buffer.Length - count)
-                throw new ArgumentException();
+                throw new ArgumentException("The buffer offset and count do not describe a valid range.");
         }
     }
 }

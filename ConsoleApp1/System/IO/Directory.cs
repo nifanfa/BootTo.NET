@@ -15,30 +15,30 @@ namespace System.IO
         public static void CreateDirectory(string path)
         {
             if (string.IsNullOrEmpty(path))
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The directory path cannot be null or empty.");
             if (!UefiFileSystem.CreateDirectory(path))
-                throw new IOException();
+                throw new IOException("The directory could not be created.");
         }
 
         public static void Delete(string path)
         {
             if (string.IsNullOrEmpty(path))
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The directory path cannot be null or empty.");
             if (!UefiFileSystem.Delete(path))
-                throw new IOException();
+                throw new IOException("The directory could not be deleted.");
         }
 
         public static string[] GetFiles(string path)
         {
             if (string.IsNullOrEmpty(path))
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The directory path cannot be null or empty.");
             return AddDirectoryPrefix(path, UefiFileSystem.ReadDirectory(path, false));
         }
 
         public static string[] GetDirectories(string path)
         {
             if (string.IsNullOrEmpty(path))
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The directory path cannot be null or empty.");
             return AddDirectoryPrefix(path, UefiFileSystem.ReadDirectory(path, true));
         }
 

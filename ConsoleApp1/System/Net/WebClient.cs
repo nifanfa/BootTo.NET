@@ -54,7 +54,7 @@ namespace System.Net
         public string Get(string name)
         {
             if (name == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The header name cannot be null.");
 
             int index = Find(name);
             return index < 0 ? null : _headers[index].Value;
@@ -63,21 +63,21 @@ namespace System.Net
         public string GetKey(int index)
         {
             if ((uint)index >= (uint)_headers.Count)
-                throw new ArgumentException();
+                throw new ArgumentException("The header index is outside the collection.");
             return _headers[index].Name;
         }
 
         public string Get(int index)
         {
             if ((uint)index >= (uint)_headers.Count)
-                throw new ArgumentException();
+                throw new ArgumentException("The header index is outside the collection.");
             return _headers[index].Value;
         }
 
         public bool Remove(string name)
         {
             if (name == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The header name cannot be null.");
 
             int index = Find(name);
             if (index < 0)
@@ -108,18 +108,18 @@ namespace System.Net
         private static void Validate(string name, string value)
         {
             if (string.IsNullOrEmpty(name) || value == null)
-                throw new ArgumentException();
+                throw new ArgumentException("The header name must be non-empty and the value cannot be null.");
 
             for (int i = 0; i < name.Length; i++)
             {
                 char c = name[i];
                 if (c <= ' ' || c == ':' || c == '\r' || c == '\n')
-                    throw new ArgumentException();
+                    throw new ArgumentException("The header name contains an invalid character.");
             }
 
             for (int i = 0; i < value.Length; i++)
                 if (value[i] == '\r' || value[i] == '\n')
-                    throw new ArgumentException();
+                    throw new ArgumentException("The header value cannot contain CR or LF characters.");
         }
 
         internal static bool EqualsIgnoreCase(string left, string right)
@@ -175,7 +175,7 @@ namespace System.Net
             set
             {
                 if (value == null)
-                    throw new ArgumentNullException();
+                    throw new ArgumentNullException("The response encoding cannot be null.");
                 _encoding = value;
             }
         }
@@ -228,7 +228,7 @@ namespace System.Net
         public void DownloadFile(string address, string fileName)
         {
             if (fileName == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The destination file name cannot be null.");
 
             byte[] data = DownloadData(address);
             FileStream stream = null;
@@ -253,7 +253,7 @@ namespace System.Net
         public byte[] UploadData(string address, string method, byte[] data)
         {
             if (data == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The upload data cannot be null.");
             if (string.IsNullOrEmpty(method))
                 method = "POST";
 
@@ -274,7 +274,7 @@ namespace System.Net
         public string UploadString(string address, string method, string data)
         {
             if (data == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The upload string cannot be null.");
             if (string.IsNullOrEmpty(method))
                 method = "POST";
 
@@ -370,7 +370,7 @@ namespace System.Net
         private byte[] SendRequest(string method, string address, byte[] body, string defaultContentType)
         {
             if (string.IsNullOrEmpty(method) || ContainsControlCharacter(method))
-                throw new ArgumentException();
+                throw new ArgumentException("The HTTP method must be non-empty and contain no control characters.");
 
             ParsedUrl url;
             Socket socket = null;
@@ -455,7 +455,7 @@ namespace System.Net
 
                 int sent = socket.SendAsync(part).GetAwaiter().GetResult();
                 if (sent <= 0)
-                    throw new IOException();
+                    throw new IOException("The HTTP request body could not be sent.");
                 offset += sent;
             }
         }
@@ -662,12 +662,12 @@ namespace System.Net
         private Uri ResolveAddress(string address)
         {
             if (address == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The request address cannot be null.");
             Uri result;
             if (Uri.TryCreate(address, UriKind.Absolute, out result))
                 return result;
             if (string.IsNullOrEmpty(_baseAddress))
-                throw new NotSupportedException();
+                throw new NotSupportedException("The address is relative and no base address has been configured.");
             return new Uri(new Uri(_baseAddress, UriKind.Absolute), address);
         }
 
@@ -694,17 +694,17 @@ namespace System.Net
         {
             if (uri == null || !uri.IsAbsoluteUri ||
                 !WebHeaderCollection.EqualsIgnoreCase(uri.Scheme, Uri.UriSchemeHttp))
-                throw new NotSupportedException();
+                throw new NotSupportedException("Only absolute HTTP URIs are supported.");
             if (uri.UserInfo.Length != 0 || uri.HostNameType == UriHostNameType.IPv6 || uri.Port < 1)
-                throw new NotSupportedException();
+                throw new NotSupportedException("The URI contains unsupported user info, IPv6, or port settings.");
         }
 
         private void BeginOperation()
         {
             if (_disposed)
-                throw new InvalidOperationException();
+                throw new InvalidOperationException("The WebClient has already been disposed.");
             if (_busy)
-                throw new NotSupportedException();
+                throw new NotSupportedException("Another WebClient operation is already in progress.");
             _busy = true;
             _responseHeaders = null;
         }
@@ -890,14 +890,14 @@ namespace System.Net
             internal byte GetByte(int index)
             {
                 if ((uint)index >= (uint)_length)
-                    throw new ArgumentException();
+                    throw new ArgumentException("The response buffer index is outside the available data.");
                 return _buffer[_offset + index];
             }
 
             internal byte[] ToArray(int start, int count)
             {
                 if (start < 0 || count < 0 || start > _length - count)
-                    throw new ArgumentException();
+                    throw new ArgumentException("The response buffer range is invalid.");
                 byte[] result = new byte[count];
                 for (int i = 0; i < count; i++)
                     result[i] = _buffer[_offset + start + i];
@@ -907,14 +907,14 @@ namespace System.Net
             internal void CopyTo(MemoryStream destination, int count)
             {
                 if (count < 0 || count > _length)
-                    throw new ArgumentException();
+                    throw new ArgumentException("The requested response copy length is invalid.");
                 destination.Write(_buffer, _offset, count);
             }
 
             internal void Consume(int count)
             {
                 if (count < 0 || count > _length)
-                    throw new ArgumentException();
+                    throw new ArgumentException("The response consume length is invalid.");
                 _offset += count;
                 _length -= count;
                 if (_length == 0)

@@ -56,7 +56,7 @@ namespace System.Collections.Generic
         public Dictionary(int capacity, IEqualityComparer<TKey> comparer)
         {
             if (capacity < 0)
-                throw new System.ArgumentException();
+                throw new System.ArgumentException("The dictionary capacity cannot be negative.");
 
             _buckets = new int[0];
             _entries = new Entry[0];
@@ -74,7 +74,7 @@ namespace System.Collections.Generic
             {
                 int index = FindEntry(key);
                 if (index < 0)
-                    throw new KeyNotFoundException();
+                    throw new KeyNotFoundException("The requested key was not found in the dictionary.");
 
                 return _entries[index].Value;
             }
@@ -193,7 +193,7 @@ namespace System.Collections.Generic
                     continue;
 
                 if (add)
-                    throw new System.ArgumentException();
+                    throw new System.ArgumentException("An item with the same key has already been added.");
 
                 entry.Value = value;
                 return;
@@ -263,7 +263,7 @@ namespace System.Collections.Generic
         private static void ValidateKey(TKey key)
         {
             if ((object)key == null)
-                throw new System.ArgumentNullException();
+                throw new System.ArgumentNullException("The dictionary key cannot be null.");
         }
 
         public struct Enumerator : IEnumerator<KeyValuePair<TKey, TValue>>

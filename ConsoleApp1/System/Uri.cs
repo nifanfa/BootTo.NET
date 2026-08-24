@@ -71,9 +71,9 @@ namespace System
         public Uri(string uriString, UriKind uriKind)
         {
             if (uriString == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The URI string cannot be null.");
             if (uriKind != UriKind.RelativeOrAbsolute && uriKind != UriKind.Absolute && uriKind != UriKind.Relative)
-                throw new ArgumentException();
+                throw new ArgumentException("The URI kind value is not valid.");
 
             _originalString = uriString;
             bool looksAbsolute = HasScheme(uriString);
@@ -85,7 +85,7 @@ namespace System
                 return;
             }
             if (!looksAbsolute)
-                throw new UriFormatException();
+                throw new UriFormatException("The absolute URI is missing a valid scheme.");
 
             ParseAbsolute(uriString);
         }
@@ -93,9 +93,9 @@ namespace System
         public Uri(Uri baseUri, string relativeUri)
         {
             if (baseUri == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The base URI cannot be null.");
             if (!baseUri.IsAbsoluteUri)
-                throw new ArgumentException();
+                throw new ArgumentException("The base URI must be absolute.");
 
             string combined = Combine(baseUri, relativeUri ?? string.Empty);
             _originalString = combined;
@@ -343,7 +343,7 @@ namespace System
                 return _scheme + "://" + authority + _absolutePath;
             if (part == UriPartial.Query)
                 return _scheme + "://" + authority + _absolutePath + _query;
-            throw new ArgumentException();
+            throw new ArgumentException("The URI partial value is not supported.");
         }
 
         public override string ToString() => _isAbsolute ? _absoluteUri : _originalString;
@@ -373,7 +373,7 @@ namespace System
         {
             int schemeEnd = IndexOf(value, ':', 0);
             if (schemeEnd <= 0)
-                throw new UriFormatException();
+                throw new UriFormatException("The absolute URI is missing a valid scheme.");
 
             string scheme = value.Substring(0, schemeEnd);
             if (!CheckSchemeName(scheme))
@@ -446,7 +446,7 @@ namespace System
                 if (closeBracket + 1 < hostAndPort.Length)
                 {
                     if (hostAndPort[closeBracket + 1] != ':')
-                        throw new UriFormatException();
+                        throw new UriFormatException("Unexpected characters follow the IPv6 host.");
                     portText = hostAndPort.Substring(closeBracket + 2);
                 }
             }
@@ -612,13 +612,13 @@ namespace System
         {
             for (int i = 0; i < value.Length; i++)
                 if (value[i] <= ' ')
-                    throw new UriFormatException();
+                    throw new UriFormatException("The URI contains a control character.");
         }
 
         private void EnsureAbsolute()
         {
             if (!_isAbsolute)
-                throw new InvalidOperationException();
+                throw new InvalidOperationException("This operation requires an absolute URI.");
         }
 
         private static string LowerAscii(string value)

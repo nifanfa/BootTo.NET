@@ -57,9 +57,9 @@ namespace System.IO
         public StreamWriter(Stream stream, Encoding encoding, int bufferSize, bool leaveOpen)
         {
             if (stream == null || encoding == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The stream and encoding cannot be null.");
             if (bufferSize <= 0)
-                throw new ArgumentException();
+                throw new ArgumentException("The writer buffer size must be positive.");
 
             _stream = stream;
             _encoding = encoding;
@@ -83,9 +83,9 @@ namespace System.IO
         public override void Write(char[] buffer, int index, int count)
         {
             if (buffer == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The write buffer cannot be null.");
             if (index < 0 || count < 0 || index > buffer.Length - count)
-                throw new ArgumentException();
+                throw new ArgumentException("The write buffer offset and count do not describe a valid range.");
             char[] value = new char[count];
             for (int i = 0; i < count; i++)
                 value[i] = buffer[index + i];
@@ -117,7 +117,7 @@ namespace System.IO
         private void EnsureOpen()
         {
             if (_closed)
-                throw new IOException();
+                throw new IOException("The stream writer is closed.");
         }
     }
 }

@@ -7,7 +7,7 @@ namespace System.Linq
         public static List<TSource> ToList<TSource>(this TSource[] source)
         {
             if (source == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source sequence cannot be null.");
             List<TSource> result = new List<TSource>(source.Length);
             for (int i = 0; i < source.Length; i++)
                 result.Add(source[i]);
@@ -17,7 +17,7 @@ namespace System.Linq
         public static List<TSource> ToList<TSource>(this IEnumerable<TSource> source)
         {
             if (source == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The source sequence cannot be null.");
             List<TSource> result = new List<TSource>();
             IEnumerator<TSource> enumerator = source.GetEnumerator();
             try

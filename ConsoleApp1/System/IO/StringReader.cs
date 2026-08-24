@@ -8,7 +8,7 @@ namespace System.IO
 
         public StringReader(string value)
         {
-            _value = value ?? throw new ArgumentNullException();
+            _value = value ?? throw new ArgumentNullException("The string to read cannot be null.");
         }
 
         public override int Read()
@@ -21,9 +21,9 @@ namespace System.IO
         {
             EnsureOpen();
             if (buffer == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The read buffer cannot be null.");
             if (index < 0 || count < 0 || index > buffer.Length - count)
-                throw new ArgumentException();
+                throw new ArgumentException("The read buffer offset and count do not describe a valid range.");
 
             int available = _value.Length - _position;
             int read = count < available ? count : available;
@@ -61,7 +61,7 @@ namespace System.IO
         private void EnsureOpen()
         {
             if (_closed)
-                throw new IOException();
+                throw new IOException("The string reader is closed.");
         }
 
         private static string Slice(string value, int start, int length)

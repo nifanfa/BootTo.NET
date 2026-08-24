@@ -48,10 +48,10 @@ namespace System.IO
         public FileStream(string path, FileMode mode, FileAccess access, FileShare share)
         {
             if (string.IsNullOrEmpty(path) || (int)access < (int)FileAccess.Read || (int)access > (int)FileAccess.ReadWrite)
-                throw new ArgumentException();
+                throw new ArgumentException("The file path or access mode is invalid.");
             if ((mode == FileMode.CreateNew || mode == FileMode.Create || mode == FileMode.Truncate || mode == FileMode.Append) &&
                 (access & FileAccess.Write) != FileAccess.Write)
-                throw new ArgumentException();
+                throw new ArgumentException("The selected file mode requires write access.");
 
             _canRead = (access & FileAccess.Read) == FileAccess.Read;
             _canWrite = (access & FileAccess.Write) == FileAccess.Write;
@@ -59,16 +59,16 @@ namespace System.IO
 
             EFI_LOADED_IMAGE_PROTOCOL* loadedimage = null;
             if (gBS->HandleProtocol(gImageHandle, (EFI_GUID*)EFI_LOADED_IMAGE_PROTOCOL_GUID, (void**)&loadedimage) != EFI_SUCCESS || loadedimage == null)
-                throw new IOException();
+                throw new IOException("The loaded image protocol is unavailable.");
 
             EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* simplefilesystem = null;
             if (gBS->HandleProtocol(loadedimage->DeviceHandle, (EFI_GUID*)EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID, (void**)&simplefilesystem) != EFI_SUCCESS || simplefilesystem == null)
-                throw new IOException();
+                throw new IOException("The device does not expose a simple file system.");
 
             {
                 EFI_FILE_HANDLE* vol = null;
                 if (simplefilesystem->OpenVolume(simplefilesystem, &vol) != EFI_SUCCESS || vol == null)
-                    throw new IOException();
+                    throw new IOException("The file system volume could not be opened.");
                 Volume = vol;
             }
             if (mode == FileMode.CreateNew)
@@ -81,7 +81,7 @@ namespace System.IO
                         existing->Close(existing);
                         Volume->Close(Volume);
                         Volume = null;
-                        throw new IOException();
+                        throw new IOException("The file already exists and the mode requires a new file.");
                     }
                 }
             }
@@ -97,7 +97,7 @@ namespace System.IO
                     openMode |= EFI_FILE_MODE_CREATE;
                 fixed (char* ptr = path)
                     if (Volume->Open(Volume, &file, ptr, openMode, 0) != EFI_SUCCESS || file == null)
-                        throw new IOException();
+                        throw new IOException("The requested file could not be opened.");
                 File = file;
             }
 
@@ -108,7 +108,7 @@ namespace System.IO
                 Volume->Close(Volume);
                 File = null;
                 Volume = null;
-                throw new IOException();
+                throw new IOException("The file metadata size could not be queried.");
             }
 
             byte[] fileinfobuffer = new byte[fileinfosize];
@@ -120,7 +120,7 @@ namespace System.IO
                     Volume->Close(Volume);
                     File = null;
                     Volume = null;
-                    throw new IOException();
+                    throw new IOException("The file metadata could not be read.");
                 }
 
                 EFI_FILE_INFO* fileinfo = (EFI_FILE_INFO*)pfileinfo;
@@ -133,7 +133,7 @@ namespace System.IO
                         Volume->Close(Volume);
                         File = null;
                         Volume = null;
-                        throw new IOException();
+                        throw new IOException("The file length could not be updated.");
                     }
                 }
 
@@ -146,7 +146,7 @@ namespace System.IO
                 Volume->Close(Volume);
                 File = null;
                 Volume = null;
-                throw new IOException();
+                throw new IOException("The file could not be positioned for append.");
             }
 
             InitializeAsyncIO();
@@ -159,14 +159,14 @@ namespace System.IO
                 EnsureOpen();
                 ulong position = 0;
                 if (File->GetPosition(File, &position) != EFI_SUCCESS)
-                    throw new IOException();
+                    throw new IOException("The current file position could not be read.");
                 return (long)position;
             }
             set
             {
                 EnsureOpen();
                 if (value < 0 || File->SetPosition(File, (ulong)value) != EFI_SUCCESS)
-                    throw new IOException();
+                    throw new IOException("The requested file position is invalid or could not be set.");
             }
         }
 
@@ -178,7 +178,7 @@ namespace System.IO
                 SeekOrigin.Begin => offset,
                 SeekOrigin.Current => Position + offset,
                 SeekOrigin.End => (long)_fileSize + offset,
-                _ => throw new ArgumentException()
+                _ => throw new ArgumentException("The seek origin is not supported.")
             };
             Position = position;
             return position;
@@ -188,20 +188,20 @@ namespace System.IO
         {
             EnsureOpen();
             if (!_canWrite || value < 0)
-                throw new IOException();
+                throw new IOException("The file is not writable or the requested length is negative.");
 
             ulong fileinfosize = 0;
             if (File->GetInfo(File, (EFI_GUID*)EFI_FILE_INFO_ID, &fileinfosize, null) != EFI_BUFFER_TOO_SMALL)
-                throw new IOException();
+                throw new IOException("The file metadata size could not be queried for SetLength.");
 
             byte[] fileinfobuffer = new byte[fileinfosize];
             fixed (byte* pfileinfo = fileinfobuffer)
             {
                 if (File->GetInfo(File, (EFI_GUID*)EFI_FILE_INFO_ID, &fileinfosize, pfileinfo) != EFI_SUCCESS)
-                    throw new IOException();
+                    throw new IOException("The file metadata could not be read for SetLength.");
                 ((EFI_FILE_INFO*)pfileinfo)->FileSize = (ulong)value;
                 if (File->SetInfo(File, (EFI_GUID*)EFI_FILE_INFO_ID, fileinfosize, pfileinfo) != EFI_SUCCESS)
-                    throw new IOException();
+                    throw new IOException("The file length could not be set.");
             }
 
             _fileSize = (ulong)value;
@@ -229,11 +229,11 @@ namespace System.IO
         public override Task<int> ReadAsync(byte[] buffer)
         {
             if (buffer == null)
-                return Task.FromException<int>(new ArgumentNullException());
+                return Task.FromException<int>(new ArgumentNullException("The read buffer cannot be null."));
             if (File == null || !_canRead)
-                return Task.FromException<int>(new IOException());
+                return Task.FromException<int>(new IOException("The file is closed or not readable."));
             if (_readCompletion != null)
-                return Task.FromException<int>(new IOException());
+                return Task.FromException<int>(new IOException("A file read is already in progress."));
             if (!_asyncSupported)
                 return ReadSynchronously(buffer);
             if (buffer.Length == 0)
@@ -279,11 +279,11 @@ namespace System.IO
         public override Task<int> WriteAsync(byte[] buffer)
         {
             if (buffer == null)
-                return Task.FromException<int>(new ArgumentNullException());
+                return Task.FromException<int>(new ArgumentNullException("The write buffer cannot be null."));
             if (File == null || !_canWrite)
-                return Task.FromException<int>(new IOException());
+                return Task.FromException<int>(new IOException("The file is closed or not writable."));
             if (_writeCompletion != null)
-                return Task.FromException<int>(new IOException());
+                return Task.FromException<int>(new IOException("A file write is already in progress."));
             if (!_asyncSupported)
                 return WriteSynchronously(buffer);
             if (buffer.Length == 0)
@@ -316,9 +316,9 @@ namespace System.IO
         public override Task FlushAsync()
         {
             if (File == null)
-                return Task.FromException(new IOException());
+                return Task.FromException(new IOException("The file is closed."));
             if (_flushCompletion != null)
-                return Task.FromException(new IOException());
+                return Task.FromException(new IOException("A file flush is already in progress."));
             if (!_asyncSupported)
                 return FlushSynchronously();
 
@@ -427,7 +427,7 @@ namespace System.IO
                 ulong size = (ulong)buffer.Length;
                 EFI_STATUS status = File->Read(File, &size, data);
                 if ((ulong)status != EFI_SUCCESS)
-                    return Task.FromException<int>(new IOException());
+                    return Task.FromException<int>(new IOException("The synchronous file read failed."));
                 return Task.FromResult((int)size);
             }
         }
@@ -439,7 +439,7 @@ namespace System.IO
                 ulong size = (ulong)buffer.Length;
                 EFI_STATUS status = File->Write(File, &size, data);
                 if ((ulong)status != EFI_SUCCESS)
-                    return Task.FromException<int>(new IOException());
+                    return Task.FromException<int>(new IOException("The synchronous file write failed."));
 
                 UpdateFileSize();
                 return Task.FromResult((int)size);
@@ -451,7 +451,7 @@ namespace System.IO
             EFI_STATUS status = File->Flush(File);
             return (ulong)status == EFI_SUCCESS
                 ? Task.CompletedTask
-                : Task.FromException(new IOException());
+                : Task.FromException(new IOException("The synchronous file flush failed."));
         }
 
         private void Poll()
@@ -480,7 +480,7 @@ namespace System.IO
             if ((ulong)status == EFI_SUCCESS)
                 completion.TrySetResult(bytesRead);
             else
-                completion.TrySetException(new IOException());
+                completion.TrySetException(new IOException("The asynchronous file read failed."));
         }
 
         private void CompleteWrite(EFI_STATUS status)
@@ -501,7 +501,7 @@ namespace System.IO
             }
             else
             {
-                completion.TrySetException(new IOException());
+                completion.TrySetException(new IOException("The asynchronous file write failed."));
             }
         }
 
@@ -516,7 +516,7 @@ namespace System.IO
             if ((ulong)status == EFI_SUCCESS)
                 completion.TrySetResult();
             else
-                completion.TrySetException(new IOException());
+                completion.TrySetException(new IOException("The asynchronous file flush failed."));
         }
 
         private void UpdateFileSize()
@@ -557,15 +557,15 @@ namespace System.IO
         private static void ValidateRange(byte[] buffer, int offset, int count)
         {
             if (buffer == null)
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("The buffer cannot be null.");
             if (offset < 0 || count < 0 || offset > buffer.Length - count)
-                throw new ArgumentException();
+                throw new ArgumentException("The buffer offset and count do not describe a valid range.");
         }
 
         private void EnsureOpen()
         {
             if (File == null)
-                throw new IOException();
+                throw new IOException("The file stream is closed.");
         }
     }
 }
