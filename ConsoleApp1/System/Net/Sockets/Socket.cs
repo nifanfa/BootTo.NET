@@ -57,6 +57,7 @@ namespace System.Net.Sockets
         private bool bound;
         private bool udpConfigured;
         private bool listening;
+        private uint udpAddressConfigurationAttempt;
         private readonly SocketType socketType;
         private readonly ProtocolType protocolType;
         private bool ownsServiceBinding = true;
@@ -271,7 +272,7 @@ namespace System.Net.Sockets
                     throw new SocketException(status);
                 }
                 if ((ulong)status == EFI_NO_MAPPING)
-                    waitingForAddress = true;
+                    BeginUdpAddressConfigurationWait();
             }
             bound = true;
         }
@@ -457,8 +458,7 @@ namespace System.Net.Sockets
                 status = ConfigureUdp(address, port);
             if ((ulong)status == EFI_NO_MAPPING)
             {
-                waitingForAddress = true;
-                UpdatePollingRegistration();
+                BeginUdpAddressConfigurationWait();
             }
             else if ((ulong)status == EFI_SUCCESS)
             {
@@ -488,7 +488,7 @@ namespace System.Net.Sockets
                     return Task.FromException<int>(e);
                 }
             }
-            if (udp == null || waitingForAddress)
+            if (udp == null)
                 return Task.FromException<int>(new SocketException(EFI_NOT_STARTED));
             if (udpTransmitCompletion != null || udpCloseCompletion != null)
                 return Task.FromException<int>(new SocketException(EFI_ACCESS_DENIED));
@@ -503,19 +503,15 @@ namespace System.Net.Sockets
             udpTransmitData.DataLength = (uint)buffer.Length;
             udpTransmitData.FragmentCount = 1;
             udpTransmitData.FragmentTable.FragmentLength = (uint)buffer.Length;
-            fixed (byte* data = buffer)
-            fixed (EFI_UDP4_SESSION_DATA* session = &udpSession)
-            fixed (EFI_UDP4_TRANSMIT_DATA* transmit = &udpTransmitData)
-            fixed (EFI_UDP4_COMPLETION_TOKEN* token = &udpTransmitToken)
+            if (waitingForAddress)
             {
-                udpTransmitData.FragmentTable.FragmentBuffer = data;
-                udpTransmitData.UdpSessionData = session;
-                udpTransmitToken.Packet_TxData = transmit;
-                udpTransmitToken.Status = EFI_NOT_READY;
-                EFI_STATUS status = udp->Transmit(udp, token);
-                if ((ulong)status != EFI_SUCCESS)
-                    CompleteUdpTransmit(status);
+                UpdatePollingRegistration();
+                return completion.Task;
             }
+
+            EFI_STATUS status = SubmitUdpTransmit();
+            if ((ulong)status != EFI_SUCCESS)
+                CompleteUdpTransmit(status);
             UpdatePollingRegistration();
             return completion.Task;
         }
@@ -571,6 +567,16 @@ namespace System.Net.Sockets
                 udpCloseCompletion = null;
                 completion.TrySetResult();
             }
+            else if (waitingForAddress)
+            {
+                waitingForAddress = false;
+                udpAddressConfigurationAttempt++;
+                if (udpReceiveCompletion != null || receiveFromCompletion != null)
+                    CompleteUdpReceive(EFI_ABORTED);
+                if (udpTransmitCompletion != null)
+                    CompleteUdpTransmit(EFI_ABORTED);
+                MaybeCompleteUdpClose();
+            }
             else
             {
                 if (udpReceiveCompletion != null || receiveFromCompletion != null)
@@ -609,10 +615,7 @@ namespace System.Net.Sockets
             EFI_STATUS status = udp->GetModeData(udp, null, &mode, null, null);
             if ((ulong)status != EFI_SUCCESS && (ulong)status != EFI_NO_MAPPING)
             {
-                if (connectCompletion != null)
-                    CompleteConnect(status);
-                else
-                    waitingForAddress = false;
+                CompleteUdpAddressConfiguration(status);
                 return;
             }
             if (!mode.IsConfigured)
@@ -620,23 +623,66 @@ namespace System.Net.Sockets
             status = ConfigureUdp(remoteAddress, remotePort);
             if ((ulong)status == EFI_NO_MAPPING)
                 return;
+            if ((ulong)status != EFI_SUCCESS)
+            {
+                CompleteUdpAddressConfiguration(status);
+                return;
+            }
+
+            CompleteUdpAddressConfiguration(EFI_SUCCESS);
+        }
+
+        private void BeginUdpAddressConfigurationWait()
+        {
+            if (waitingForAddress)
+                return;
+
+            waitingForAddress = true;
+            uint attempt = ++udpAddressConfigurationAttempt;
+            Task.Delay((int)(DefaultConnectionTimeoutSeconds * 1000)).AddContinuation(
+                () => UdpAddressConfigurationTimedOut(attempt));
+            UpdatePollingRegistration();
+        }
+
+        private void UdpAddressConfigurationTimedOut(uint attempt)
+        {
+            if (!waitingForAddress || attempt != udpAddressConfigurationAttempt)
+                return;
+
+            CompleteUdpAddressConfiguration(EFI_TIMEOUT);
+        }
+
+        private void CompleteUdpAddressConfiguration(EFI_STATUS status)
+        {
             waitingForAddress = false;
+            udpAddressConfigurationAttempt++;
+
             if ((ulong)status != EFI_SUCCESS)
             {
                 if (connectCompletion != null)
                     CompleteConnect(status);
+                if (udpTransmitCompletion != null)
+                    CompleteUdpTransmit(status);
                 if (udpReceiveCompletion != null || receiveFromCompletion != null)
                     CompleteUdpReceive(status);
-                UpdatePollingRegistration();
+                if (udp != null)
+                    ReleaseUdp();
                 return;
             }
+
             if (connectCompletion != null)
                 CompleteConnect(status);
-            if ((ulong)status == EFI_SUCCESS && (udpReceiveCompletion != null || receiveFromCompletion != null))
+            if (udpReceiveCompletion != null || receiveFromCompletion != null)
             {
                 status = SubmitUdpReceive();
                 if ((ulong)status != EFI_SUCCESS)
                     CompleteUdpReceive(status);
+            }
+            if (udpTransmitCompletion != null)
+            {
+                status = SubmitUdpTransmit();
+                if ((ulong)status != EFI_SUCCESS)
+                    CompleteUdpTransmit(status);
             }
             UpdatePollingRegistration();
         }
@@ -741,6 +787,21 @@ namespace System.Net.Sockets
             udpReceiveToken.Status = EFI_NOT_READY;
             fixed (EFI_UDP4_COMPLETION_TOKEN* token = &udpReceiveToken)
                 return udp->Receive(udp, token);
+        }
+
+        private EFI_STATUS SubmitUdpTransmit()
+        {
+            fixed (byte* data = transmitBuffer)
+            fixed (EFI_UDP4_SESSION_DATA* session = &udpSession)
+            fixed (EFI_UDP4_TRANSMIT_DATA* transmit = &udpTransmitData)
+            fixed (EFI_UDP4_COMPLETION_TOKEN* token = &udpTransmitToken)
+            {
+                udpTransmitData.FragmentTable.FragmentBuffer = data;
+                udpTransmitData.UdpSessionData = session;
+                udpTransmitToken.Packet_TxData = transmit;
+                udpTransmitToken.Status = EFI_NOT_READY;
+                return udp->Transmit(udp, token);
+            }
         }
 
         private void CompleteUdpReceive(EFI_STATUS status)
@@ -856,6 +917,7 @@ namespace System.Net.Sockets
             connected = false;
             udpConfigured = false;
             waitingForAddress = false;
+            udpAddressConfigurationAttempt++;
         }
 
         private static uint ToUInt32(EFI_IPv4_ADDRESS address)

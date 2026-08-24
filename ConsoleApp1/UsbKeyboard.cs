@@ -236,7 +236,7 @@ internal unsafe sealed class UsbKeyboard
         // The USB interface handle is owned by UsbKbDxe. Passing null as the
         // driver image asks Boot Services to stop every driver on this child
         // handle while preserving the parent USB host controller.
-        gBS->DisconnectController(controller, default, null);
+        UefiHelpers.DisconnectController(controller);
     }
 
     private void ProcessReport(byte* report, ulong length)

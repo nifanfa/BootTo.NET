@@ -129,7 +129,7 @@ namespace System.Diagnostics
             return unchecked(whole * destinationFrequency + remainder * destinationFrequency / sourceFrequency);
         }
 
-        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        [System.Runtime.InteropServices.StructLayout(Runtime.InteropServices.LayoutKind.Sequential)]
         private struct CpuArchProtocol
         {
             public void* FlushDataCache;

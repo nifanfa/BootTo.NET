@@ -1,11 +1,8 @@
 using Playground.NES;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Drawing;
 using System.IO;
 using System.IO.Ports;
-using System.Linq;
 using System.Net;
 using System.Runtime;
 using System.Runtime.CompilerServices;
@@ -21,6 +18,13 @@ partial class Program
 
     static readonly List<string> DxeDrivers = new()
     {
+        @"\EFI\Drivers\RngDxe.efi",
+        @"\EFI\Drivers\Hash2DxeCrypto.efi",
+        @"\EFI\Drivers\DpcDxe.efi",
+        @"\EFI\Drivers\DnsDxe.efi",
+        @"\EFI\Drivers\HttpUtilitiesDxe.efi",
+        @"\EFI\Drivers\TlsDxe.efi",
+        @"\EFI\Drivers\HttpDxe.efi",
         @"\EFI\Drivers\AudioDxe.efi",
         @"\EFI\Drivers\XhciDxe.efi",
         @"\EFI\Drivers\UsbMouseDxe.efi"
@@ -37,16 +41,21 @@ partial class Program
         //Disable watchdog timer
         gBS->SetWatchdogTimer(0, 0, 0, null);
 
+        EFI_STATUS certificateStatus = InstallTlsCaCertificates(@"\EFI\Certificates\TlsCaCertificate.esl");
+        Console.WriteLine($"TLS CA certificates {(certificateStatus == EFI_SUCCESS ? "are available!" : "are unavailable!")}");
+
         foreach (var driver in DxeDrivers)
         {
-            WriteLoadDriver(driver);
+            EFI_STATUS status;
+            if ((status = LoadDriver(driver)) != EFI_SUCCESS)
+            {
+                Console.WriteLine($"Driver {driver} failed to load(0x{(ulong)status:x2})!");
+            }
         }
 
-        void WriteLoadDriver(string path)
-        {
-            EFI_STATUS driverStatus = LoadDriver(path);
-            Console.WriteLine("Driver " + path + " " + (driverStatus == EFI_SUCCESS ? "is loaded!" : "failed to load!"));
-        }
+        Console.WriteLine("Connecting PCI controllers...");
+        EFI_STATUS connectStatus = ConnectPciControllers();
+        Console.WriteLine($"PCI controllers {(connectStatus == EFI_SUCCESS ? "are connected!" : "failed to connect!")}");
 
         ManagedMain(0, null);
 
@@ -82,7 +91,7 @@ partial class Program
 
         printf("GC.Collect freed %d unreferenced objects!\r\n"u8, GC.Collect());
 
-#if true
+#if false
         Console.WriteLine("Press any key to continue...");
 
         Console.ReadKey();
@@ -163,7 +172,7 @@ partial class Program
 #if false
         #region WebClient Test
         WebClientTest test = new WebClientTest();
-        test.Run().GetAwaiter().GetResult();
+        _ = test.Run();
         #endregion
 #endif
 
@@ -256,7 +265,7 @@ partial class Program
     {
         public async Task Run()
         {
-            IPAddress address = System.Net.IPAddress.Parse("192.168.0.102");
+            IPAddress address = IPAddress.Parse("192.168.0.102");
 
             System.Net.Sockets.Socket socket = new System.Net.Sockets.Socket(System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
             await socket.ConnectAsync(address, 54188);
@@ -276,7 +285,7 @@ partial class Program
     {
         public async Task Run()
         {
-            IPAddress address = System.Net.IPAddress.Parse("192.168.0.102");
+            IPAddress address = IPAddress.Parse("192.168.0.102");
 
             System.Net.Sockets.Socket socket = new System.Net.Sockets.Socket(System.Net.Sockets.SocketType.Dgram, System.Net.Sockets.ProtocolType.Udp);
             await socket.ConnectAsync(address, 54188);
@@ -297,8 +306,15 @@ partial class Program
     {
         public async Task Run()
         {
-            WebClient client = new WebClient();
-            Console.WriteLine(client.DownloadString("http://httpforever.com"));
+            try
+            {
+                WebClient wc = new WebClient();
+                Console.WriteLine(wc.DownloadString("https://example.com"));
+            }
+            catch(Exception e) 
+            {
+                Console.WriteLine($"Unable to run {nameof(WebClientTest)}: {e.Message}");
+            }
         }
     }
 
@@ -412,9 +428,50 @@ partial class Program
             return status;
         }
 
+        return EFI_SUCCESS;
+    }
+
+    unsafe static EFI_STATUS InstallTlsCaCertificates(string path)
+    {
+        EFI_GUID TlsCaCertificateGuid = new EFI_GUID(
+            0xfd2340d0, 0x3dab, 0x4349, 0xa6, 0xc7, 0x3b, 0x4f, 0x12, 0xb4, 0x8e, 0xae);
+
+        fixed (char* variableName = "TlsCaCertificate")
+        {
+            ulong existingSize = 0;
+            EFI_STATUS status = gRT->GetVariable(variableName, &TlsCaCertificateGuid, null, &existingSize, null);
+            if ((ulong)status == EFI_SUCCESS || (ulong)status == EFI_BUFFER_TOO_SMALL)
+                return EFI_SUCCESS;
+            if ((ulong)status != EFI_NOT_FOUND)
+                return status;
+
+            if (!File.Exists(path))
+                return EFI_NOT_FOUND;
+
+            byte[] certificates = File.ReadAllBytes(path);
+            fixed (byte* certificateData = certificates)
+            {
+                return gRT->SetVariable(
+                    variableName,
+                    &TlsCaCertificateGuid,
+                    (uint)EFI_VARIABLE_BOOTSERVICE_ACCESS,
+                    (ulong)certificates.Length,
+                    certificateData);
+            }
+        }
+    }
+
+    unsafe static EFI_STATUS ConnectPciControllers()
+    {
         EFI_HANDLE* handles = null;
         ulong handleCount = 0;
-        status = gBS->LocateHandleBuffer(AllHandles, null, null, &handleCount, &handles);
+        EFI_GUID pciIoProtocol = EFI_PCI_IO_PROTOCOL_GUID;
+        EFI_STATUS status = gBS->LocateHandleBuffer(
+            ByProtocol,
+            &pciIoProtocol,
+            null,
+            &handleCount,
+            &handles);
         if ((ulong)status != EFI_SUCCESS)
             return status;
 

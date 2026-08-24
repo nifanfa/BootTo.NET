@@ -1,20 +1,21 @@
-using System.Collections.Generic;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
 namespace System.Net
 {
     public static class Dns
     {
-        private const int DnsPort = 53;
-        private const int QueryTimeoutMilliseconds = 5000;
-        private const int MaximumResponseSize = 4096;
+        private const byte IpProtocolUdp = 17;
+        private const uint RetryCount = 2;
+        private const uint RetryIntervalSeconds = 2;
 
-        private static readonly IPAddress s_nameServer = IPAddress.Parse("8.8.8.8");
-        // A monotonically changing ID is sufficient for the single outstanding
-        // query used by this compact resolver and avoids pulling Environment's
-        // broader platform surface into the NativeAOT image.
-        private static int s_nextQueryId = 0x4D53;
+        private static EFI_GUID Dns4ServiceBindingProtocolGuid => new EFI_GUID(
+            0xb625b186, 0xe063, 0x44f7, 0x89, 0x05, 0x6a, 0x74, 0xdc, 0x6f, 0x52, 0xb4);
+
+        private static EFI_GUID Dns4ProtocolGuid => new EFI_GUID(
+            0xae3d28cc, 0xe05b, 0x4fa1, 0xa0, 0x11, 0x7e, 0xb5, 0x5a, 0x3f, 0x14, 0x01);
 
         public static IPAddress[] GetHostAddresses(string hostNameOrAddress)
             => GetHostAddressesAsync(hostNameOrAddress).GetAwaiter().GetResult();
@@ -26,11 +27,17 @@ namespace System.Net
             if (hostNameOrAddress.Length == 0)
                 throw new ArgumentException("The host name cannot be empty.");
 
-            IPAddress address;
-            if (IPAddress.TryParse(hostNameOrAddress, out address))
+            if (IPAddress.TryParse(hostNameOrAddress, out IPAddress address))
                 return Task.FromResult(new IPAddress[] { address });
 
-            return QueryHostAddressesAsync(hostNameOrAddress);
+            try
+            {
+                return Task.FromResult(ResolveHostName(hostNameOrAddress));
+            }
+            catch (Exception exception)
+            {
+                return Task.FromException<IPAddress[]>(exception);
+            }
         }
 
         public static IPHostEntry GetHostEntry(string hostNameOrAddress)
@@ -49,214 +56,189 @@ namespace System.Net
 
         public static string GetHostName() => "localhost";
 
-        private static async Task<IPAddress[]> QueryHostAddressesAsync(string hostName)
+        private static unsafe IPAddress[] ResolveHostName(string hostName)
         {
-            ushort queryId = unchecked((ushort)++s_nextQueryId);
-            byte[] query = BuildQuery(hostName, queryId);
-            byte[] response = new byte[MaximumResponseSize];
-            Socket socket = new Socket(SocketType.Dgram, ProtocolType.Udp);
-            bool operationFinished = false;
-            bool timedOut = false;
+            if (!NetworkInterface.GetIsNetworkAvailable())
+                throw new Exception("The network is unavailable.");
 
-            Task timeout = Task.Delay(QueryTimeoutMilliseconds);
-            timeout.AddContinuation(() =>
-            {
-                if (!operationFinished)
-                {
-                    timedOut = true;
-                    socket.CloseAsync();
-                }
-            });
+            EFI_HANDLE serviceHandle = default;
+            EFI_HANDLE childHandle = default;
+            EFI_SERVICE_BINDING* serviceBinding = null;
+            EFI_DNS4_PROTOCOL* dns = null;
+            EFI_EVENT completionEvent = default;
+            DNS_HOST_TO_ADDR_DATA* response = null;
+            bool childCreated = false;
+            bool dnsOpened = false;
+            bool configured = false;
 
             try
             {
-                await socket.ConnectAsync(s_nameServer, DnsPort);
-                await socket.SendAsync(query);
-                SocketReceiveResult result = await socket.ReceiveFromAsync(response);
+                OpenDnsProtocol(
+                    &serviceHandle,
+                    &childHandle,
+                    &serviceBinding,
+                    &dns,
+                    &childCreated,
+                    &dnsOpened);
 
-                if (!result.RemoteAddress.Equals(s_nameServer) || result.RemotePort != DnsPort)
-                    throw new Exception("The DNS response came from an unexpected server.");
+                //
+                // Always use Google Public DNS. Some DHCP servers do not provide option 6,
+                // and some firmware does not expose EFI_IP4_CONFIG2_PROTOCOL.
+                // https://github.com/nifanfa/udk/blob/184fd25cffe9c7118d93398c3046c713dfec6ea7/NetworkPkg/HttpDxe/HttpDns.c#L57
+                //
+                EFI_IPv4_ADDRESS dnsServer = default;
+                dnsServer.Addr[0] = 8;
+                dnsServer.Addr[1] = 8;
+                dnsServer.Addr[2] = 8;
+                dnsServer.Addr[3] = 8;
 
-                return ParseResponse(response, result.BytesReceived, queryId);
-            }
-            catch (Exception)
-            {
-                if (timedOut)
-                    throw new Exception("The DNS query timed out.");
-                throw;
+                EFI_DNS4_CONFIG_DATA config = new EFI_DNS4_CONFIG_DATA
+                {
+                    DnsServerListCount = 1,
+                    DnsServerList = &dnsServer,
+                    UseDefaultSetting = true,
+                    EnableDnsCache = true,
+                    Protocol = IpProtocolUdp,
+                    RetryCount = RetryCount,
+                    RetryInterval = RetryIntervalSeconds
+                };
+                EFI_STATUS status = dns->Configure(dns, &config);
+                ThrowIfError(status, "configure EFI DNS4");
+                configured = true;
+
+                bool complete = false;
+                EFI_DNS4_COMPLETION_TOKEN token = new EFI_DNS4_COMPLETION_TOKEN
+                {
+                    Status = EFI_NOT_READY,
+                    RetryCount = RetryCount,
+                    RetryInterval = RetryIntervalSeconds
+                };
+                status = gBS->CreateEvent(
+                    EVT_NOTIFY_SIGNAL,
+                    TPL_CALLBACK,
+                    &OperationCompleted,
+                    &complete,
+                    &completionEvent);
+                ThrowIfError(status, "create the EFI DNS4 completion event");
+                token.Event = completionEvent;
+
+                fixed (char* hostNamePointer = &hostName.FirstChar)
+                    status = dns->HostNameToIp(dns, hostNamePointer, &token);
+                ThrowIfError(status, "submit the EFI DNS4 query");
+
+                while (!complete)
+                    dns->Poll(dns);
+
+                response = token.H2AData;
+                ThrowIfError(token.Status, "resolve the host name through EFI DNS4");
+                if (response == null || response->IpCount == 0 || response->IpList == null)
+                    throw new Exception("EFI DNS4 returned no IPv4 addresses.");
+                if (response->IpCount > int.MaxValue)
+                    throw new Exception("EFI DNS4 returned too many IPv4 addresses.");
+
+                IPAddress[] addresses = new IPAddress[(int)response->IpCount];
+                for (int i = 0; i < addresses.Length; i++)
+                {
+                    EFI_IPv4_ADDRESS* source = response->IpList + i;
+                    addresses[i] = new IPAddress(new byte[]
+                    {
+                        source->Addr[0],
+                        source->Addr[1],
+                        source->Addr[2],
+                        source->Addr[3]
+                    });
+                }
+                return addresses;
             }
             finally
             {
-                operationFinished = true;
-                await socket.CloseAsync();
-            }
-        }
-
-        private static byte[] BuildQuery(string hostName, ushort queryId)
-        {
-            int hostLength = hostName.Length;
-            if (hostLength > 0 && hostName[hostLength - 1] == '.')
-                hostLength--;
-            if (hostLength == 0 || hostLength > 253)
-                throw new ArgumentException("The host name must contain between 1 and 253 characters.");
-
-            int labelLength = 0;
-            for (int i = 0; i < hostLength; i++)
-            {
-                char character = hostName[i];
-                if (character == '.')
+                if ((void*)completionEvent != null)
+                    gBS->CloseEvent(completionEvent);
+                if (response != null)
                 {
-                    if (labelLength == 0 || labelLength > 63)
-                        throw new ArgumentException("Each DNS label must contain between 1 and 63 characters.");
-                    labelLength = 0;
-                    continue;
+                    if (response->IpList != null)
+                        gBS->FreePool(response->IpList);
+                    gBS->FreePool(response);
                 }
-
-                if (character <= ' ' || character > 0x7f)
-                    throw new ArgumentException("The host name contains a character that is not valid in DNS.");
-                labelLength++;
+                if (configured && dns != null)
+                    dns->Configure(dns, null);
+                if (dnsOpened)
+                    gBS->CloseProtocol(
+                        childHandle,
+                        (EFI_GUID*)Dns4ProtocolGuid,
+                        gImageHandle,
+                        default);
+                if (childCreated && serviceBinding != null)
+                    serviceBinding->DestroyChild(serviceBinding, childHandle);
+                if (serviceBinding != null)
+                    gBS->CloseProtocol(
+                        serviceHandle,
+                        (EFI_GUID*)Dns4ServiceBindingProtocolGuid,
+                        gImageHandle,
+                        default);
             }
-            if (labelLength == 0 || labelLength > 63)
-                throw new ArgumentException("The final DNS label must contain between 1 and 63 characters.");
+        }
 
-            int wireNameLength = hostLength + 2;
-            if (wireNameLength > 255)
-                throw new ArgumentException("The encoded DNS name exceeds the 255-byte protocol limit.");
-
-            byte[] query = new byte[12 + wireNameLength + 4];
-            WriteUInt16(query, 0, queryId);
-            WriteUInt16(query, 2, 0x0100); // Recursion desired.
-            WriteUInt16(query, 4, 1);
-
-            int output = 12;
-            int labelStart = 0;
-            for (int i = 0; i <= hostLength; i++)
+        private static unsafe void OpenDnsProtocol(
+            EFI_HANDLE* serviceHandle,
+            EFI_HANDLE* childHandle,
+            EFI_SERVICE_BINDING** serviceBinding,
+            EFI_DNS4_PROTOCOL** dns,
+            bool* childCreated,
+            bool* dnsOpened)
+        {
+            ulong handleCount = 0;
+            EFI_HANDLE* handles = null;
+            EFI_STATUS status = gBS->LocateHandleBuffer(
+                ByProtocol,
+                (EFI_GUID*)Dns4ServiceBindingProtocolGuid,
+                null,
+                &handleCount,
+                &handles);
+            if ((ulong)status != EFI_SUCCESS || handleCount == 0)
             {
-                if (i != hostLength && hostName[i] != '.')
-                    continue;
-
-                int length = i - labelStart;
-                query[output++] = (byte)length;
-                for (int j = labelStart; j < i; j++)
-                {
-                    char character = hostName[j];
-                    if (character >= 'A' && character <= 'Z')
-                        character = (char)(character + ('a' - 'A'));
-                    query[output++] = (byte)character;
-                }
-                labelStart = i + 1;
-            }
-            query[output++] = 0;
-            WriteUInt16(query, output, 1); // A
-            WriteUInt16(query, output + 2, 1); // IN
-            return query;
-        }
-
-        private static IPAddress[] ParseResponse(byte[] response, int length, ushort queryId)
-        {
-            if (response == null || length < 12 || length > response.Length)
-                throw new Exception("The DNS response is invalid.");
-            if (ReadUInt16(response, 0) != queryId)
-                throw new Exception("The DNS response has an unexpected transaction ID.");
-
-            ushort flags = ReadUInt16(response, 2);
-            if ((flags & 0x8000) == 0 || (flags & 0x7800) != 0)
-                throw new Exception("The DNS response is invalid.");
-            if ((flags & 0x0200) != 0)
-                throw new Exception("The DNS response was truncated.");
-
-            int responseCode = flags & 0x000f;
-            if (responseCode != 0)
-                throw new Exception("The DNS server returned error " + responseCode + ".");
-
-            int questionCount = ReadUInt16(response, 4);
-            int answerCount = ReadUInt16(response, 6);
-            int offset = 12;
-            for (int i = 0; i < questionCount; i++)
-            {
-                offset = SkipName(response, length, offset);
-                EnsureAvailable(length, offset, 4);
-                offset += 4;
+                if (handles != null)
+                    gBS->FreePool(handles);
+                throw new Exception("EFI DNS4 is unavailable. Ensure DnsDxe.efi was loaded.");
             }
 
-            List<IPAddress> addresses = new List<IPAddress>();
-            for (int i = 0; i < answerCount; i++)
-            {
-                offset = SkipName(response, length, offset);
-                EnsureAvailable(length, offset, 10);
-                ushort type = ReadUInt16(response, offset);
-                ushort dnsClass = ReadUInt16(response, offset + 2);
-                int dataLength = ReadUInt16(response, offset + 8);
-                offset += 10;
-                EnsureAvailable(length, offset, dataLength);
+            *serviceHandle = handles[0];
+            status = gBS->OpenProtocol(
+                *serviceHandle,
+                (EFI_GUID*)Dns4ServiceBindingProtocolGuid,
+                (void**)serviceBinding,
+                gImageHandle,
+                default,
+                EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+            gBS->FreePool(handles);
+            ThrowIfError(status, "open the EFI DNS4 service binding");
 
-                if (type == 1 && dnsClass == 1 && dataLength == 4)
-                {
-                    IPAddress address = new IPAddress(new byte[]
-                    {
-                        response[offset],
-                        response[offset + 1],
-                        response[offset + 2],
-                        response[offset + 3]
-                    });
-                    if (!Contains(addresses, address))
-                        addresses.Add(address);
-                }
-                offset += dataLength;
-            }
+            status = (*serviceBinding)->CreateChild(*serviceBinding, childHandle);
+            ThrowIfError(status, "create an EFI DNS4 child");
+            *childCreated = true;
 
-            if (addresses.Count == 0)
-                throw new Exception("The DNS response did not contain an IPv4 address.");
-            return addresses.ToArray();
+            status = gBS->OpenProtocol(
+                *childHandle,
+                (EFI_GUID*)Dns4ProtocolGuid,
+                (void**)dns,
+                gImageHandle,
+                default,
+                EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+            ThrowIfError(status, "open the EFI DNS4 protocol");
+            *dnsOpened = true;
         }
 
-        private static int SkipName(byte[] message, int length, int offset)
+        [UnmanagedCallersOnly]
+        private static unsafe void OperationCompleted(EFI_EVENT eventHandle, void* context)
         {
-            int labels = 0;
-            while (true)
-            {
-                EnsureAvailable(length, offset, 1);
-                int labelLength = message[offset++];
-                if (labelLength == 0)
-                    return offset;
-                if ((labelLength & 0xc0) == 0xc0)
-                {
-                    EnsureAvailable(length, offset, 1);
-                    int pointer = ((labelLength & 0x3f) << 8) | message[offset];
-                    if (pointer >= length)
-                        throw new Exception("The DNS response contains an invalid name pointer.");
-                    return offset + 1;
-                }
-                if ((labelLength & 0xc0) != 0 || labelLength > 63)
-                    throw new Exception("The DNS response contains an invalid name.");
-                EnsureAvailable(length, offset, labelLength);
-                offset += labelLength;
-                if (++labels > 127)
-                    throw new Exception("The DNS response contains an invalid name.");
-            }
+            *(bool*)context = true;
         }
 
-        private static bool Contains(List<IPAddress> addresses, IPAddress address)
+        private static void ThrowIfError(EFI_STATUS status, string operation)
         {
-            for (int i = 0; i < addresses.Count; i++)
-                if (addresses[i].Equals(address))
-                    return true;
-            return false;
-        }
-
-        private static ushort ReadUInt16(byte[] buffer, int offset)
-            => (ushort)((buffer[offset] << 8) | buffer[offset + 1]);
-
-        private static void WriteUInt16(byte[] buffer, int offset, int value)
-        {
-            buffer[offset] = (byte)(value >> 8);
-            buffer[offset + 1] = (byte)value;
-        }
-
-        private static void EnsureAvailable(int length, int offset, int count)
-        {
-            if (offset < 0 || count < 0 || offset > length - count)
-                throw new Exception("The DNS response is truncated or malformed.");
+            ulong value = status;
+            if (value != EFI_SUCCESS)
+                throw new Exception("Failed to " + operation + " (EFI_STATUS " + value + ").");
         }
     }
 
@@ -266,4 +248,49 @@ namespace System.Net
         public string[] Aliases { get; set; } = new string[0];
         public string HostName { get; set; } = string.Empty;
     }
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct EFI_DNS4_CONFIG_DATA
+{
+    public ulong DnsServerListCount;
+    public EFI_IPv4_ADDRESS* DnsServerList;
+    public bool UseDefaultSetting;
+    public bool EnableDnsCache;
+    public byte Protocol;
+    public EFI_IPv4_ADDRESS StationIp;
+    public EFI_IPv4_ADDRESS SubnetMask;
+    public ushort LocalPort;
+    public uint RetryCount;
+    public uint RetryInterval;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct DNS_HOST_TO_ADDR_DATA
+{
+    public uint IpCount;
+    public EFI_IPv4_ADDRESS* IpList;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct EFI_DNS4_COMPLETION_TOKEN
+{
+    public EFI_EVENT Event;
+    public EFI_STATUS Status;
+    public uint RetryCount;
+    public uint RetryInterval;
+    public DNS_HOST_TO_ADDR_DATA* H2AData;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct EFI_DNS4_PROTOCOL
+{
+    public readonly void* GetModeData;
+    public readonly delegate* unmanaged<EFI_DNS4_PROTOCOL*, EFI_DNS4_CONFIG_DATA*, EFI_STATUS> Configure;
+    public readonly delegate* unmanaged<EFI_DNS4_PROTOCOL*, char*, EFI_DNS4_COMPLETION_TOKEN*, EFI_STATUS> HostNameToIp;
+    public readonly void* IpToHostName;
+    public readonly void* GeneralLookUp;
+    public readonly void* UpdateDnsCache;
+    public readonly delegate* unmanaged<EFI_DNS4_PROTOCOL*, EFI_STATUS> Poll;
+    public readonly delegate* unmanaged<EFI_DNS4_PROTOCOL*, EFI_DNS4_COMPLETION_TOKEN*, EFI_STATUS> Cancel;
 }

@@ -14,6 +14,8 @@ Publishing updates the boot files in `Drive`, then starts the repository-local Q
 
 Use `dotnet publish --tl:off -c Release ConsoleApp1` to publish and run with live build output. Pass `-p:RunQemu=false` to publish without starting QEMU.
 
+QEMU mounts the bundled UEFI variable template through a temporary snapshot. Variable changes are discarded when QEMU exits, so stale physical-network settings cannot override the `-netdev user` DHCP configuration and no per-build `.vars.fd` file is created.
+
 `RunQemu` detects whether the bundled QEMU supports WHPX and whether the Windows hypervisor is active. It uses WHPX only when both checks pass; otherwise it falls back to TCG.
 
 > **Performance:** Enable **Windows Hypervisor Platform** (`Windows 虚拟机监控程序平台`) in **Turn Windows features on or off**, then restart Windows. This allows QEMU to use WHPX hardware acceleration; without it, QEMU falls back to TCG and runs significantly slower.
