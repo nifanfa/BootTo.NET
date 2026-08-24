@@ -6,31 +6,23 @@ namespace Playground.NES
     {
         Emulator NES;
 
-        public uint[] displayBuffer;
-        public bool screenUpdated = false;
+        Graphics graphics;
         public int screenWidth = 256, screenHeight = 240;
-
-        public void InitializeGame()
-        {
-            displayBuffer = new uint[screenWidth * screenHeight];
-        }
 
         public unsafe void WriteBitmap(byte[] byteToWrite, Color XColor)
         {
             lock (this)
             {
-                for (int i = 0; i < displayBuffer.Length; i++) displayBuffer[i] = XColor.ToArgb();
-
                 int w = 0;
                 int h = 0;
+
+                int baseX = (int)((graphics.VisibleClipBounds.Width / 2) - (screenWidth / 2));
+                int baseY = (int)((graphics.VisibleClipBounds.Height / 2) - (screenHeight / 2));
 
                 for (int i = 0; i < byteToWrite.Length; i += 4)
                 {
                     Color color = Color.FromArgb(byteToWrite[i + 3], byteToWrite[i + 2], byteToWrite[i + 1], byteToWrite[i + 0]);
-                    if (color.A != 0)
-                    {
-                        displayBuffer[screenWidth * h + w] = color.ToArgb();
-                    }
+                    graphics.DrawPoint(baseX + w, baseY + h, color.A != 0 ? color : XColor);
                     //
                     w++;
                     //256*240
@@ -40,15 +32,13 @@ namespace Playground.NES
                         h++;
                     }
                 }
-
-                screenUpdated = true;
             }
         }
 
         public GameRender(Emulator formObject)
         {
             NES = formObject;
-            InitializeGame();
+            graphics = CreateGraphics();
         }
     }
 }

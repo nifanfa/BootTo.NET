@@ -29,7 +29,7 @@ namespace System.IO
         {
             get
             {
-                if (!UefiFileSystem.TryGetInfo(_fullName, out UefiFileMetadata metadata))
+                if (!FileSystem.TryGetInfo(_fullName, out FileMetadata metadata))
                     return false;
                 return (metadata.Attribute & EFI_FILE_DIRECTORY) == 0;
             }
@@ -39,7 +39,7 @@ namespace System.IO
         {
             get
             {
-                if (!UefiFileSystem.TryGetInfo(_fullName, out UefiFileMetadata metadata))
+                if (!FileSystem.TryGetInfo(_fullName, out FileMetadata metadata))
                     throw new IOException("The file metadata could not be read.");
                 return (long)metadata.FileSize;
             }
@@ -56,7 +56,7 @@ namespace System.IO
 
         public void Delete()
         {
-            if (!UefiFileSystem.Delete(_fullName))
+            if (!FileSystem.Delete(_fullName))
                 throw new IOException("The file could not be deleted.");
         }
 
@@ -66,9 +66,9 @@ namespace System.IO
         public FileStream OpenWrite()
             => new FileStream(_fullName, FileMode.OpenOrCreate);
 
-        private UefiFileMetadata GetMetadata()
+        private FileMetadata GetMetadata()
         {
-            if (!UefiFileSystem.TryGetInfo(_fullName, out UefiFileMetadata metadata))
+            if (!FileSystem.TryGetInfo(_fullName, out FileMetadata metadata))
                 throw new IOException("The file metadata could not be read.");
             return metadata;
         }

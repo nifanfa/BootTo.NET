@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Text;
 
+new System.Media.SoundPlayer(@"\dragon-studio-computer-startup-sound-effect.wav").PlaySync();
+
 Console.WriteLine($"Hello world, Time: {DateTime.Now}");
 unsafe
 {

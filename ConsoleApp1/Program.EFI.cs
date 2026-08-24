@@ -1,6 +1,7 @@
 using Playground.NES;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.IO.Ports;
@@ -36,6 +37,17 @@ partial class Program
         //Disable watchdog timer
         gBS->SetWatchdogTimer(0, 0, 0, null);
 
+        foreach (var driver in DxeDrivers)
+        {
+            WriteLoadDriver(driver);
+        }
+
+        void WriteLoadDriver(string path)
+        {
+            EFI_STATUS driverStatus = LoadDriver(path);
+            Console.WriteLine("Driver " + path + " " + (driverStatus == EFI_SUCCESS ? "is loaded!" : "failed to load!"));
+        }
+
         ManagedMain(0, null);
 
         try
@@ -55,17 +67,6 @@ partial class Program
 
         //Encoding, ToString test
         Console.WriteLine(Encoding.UTF8.GetString("System available memory(MB): "u8) + (GetAvailableMemory() / 1048576f).ToString());
-
-        foreach (var driver in DxeDrivers)
-        {
-            WriteLoadDriver(driver);
-        }
-
-        void WriteLoadDriver(string path)
-        {
-            EFI_STATUS driverStatus = LoadDriver(path);
-            Console.WriteLine("Driver " + path + " " + (driverStatus == EFI_SUCCESS ? "is loaded!" : "failed to load!"));
-        }
 
         Console.WriteLine("Welcome to the: ");
         Console.ForegroundColor = ConsoleColor.Green;
@@ -183,16 +184,8 @@ partial class Program
     {
         Emulator nes = new Emulator();
 
-        Graphics graphics;
-
-        uint[] cachedDisplayBuffer;
-
         public unsafe NesTest(string rom)
         {
-            graphics = CreateGraphics();
-
-            cachedDisplayBuffer = new uint[nes.gameRender.screenWidth * nes.gameRender.screenHeight];
-
             Console.Clear();
             int height = Console.BufferHeight - 2;
             int width = Console.BufferWidth - 1;
@@ -228,30 +221,6 @@ partial class Program
             for (; ; )
             {
                 nes.runGame();
-
-                if (nes.gameRender.screenUpdated)
-                {
-                    int baseX = (int)((graphics.VisibleClipBounds.Width / 2) - (nes.gameRender.screenWidth / 2));
-                    int baseY = (int)((graphics.VisibleClipBounds.Height / 2) - (nes.gameRender.screenHeight / 2));
-
-                    for (int y = 0; y < nes.gameRender.screenHeight; y++)
-                    {
-                        for (int x = 0; x < nes.gameRender.screenWidth; x++)
-                        {
-                            if (cachedDisplayBuffer[y * nes.gameRender.screenWidth + x] != nes.gameRender.displayBuffer[y * nes.gameRender.screenWidth + x])
-                            {
-                                uint color = nes.gameRender.displayBuffer[y * nes.gameRender.screenWidth + x];
-                                cachedDisplayBuffer[y * nes.gameRender.screenWidth + x] = color;
-                                unsafe
-                                {
-                                    graphics.DrawPoint(baseX + x, baseY + y, Color.FromArgb(color));
-                                }
-                            }
-                        }
-                    }
-
-                    nes.gameRender.screenUpdated = false;
-                }
             }
         }
     }

@@ -6,8 +6,6 @@ namespace System.Media
     {
         private const int PcmFormat = 1;
         private const int BitsPerSample = 16;
-        private const int OutputSampleRate = 44100;
-        private const int InputChunkBytes = 16384;
 
         private string _soundLocation = string.Empty;
         private Stream _stream;
@@ -80,31 +78,18 @@ namespace System.Media
                 if (!TryParse(input, out format))
                     throw new InvalidOperationException("The sound data is not a supported PCM WAV file.");
 
-                WaveOutAudio.Initialize(OutputSampleRate);
-                if (!WaveOutAudio.IsAvailable)
+                Audio.Initialize(format.SampleRate);
+                if (!Audio.IsAvailable)
                     throw new InvalidOperationException("No UEFI audio output is available.");
 
-                byte[] buffer = new byte[InputChunkBytes];
-                int remaining = format.DataLength;
-                while (remaining > 0)
+                byte[] buffer = new byte[format.DataLength];
+                if (ReadFully(input, buffer, buffer.Length) != buffer.Length ||
+                    Audio.WritePcm(buffer, 0, buffer.Length, format.Channels, format.SampleRate) != buffer.Length)
                 {
-                    int request = remaining < buffer.Length ? remaining : buffer.Length;
-                    request -= request % format.BlockAlign;
-                    if (request <= 0)
-                        break;
-
-                    int bytesRead = ReadFully(input, buffer, request);
-                    bytesRead -= bytesRead % format.BlockAlign;
-                    if (bytesRead <= 0)
-                        break;
-
-                    int consumed = WaveOutAudio.WritePcm(buffer, 0, bytesRead, format.Channels, format.SampleRate);
-                    if (consumed != bytesRead)
-                        throw new InvalidOperationException("The audio device accepted fewer PCM bytes than requested.");
-                    remaining -= consumed;
+                    throw new InvalidOperationException("Audio playback did not accept the complete WAV data stream.");
                 }
 
-                if (remaining != 0 || !WaveOutAudio.CompletePlayback())
+                if (!Audio.CompletePlayback())
                     throw new InvalidOperationException("Audio playback did not consume the complete WAV data stream.");
             }
             finally

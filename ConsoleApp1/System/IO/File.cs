@@ -11,7 +11,7 @@
             return buffer;
         }
 
-        public static bool Exists(string path) => UefiFileSystem.FileExists(path);
+        public static bool Exists(string path) => FileSystem.FileExists(path);
 
         public static void WriteAllBytes(string path, byte[] buffer)
         {
@@ -21,6 +21,6 @@
             fs.Close();
         }
 
-        public static void Delete(string path) => UefiFileSystem.Delete(path);
+        public static void Delete(string path) => FileSystem.Delete(path);
     }
 }

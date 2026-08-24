@@ -143,7 +143,6 @@ namespace Playground.NES
             mappers = new Mappers();
             memory = new MemoryMap(registers, input, this, mappers);
             apu = new APU(memory.ReadPRG);
-            WaveOutAudio.Initialize(APU.PcmSampleRate);
             memory.AttachAPU(apu);
             ppu = new PPU(memory, this);
             cpu = new CPU(memory, input, ppu, registers);

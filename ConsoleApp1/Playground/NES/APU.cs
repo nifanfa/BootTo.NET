@@ -128,7 +128,7 @@ namespace Playground.NES
             if (pcmBufferOffset == 0)
                 return;
 
-            WaveOutAudio.WritePcm(pcmBuffer, 0, pcmBufferOffset, PcmChannels, PcmSampleRate);
+            // TO-DO
             pcmBufferOffset = 0;
         }
 
@@ -241,7 +241,7 @@ namespace Playground.NES
             pcmBuffer[pcmBufferOffset++] = (byte)((LastSample >> 8) & 0xFF);
             if (pcmBufferOffset == pcmBuffer.Length)
             {
-                WaveOutAudio.WritePcm(pcmBuffer, 0, pcmBuffer.Length, PcmChannels, PcmSampleRate);
+                // TO-DO
                 pcmBufferOffset = 0;
             }
         }

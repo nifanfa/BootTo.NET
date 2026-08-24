@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 
 
-internal unsafe struct UefiFileMetadata
+internal unsafe struct FileMetadata
 {
     internal ulong FileSize;
     internal ulong Attribute;
@@ -10,7 +10,7 @@ internal unsafe struct UefiFileMetadata
     internal EFI_TIME ModificationTime;
 }
 
-internal static unsafe class UefiFileSystem
+internal static unsafe class FileSystem
 {
     internal static bool OpenVolume(out EFI_FILE_HANDLE* volume)
     {
@@ -36,7 +36,7 @@ internal static unsafe class UefiFileSystem
         return true;
     }
 
-    internal static bool TryGetInfo(string path, out UefiFileMetadata metadata)
+    internal static bool TryGetInfo(string path, out FileMetadata metadata)
     {
         metadata = default;
         if (!OpenVolume(out EFI_FILE_HANDLE* volume))
@@ -82,7 +82,7 @@ internal static unsafe class UefiFileSystem
         if (string.IsNullOrEmpty(path))
             return false;
 
-        if (!TryGetInfo(path, out UefiFileMetadata metadata))
+        if (!TryGetInfo(path, out FileMetadata metadata))
             return false;
 
         return (metadata.Attribute & EFI_FILE_DIRECTORY) == 0;

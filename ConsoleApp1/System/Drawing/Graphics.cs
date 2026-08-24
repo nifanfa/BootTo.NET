@@ -7,12 +7,14 @@ namespace System.Drawing
     public unsafe sealed class Graphics : IDisposable
     {
         private EFI_GRAPHICS_OUTPUT_PROTOCOL* _graphics;
+        private Color[] _cache;
 
         internal Graphics(EFI_GRAPHICS_OUTPUT_PROTOCOL* graphics)
         {
             if (graphics == null || graphics->Mode == null || graphics->Mode->Info == null || graphics->Blt == null)
                 throw new ArgumentException("The graphics protocol is incomplete or unavailable.");
             _graphics = graphics;
+            _cache = new Color[_graphics->Mode->Info->HorizontalResolution * _graphics->Mode->Info->VerticalResolution];
         }
 
         public RectangleF VisibleClipBounds => GetDisplayBounds();
@@ -24,6 +26,9 @@ namespace System.Drawing
                 (uint)x >= _graphics->Mode->Info->HorizontalResolution ||
                 (uint)y >= _graphics->Mode->Info->VerticalResolution)
                 return;
+
+            if (_cache[_graphics->Mode->Info->HorizontalResolution * y + x] == color) return;
+            _cache[_graphics->Mode->Info->HorizontalResolution * y + x] = color;
 
             EFI_GRAPHICS_OUTPUT_BLT_PIXEL pixel = new EFI_GRAPHICS_OUTPUT_BLT_PIXEL
             {

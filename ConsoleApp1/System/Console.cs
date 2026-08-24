@@ -299,6 +299,31 @@
             }
         }
 
+        public static void SetCursorPosition(int left, int top)
+        {
+            if (left < 0 || top < 0)
+                throw new ArgumentException("The cursor position cannot be negative.");
+
+            lock (s_syncRoot)
+            {
+                SIMPLE_TEXT_OUTPUT_INTERFACE* consoleOut = GetConsoleOutput();
+                int width;
+                int height;
+                QueryBufferDimensions(out width, out height);
+                if (left >= width || top >= height)
+                    throw new ArgumentException("The cursor position is outside the console buffer.");
+
+                EFI_STATUS status = consoleOut->SetCursorPosition(
+                    consoleOut,
+                    (ulong)left,
+                    (ulong)top);
+                if ((ulong)status != EFI_SUCCESS)
+                    throw new IO.IOException("The console cursor position could not be changed.");
+
+                s_lineWrapped = false;
+            }
+        }
+
         public static void Write(char c)
         {
             lock (s_syncRoot)
