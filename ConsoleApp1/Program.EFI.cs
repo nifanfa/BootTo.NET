@@ -151,6 +151,13 @@ partial class Program
 #endif
 
 #if false
+        #region Socket Test2
+        SocketTest2 test = new SocketTest2();
+        _ = test.Run();
+        #endregion
+#endif
+
+#if false
         #region Serial Test
         SerialTest test = new SerialTest();
         _ = test.Run();
@@ -278,6 +285,27 @@ partial class Program
             await socket.SendAsync(Encoding.UTF8.GetBytes("Hello world from BootTo.NET project!"));
             Console.WriteLine("Try receive 64bytes from server");
             byte[] buffer = new byte[64];
+            await socket.ReceiveAsync(buffer);
+            unsafe
+            {
+                printf("Buffer received: %s\r\n"u8, buffer);
+            }
+            socket.Close();
+        }
+    }
+
+    class SocketTest2
+    {
+        public async Task Run()
+        {
+            System.Net.IPAddress address = System.Net.IPAddress.Parse("192.168.0.102");
+
+            System.Net.Sockets.Socket socket = new System.Net.Sockets.Socket(System.Net.Sockets.SocketType.Dgram, System.Net.Sockets.ProtocolType.Udp);
+            await socket.ConnectAsync(address, 54188);
+            await socket.SendAsync(Encoding.UTF8.GetBytes("Hello world from BootTo.NET project!"));
+            Console.WriteLine("Try receive 64bytes from server");
+            byte[] buffer = new byte[64];
+            var result = await socket.ReceiveFromAsync(buffer);
             await socket.ReceiveAsync(buffer);
             unsafe
             {

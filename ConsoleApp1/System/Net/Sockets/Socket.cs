@@ -14,9 +14,11 @@ namespace System.Net.Sockets
         }
 
         private EFI_TCP4* tcp;
+        private EFI_UDP4* udp;
         private EFI_SERVICE_BINDING* serviceBinding;
         private EFI_HANDLE serviceHandle;
         private EFI_HANDLE tcpHandle;
+        private EFI_HANDLE udpHandle;
 
         private EFI_TCP4_RECEIVE_DATA receiveData;
         private EFI_TCP4_TRANSMIT_DATA transmitData;
@@ -24,28 +26,82 @@ namespace System.Net.Sockets
         private EFI_TCP4_IO_TOKEN transmitToken;
         private EFI_TCP4_CONNECTION_TOKEN connectionToken;
         private EFI_TCP4_CLOSE_TOKEN closeToken;
+        private EFI_TCP4_LISTEN_TOKEN listenToken;
         private EFI_TCP4_CONFIG_DATA configuration;
         private EFI_TCP4_OPTION controlOption;
+
+        private EFI_UDP4_CONFIG_DATA udpConfiguration;
+        private EFI_UDP4_SESSION_DATA udpSession;
+        private EFI_UDP4_TRANSMIT_DATA udpTransmitData;
+        private EFI_UDP4_COMPLETION_TOKEN udpReceiveToken;
+        private EFI_UDP4_COMPLETION_TOKEN udpTransmitToken;
 
         private TaskCompletionSource connectCompletion;
         private TaskCompletionSource<int> receiveCompletion;
         private TaskCompletionSource<int> transmitCompletion;
         private TaskCompletionSource closeCompletion;
+        private TaskCompletionSource<Socket> acceptCompletion;
+        private TaskCompletionSource<SocketReceiveResult> receiveFromCompletion;
+        private TaskCompletionSource<int> udpReceiveCompletion;
+        private TaskCompletionSource<int> udpTransmitCompletion;
+        private TaskCompletionSource udpCloseCompletion;
 
         private byte[] receiveBuffer;
         private byte[] transmitBuffer;
+        private IPAddress localAddress;
+        private IPAddress remoteAddress;
+        private int localPort;
+        private int remotePort;
         private bool waitingForAddress;
         private bool connected;
+        private bool bound;
+        private bool udpConfigured;
+        private bool listening;
+        private readonly SocketType socketType;
+        private readonly ProtocolType protocolType;
+        private bool ownsServiceBinding = true;
         private readonly SocketPoller poller;
 
         private const uint DefaultConnectionTimeoutSeconds = 30;
 
         public Socket(SocketType socketType, ProtocolType protocolType)
         {
-            if (socketType != SocketType.Stream || protocolType != ProtocolType.Tcp)
+            if ((socketType != SocketType.Stream || protocolType != ProtocolType.Tcp) &&
+                (socketType != SocketType.Dgram || protocolType != ProtocolType.Udp))
                 throw new SocketException(EFI_UNSUPPORTED);
 
+            this.socketType = socketType;
+            this.protocolType = protocolType;
             poller = new SocketPoller(this);
+        }
+
+        private Socket(EFI_TCP4* acceptedTcp, EFI_HANDLE acceptedHandle, EFI_SERVICE_BINDING* binding,
+            EFI_HANDLE bindingHandle)
+        {
+            socketType = SocketType.Stream;
+            protocolType = ProtocolType.Tcp;
+            tcp = acceptedTcp;
+            tcpHandle = acceptedHandle;
+            serviceBinding = binding;
+            serviceHandle = bindingHandle;
+            ownsServiceBinding = false;
+            connected = true;
+            poller = new SocketPoller(this);
+            receiveData = new EFI_TCP4_RECEIVE_DATA();
+            transmitData = new EFI_TCP4_TRANSMIT_DATA();
+            receiveToken = new EFI_TCP4_IO_TOKEN();
+            transmitToken = new EFI_TCP4_IO_TOKEN();
+            closeToken = new EFI_TCP4_CLOSE_TOKEN();
+            listenToken = new EFI_TCP4_LISTEN_TOKEN();
+            receiveData.FragmentCount = 1;
+            transmitData.FragmentCount = 1;
+            transmitData.Push = true;
+            fixed (EFI_TCP4_RECEIVE_DATA* data = &receiveData)
+                receiveToken.Packet_RxData = data;
+            fixed (EFI_TCP4_TRANSMIT_DATA* data = &transmitData)
+                transmitToken.Packet_TxData = data;
+            if ((ulong)CreateIoEvents() != EFI_SUCCESS)
+                ReleaseTcp();
         }
 
         public void Connect(IPAddress address, int port)
@@ -57,6 +113,8 @@ namespace System.Net.Sockets
                 throw new ArgumentNullException();
             if ((uint)port > ushort.MaxValue)
                 throw new ArgumentException();
+            if (socketType == SocketType.Dgram)
+                return ConnectUdpAsync(address, port);
             if (connected)
                 return Task.CompletedTask;
             if (connectCompletion != null)
@@ -74,7 +132,9 @@ namespace System.Net.Sockets
 
             configuration = new EFI_TCP4_CONFIG_DATA();
             configuration.TimeToLive = 188;
-            configuration.AccessPoint.UseDefaultAddress = true;
+            configuration.AccessPoint.UseDefaultAddress = localAddress == null || localAddress.Equals(IPAddress.Any);
+            configuration.AccessPoint.StationAddress = ToEfiIPv4Address(localAddress ?? IPAddress.Any);
+            configuration.AccessPoint.StationPort = (ushort)localPort;
             configuration.AccessPoint.ActiveFlag = true;
             configuration.AccessPoint.RemotePort = (ushort)port;
             configuration.AccessPoint.RemoteAddress = ToEfiIPv4Address(address);
@@ -118,6 +178,8 @@ namespace System.Net.Sockets
         {
             if (buffer == null)
                 return Task.FromException<int>(new Exception("The send buffer cannot be null."));
+            if (socketType == SocketType.Dgram)
+                return SendUdpAsync(buffer, remoteAddress, remotePort);
             if (!connected)
                 return Task.FromException<int>(new SocketException(EFI_NOT_STARTED));
             if (transmitCompletion != null)
@@ -155,6 +217,8 @@ namespace System.Net.Sockets
         {
             if (buffer == null)
                 return Task.FromException<int>(new Exception("The receive buffer cannot be null."));
+            if (socketType == SocketType.Dgram)
+                return ReceiveUdpAsync(buffer);
             if (!connected)
                 return Task.FromException<int>(new SocketException(EFI_NOT_STARTED));
             if (receiveCompletion != null)
@@ -184,8 +248,144 @@ namespace System.Net.Sockets
             return completion.Task;
         }
 
+        public void Bind(IPAddress address, int port)
+        {
+            if (address == null)
+                throw new ArgumentNullException();
+            if ((uint)port > ushort.MaxValue)
+                throw new ArgumentException();
+            if (bound || connected || listening)
+                throw new SocketException(EFI_ALREADY_STARTED);
+
+            localAddress = address;
+            localPort = port;
+            if (socketType == SocketType.Dgram)
+            {
+                EFI_STATUS status = InitializeUdp();
+                if ((ulong)status != EFI_SUCCESS)
+                    throw new SocketException(status);
+                status = ConfigureUdp(null, 0);
+                if ((ulong)status != EFI_SUCCESS && (ulong)status != EFI_NO_MAPPING)
+                {
+                    ReleaseUdp();
+                    throw new SocketException(status);
+                }
+                if ((ulong)status == EFI_NO_MAPPING)
+                    waitingForAddress = true;
+            }
+            bound = true;
+        }
+
+        public void Listen(int backlog)
+        {
+            if (socketType != SocketType.Stream)
+                throw new SocketException(EFI_UNSUPPORTED);
+            if (backlog < 0)
+                throw new ArgumentException();
+            if (listening)
+                throw new SocketException(EFI_ALREADY_STARTED);
+            if (!bound)
+                Bind(IPAddress.Any, 0);
+
+            EFI_STATUS status = InitializeTcp();
+            if ((ulong)status != EFI_SUCCESS)
+                throw new SocketException(status);
+
+            configuration = new EFI_TCP4_CONFIG_DATA();
+            configuration.TimeToLive = 188;
+            configuration.AccessPoint.UseDefaultAddress = localAddress == null || localAddress.Equals(IPAddress.Any);
+            configuration.AccessPoint.StationAddress = ToEfiIPv4Address(localAddress ?? IPAddress.Any);
+            configuration.AccessPoint.StationPort = (ushort)localPort;
+            configuration.AccessPoint.ActiveFlag = false;
+            controlOption = new EFI_TCP4_OPTION();
+            controlOption.MaxSynBackLog = (uint)backlog;
+            status = ConfigureTcp();
+            if ((ulong)status != EFI_SUCCESS)
+            {
+                ReleaseTcp();
+                throw new SocketException(status);
+            }
+
+            listening = true;
+        }
+
+        public Socket Accept()
+            => AcceptAsync().GetAwaiter().GetResult();
+
+        public Task<Socket> AcceptAsync()
+        {
+            if (!listening || tcp == null)
+                return Task.FromException<Socket>(new SocketException(EFI_NOT_STARTED));
+            if (acceptCompletion != null)
+                return Task.FromException<Socket>(new SocketException(EFI_ACCESS_DENIED));
+
+            TaskCompletionSource<Socket> completion = new TaskCompletionSource<Socket>();
+            acceptCompletion = completion;
+            SubmitAccept();
+            return completion.Task;
+        }
+
+        public int SendTo(byte[] buffer, IPAddress address, int port)
+            => SendToAsync(buffer, address, port).GetAwaiter().GetResult();
+
+        public Task<int> SendToAsync(byte[] buffer, IPAddress address, int port)
+        {
+            if (address == null)
+                return Task.FromException<int>(new ArgumentNullException());
+            if ((uint)port > ushort.MaxValue)
+                return Task.FromException<int>(new ArgumentException());
+            if (socketType != SocketType.Dgram)
+                return Task.FromException<int>(new SocketException(EFI_UNSUPPORTED));
+            return SendUdpAsync(buffer, address, port);
+        }
+
+        public int ReceiveFrom(byte[] buffer, out IPAddress address, out int port)
+        {
+            SocketReceiveResult result = ReceiveFromAsync(buffer).GetAwaiter().GetResult();
+            address = result.RemoteAddress;
+            port = result.RemotePort;
+            return result.BytesReceived;
+        }
+
+        public Task<SocketReceiveResult> ReceiveFromAsync(byte[] buffer)
+        {
+            if (socketType != SocketType.Dgram)
+                return Task.FromException<SocketReceiveResult>(new SocketException(EFI_UNSUPPORTED));
+            if (buffer == null)
+                return Task.FromException<SocketReceiveResult>(new Exception("The receive buffer cannot be null."));
+            if (receiveFromCompletion != null || udpReceiveCompletion != null)
+                return Task.FromException<SocketReceiveResult>(new SocketException(EFI_ACCESS_DENIED));
+            if (!bound)
+            {
+                try
+                {
+                    Bind(IPAddress.Any, 0);
+                }
+                catch (Exception e)
+                {
+                    return Task.FromException<SocketReceiveResult>(e);
+                }
+            }
+            TaskCompletionSource<SocketReceiveResult> completion = new TaskCompletionSource<SocketReceiveResult>();
+            receiveFromCompletion = completion;
+            receiveBuffer = buffer;
+            if (waitingForAddress)
+            {
+                UpdatePollingRegistration();
+                return completion.Task;
+            }
+            EFI_STATUS status = SubmitUdpReceive();
+            if ((ulong)status != EFI_SUCCESS)
+                CompleteUdpReceive(status);
+            else
+                UpdatePollingRegistration();
+            return completion.Task;
+        }
+
         public Task CloseAsync()
         {
+            if (socketType == SocketType.Dgram)
+                return CloseUdpAsync();
             if (tcp == null)
                 return Task.CompletedTask;
             if (closeCompletion != null)
@@ -210,6 +410,8 @@ namespace System.Net.Sockets
 
         public EFI_STATUS Poll()
         {
+            if (socketType == SocketType.Dgram)
+                return PollUdp();
             if (tcp == null)
                 return EFI_NOT_STARTED;
 
@@ -230,8 +432,435 @@ namespace System.Net.Sockets
             if (closeCompletion != null && IsSignaled(closeToken.CompletionToken.Event))
                 CompleteClose(closeToken.CompletionToken.Status);
 
+            if (acceptCompletion != null && IsSignaled(listenToken.CompletionToken.Event))
+                CompleteAccept(listenToken.CompletionToken.Status);
+
             return status;
         }
+
+        private Task ConnectUdpAsync(IPAddress address, int port)
+        {
+            if (connected)
+                return Task.CompletedTask;
+            if (connectCompletion != null)
+                return Task.FromException(new SocketException(EFI_ALREADY_STARTED));
+
+            TaskCompletionSource completion = new TaskCompletionSource();
+            connectCompletion = completion;
+            remoteAddress = address;
+            remotePort = port;
+
+            EFI_STATUS status = InitializeUdp();
+            if ((ulong)status == EFI_SUCCESS)
+                bound = true;
+            if ((ulong)status == EFI_SUCCESS)
+                status = ConfigureUdp(address, port);
+            if ((ulong)status == EFI_NO_MAPPING)
+            {
+                waitingForAddress = true;
+                UpdatePollingRegistration();
+            }
+            else if ((ulong)status == EFI_SUCCESS)
+            {
+                CompleteConnect(EFI_SUCCESS);
+            }
+            else
+            {
+                CompleteConnect(status);
+            }
+            return completion.Task;
+        }
+
+        private Task<int> SendUdpAsync(byte[] buffer, IPAddress address, int port)
+        {
+            if (buffer == null)
+                return Task.FromException<int>(new Exception("The send buffer cannot be null."));
+            if (address == null || (uint)port > ushort.MaxValue)
+                return Task.FromException<int>(new ArgumentException());
+            if (!bound)
+            {
+                try
+                {
+                    Bind(IPAddress.Any, 0);
+                }
+                catch (Exception e)
+                {
+                    return Task.FromException<int>(e);
+                }
+            }
+            if (udp == null || waitingForAddress)
+                return Task.FromException<int>(new SocketException(EFI_NOT_STARTED));
+            if (udpTransmitCompletion != null || udpCloseCompletion != null)
+                return Task.FromException<int>(new SocketException(EFI_ACCESS_DENIED));
+
+            TaskCompletionSource<int> completion = new TaskCompletionSource<int>();
+            udpTransmitCompletion = completion;
+            transmitBuffer = buffer;
+            udpSession = new EFI_UDP4_SESSION_DATA();
+            udpSession.DestinationAddress = ToEfiIPv4Address(address);
+            udpSession.DestinationPort = (ushort)port;
+            udpTransmitData = new EFI_UDP4_TRANSMIT_DATA();
+            udpTransmitData.DataLength = (uint)buffer.Length;
+            udpTransmitData.FragmentCount = 1;
+            udpTransmitData.FragmentTable.FragmentLength = (uint)buffer.Length;
+            fixed (byte* data = buffer)
+            fixed (EFI_UDP4_SESSION_DATA* session = &udpSession)
+            fixed (EFI_UDP4_TRANSMIT_DATA* transmit = &udpTransmitData)
+            fixed (EFI_UDP4_COMPLETION_TOKEN* token = &udpTransmitToken)
+            {
+                udpTransmitData.FragmentTable.FragmentBuffer = data;
+                udpTransmitData.UdpSessionData = session;
+                udpTransmitToken.Packet_TxData = transmit;
+                udpTransmitToken.Status = EFI_NOT_READY;
+                EFI_STATUS status = udp->Transmit(udp, token);
+                if ((ulong)status != EFI_SUCCESS)
+                    CompleteUdpTransmit(status);
+            }
+            UpdatePollingRegistration();
+            return completion.Task;
+        }
+
+        private Task<int> ReceiveUdpAsync(byte[] buffer)
+        {
+            if (buffer == null)
+                return Task.FromException<int>(new Exception("The receive buffer cannot be null."));
+            if (udpReceiveCompletion != null || receiveFromCompletion != null || udpCloseCompletion != null)
+                return Task.FromException<int>(new SocketException(EFI_ACCESS_DENIED));
+            if (!bound)
+            {
+                try
+                {
+                    Bind(IPAddress.Any, 0);
+                }
+                catch (Exception e)
+                {
+                    return Task.FromException<int>(e);
+                }
+            }
+            TaskCompletionSource<int> completion = new TaskCompletionSource<int>();
+            udpReceiveCompletion = completion;
+            receiveBuffer = buffer;
+            if (waitingForAddress)
+            {
+                UpdatePollingRegistration();
+                return completion.Task;
+            }
+            EFI_STATUS status = SubmitUdpReceive();
+            if ((ulong)status != EFI_SUCCESS)
+                CompleteUdpReceive(status);
+            else
+                UpdatePollingRegistration();
+            return completion.Task;
+        }
+
+        private Task CloseUdpAsync()
+        {
+            if (udp == null)
+                return Task.CompletedTask;
+            if (udpCloseCompletion != null)
+                return udpCloseCompletion.Task;
+            TaskCompletionSource completion = new TaskCompletionSource();
+            udpCloseCompletion = completion;
+            TaskCompletionSource pendingConnect = connectCompletion;
+            connectCompletion = null;
+            if (pendingConnect != null)
+                pendingConnect.TrySetException(new SocketException(EFI_ABORTED));
+            if (udpReceiveCompletion == null && receiveFromCompletion == null && udpTransmitCompletion == null)
+            {
+                ReleaseUdp();
+                udpCloseCompletion = null;
+                completion.TrySetResult();
+            }
+            else
+            {
+                if (udpReceiveCompletion != null || receiveFromCompletion != null)
+                {
+                    fixed (EFI_UDP4_COMPLETION_TOKEN* token = &udpReceiveToken)
+                        udp->Cancel(udp, token);
+                }
+                if (udpTransmitCompletion != null)
+                {
+                    fixed (EFI_UDP4_COMPLETION_TOKEN* token = &udpTransmitToken)
+                        udp->Cancel(udp, token);
+                }
+                UpdatePollingRegistration();
+            }
+            return completion.Task;
+        }
+
+        private EFI_STATUS PollUdp()
+        {
+            if (udp == null)
+                return EFI_NOT_STARTED;
+            EFI_STATUS status = udp->Poll(udp);
+            if (waitingForAddress)
+                PollUdpAddressConfiguration();
+            if ((udpReceiveCompletion != null || receiveFromCompletion != null) && IsSignaled(udpReceiveToken.Event))
+                CompleteUdpReceive(udpReceiveToken.Status);
+            if (udpTransmitCompletion != null && IsSignaled(udpTransmitToken.Event))
+                CompleteUdpTransmit(udpTransmitToken.Status);
+            MaybeCompleteUdpClose();
+            return status;
+        }
+
+        private void PollUdpAddressConfiguration()
+        {
+            EFI_IP4_MODE_DATA mode = new EFI_IP4_MODE_DATA();
+            EFI_STATUS status = udp->GetModeData(udp, null, &mode, null, null);
+            if ((ulong)status != EFI_SUCCESS && (ulong)status != EFI_NO_MAPPING)
+            {
+                if (connectCompletion != null)
+                    CompleteConnect(status);
+                else
+                    waitingForAddress = false;
+                return;
+            }
+            if (!mode.IsConfigured)
+                return;
+            status = ConfigureUdp(remoteAddress, remotePort);
+            if ((ulong)status == EFI_NO_MAPPING)
+                return;
+            waitingForAddress = false;
+            if ((ulong)status != EFI_SUCCESS)
+            {
+                if (connectCompletion != null)
+                    CompleteConnect(status);
+                if (udpReceiveCompletion != null || receiveFromCompletion != null)
+                    CompleteUdpReceive(status);
+                UpdatePollingRegistration();
+                return;
+            }
+            if (connectCompletion != null)
+                CompleteConnect(status);
+            if ((ulong)status == EFI_SUCCESS && (udpReceiveCompletion != null || receiveFromCompletion != null))
+            {
+                status = SubmitUdpReceive();
+                if ((ulong)status != EFI_SUCCESS)
+                    CompleteUdpReceive(status);
+            }
+            UpdatePollingRegistration();
+        }
+
+        private EFI_STATUS InitializeUdp()
+        {
+            if (udp != null)
+                return EFI_SUCCESS;
+            ulong deviceCount = 0;
+            EFI_HANDLE* devices = null;
+            EFI_STATUS status = gBS->LocateHandleBuffer(
+                ByProtocol,
+                (EFI_GUID*)EFI_UDP4_SERVICE_BINDING_PROTOCOL,
+                null,
+                &deviceCount,
+                &devices);
+            if ((ulong)status != EFI_SUCCESS)
+                return status;
+            if (deviceCount == 0)
+            {
+                gBS->FreePool(devices);
+                return EFI_NOT_FOUND;
+            }
+            serviceHandle = devices[0];
+            EFI_SERVICE_BINDING* binding = null;
+            status = gBS->OpenProtocol(serviceHandle, (EFI_GUID*)EFI_UDP4_SERVICE_BINDING_PROTOCOL,
+                (void**)&binding, gImageHandle, default, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+            gBS->FreePool(devices);
+            if ((ulong)status != EFI_SUCCESS)
+                return status;
+            serviceBinding = binding;
+            EFI_HANDLE childHandle = default;
+            status = serviceBinding->CreateChild(serviceBinding, &childHandle);
+            if ((ulong)status != EFI_SUCCESS)
+                return status;
+            udpHandle = childHandle;
+            fixed (EFI_UDP4** protocol = &udp)
+                status = gBS->OpenProtocol(udpHandle, (EFI_GUID*)EFI_UDP4_PROTOCOL,
+                    (void**)protocol, gImageHandle, default, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+            if ((ulong)status != EFI_SUCCESS)
+            {
+                serviceBinding->DestroyChild(serviceBinding, udpHandle);
+                udpHandle = default;
+                return status;
+            }
+            udpReceiveToken = new EFI_UDP4_COMPLETION_TOKEN();
+            udpTransmitToken = new EFI_UDP4_COMPLETION_TOKEN();
+            status = CreateUdpEvents();
+            if ((ulong)status != EFI_SUCCESS)
+                ReleaseUdp();
+            return status;
+        }
+
+        private EFI_STATUS CreateUdpEvents()
+        {
+            EFI_STATUS status;
+            fixed (EFI_UDP4_COMPLETION_TOKEN* token = &udpReceiveToken)
+                status = gBS->CreateEvent(0, TPL_APPLICATION, null, null, &token->Event);
+            if ((ulong)status != EFI_SUCCESS)
+                return status;
+            fixed (EFI_UDP4_COMPLETION_TOKEN* token = &udpTransmitToken)
+                status = gBS->CreateEvent(0, TPL_APPLICATION, null, null, &token->Event);
+            return status;
+        }
+
+        private EFI_STATUS ConfigureUdp(IPAddress address, int port)
+        {
+            if (udpConfigured)
+            {
+                EFI_STATUS resetStatus = udp->Configure(udp, null);
+                if ((ulong)resetStatus != EFI_SUCCESS)
+                    return resetStatus;
+                udpConfigured = false;
+            }
+            udpConfiguration = new EFI_UDP4_CONFIG_DATA();
+            udpConfiguration.AcceptBroadcast = true;
+            udpConfiguration.AcceptAnyPort = localPort == 0;
+            udpConfiguration.AllowDuplicatePort = false;
+            udpConfiguration.TimeToLive = 64;
+            udpConfiguration.ReceiveTimeout = 0;
+            udpConfiguration.TransmitTimeout = 0;
+            udpConfiguration.UseDefaultAddress = localAddress == null || localAddress.Equals(IPAddress.Any);
+            udpConfiguration.StationAddress = ToEfiIPv4Address(localAddress ?? IPAddress.Any);
+            udpConfiguration.StationPort = (ushort)localPort;
+            if (address != null)
+            {
+                udpConfiguration.RemoteAddress = ToEfiIPv4Address(address);
+                udpConfiguration.RemotePort = (ushort)port;
+            }
+            fixed (EFI_UDP4_CONFIG_DATA* config = &udpConfiguration)
+            {
+                EFI_STATUS status = udp->Configure(udp, config);
+                if ((ulong)status == EFI_SUCCESS)
+                    udpConfigured = true;
+                return status;
+            }
+        }
+
+        private EFI_STATUS SubmitUdpReceive()
+        {
+            udpReceiveToken.Packet_RxData = null;
+            udpReceiveToken.Status = EFI_NOT_READY;
+            fixed (EFI_UDP4_COMPLETION_TOKEN* token = &udpReceiveToken)
+                return udp->Receive(udp, token);
+        }
+
+        private void CompleteUdpReceive(EFI_STATUS status)
+        {
+            TaskCompletionSource<int> completion = udpReceiveCompletion;
+            TaskCompletionSource<SocketReceiveResult> fromCompletion = receiveFromCompletion;
+            udpReceiveCompletion = null;
+            receiveFromCompletion = null;
+            int bytes = 0;
+            IPAddress source = IPAddress.None;
+            int sourcePort = 0;
+            if ((ulong)status == EFI_SUCCESS)
+            {
+                EFI_UDP4_RECEIVE_DATA* packet = udpReceiveToken.Packet_RxData;
+                if (packet == null)
+                {
+                    status = EFI_DEVICE_ERROR;
+                }
+                else
+                {
+                    bytes = CopyUdpPacket(packet, receiveBuffer);
+                    source = new IPAddress((long)ToUInt32(packet->UdpSession.SourceAddress));
+                    sourcePort = packet->UdpSession.SourcePort;
+                    if ((void*)packet->RecycleSignal != null)
+                        gBS->SignalEvent(packet->RecycleSignal);
+                }
+            }
+            udpReceiveToken.Packet_RxData = null;
+            receiveBuffer = null;
+            UpdatePollingRegistration();
+            if (completion != null)
+            {
+                if ((ulong)status == EFI_SUCCESS)
+                    completion.TrySetResult(bytes);
+                else
+                    completion.TrySetException(new SocketException(status));
+            }
+            if (fromCompletion != null)
+            {
+                if ((ulong)status == EFI_SUCCESS)
+                    fromCompletion.TrySetResult(new SocketReceiveResult(bytes, source, sourcePort));
+                else
+                    fromCompletion.TrySetException(new SocketException(status));
+            }
+            MaybeCompleteUdpClose();
+        }
+
+        private static int CopyUdpPacket(EFI_UDP4_RECEIVE_DATA* packet, byte[] destination)
+        {
+            if (destination == null)
+                return 0;
+
+            int remaining = (int)packet->DataLength;
+            if (remaining > destination.Length)
+                remaining = destination.Length;
+            int copied = 0;
+            EFI_UDP4_FRAGMENT_DATA* fragment = &packet->FragmentTable;
+            for (uint i = 0; i < packet->FragmentCount && copied < remaining; i++)
+            {
+                int fragmentLength = (int)fragment[i].FragmentLength;
+                if (fragmentLength > remaining - copied)
+                    fragmentLength = remaining - copied;
+                byte* source = (byte*)fragment[i].FragmentBuffer;
+                for (int j = 0; j < fragmentLength; j++)
+                    destination[copied + j] = source[j];
+                copied += fragmentLength;
+            }
+            return copied;
+        }
+
+        private void CompleteUdpTransmit(EFI_STATUS status)
+        {
+            TaskCompletionSource<int> completion = udpTransmitCompletion;
+            udpTransmitCompletion = null;
+            int bytes = (int)udpTransmitData.FragmentTable.FragmentLength;
+            transmitBuffer = null;
+            UpdatePollingRegistration();
+            if (completion == null)
+                return;
+            if ((ulong)status == EFI_SUCCESS)
+                completion.TrySetResult(bytes);
+            else
+                completion.TrySetException(new SocketException(status));
+            MaybeCompleteUdpClose();
+        }
+
+        private void MaybeCompleteUdpClose()
+        {
+            if (udpCloseCompletion == null || udpReceiveCompletion != null || receiveFromCompletion != null || udpTransmitCompletion != null)
+                return;
+            TaskCompletionSource completion = udpCloseCompletion;
+            udpCloseCompletion = null;
+            ReleaseUdp();
+            completion.TrySetResult();
+        }
+
+        private void ReleaseUdp()
+        {
+            TaskScheduler.Unregister(poller);
+            CloseEvent(ref udpReceiveToken.Event);
+            CloseEvent(ref udpTransmitToken.Event);
+            if (udp != null)
+                gBS->CloseProtocol(udpHandle, (EFI_GUID*)EFI_UDP4_PROTOCOL, gImageHandle, default);
+            udp = null;
+            if (serviceBinding != null && (void*)udpHandle != null)
+                serviceBinding->DestroyChild(serviceBinding, udpHandle);
+            udpHandle = default;
+            if (serviceBinding != null && (void*)serviceHandle != null)
+                gBS->CloseProtocol(serviceHandle, (EFI_GUID*)EFI_UDP4_SERVICE_BINDING_PROTOCOL, gImageHandle, default);
+            serviceBinding = null;
+            serviceHandle = default;
+            bound = false;
+            connected = false;
+            udpConfigured = false;
+            waitingForAddress = false;
+        }
+
+        private static uint ToUInt32(EFI_IPv4_ADDRESS address)
+            => (uint)(address.Addr[0] | ((uint)address.Addr[1] << 8) |
+                ((uint)address.Addr[2] << 16) | ((uint)address.Addr[3] << 24));
 
         internal void Close()
             => CloseAsync().GetAwaiter().GetResult();
@@ -338,6 +967,27 @@ namespace System.Net.Sockets
 
             fixed (EFI_TCP4_CLOSE_TOKEN* token = &closeToken)
                 status = gBS->CreateEvent(0, TPL_APPLICATION, null, null, &token->CompletionToken.Event);
+            if ((ulong)status != EFI_SUCCESS)
+                return status;
+
+            fixed (EFI_TCP4_LISTEN_TOKEN* token = &listenToken)
+                status = gBS->CreateEvent(0, TPL_APPLICATION, null, null, &token->CompletionToken.Event);
+            return status;
+        }
+
+        private EFI_STATUS CreateIoEvents()
+        {
+            EFI_STATUS status;
+            fixed (EFI_TCP4_IO_TOKEN* token = &receiveToken)
+                status = gBS->CreateEvent(0, TPL_APPLICATION, null, null, &token->CompletionToken.Event);
+            if ((ulong)status != EFI_SUCCESS)
+                return status;
+            fixed (EFI_TCP4_IO_TOKEN* token = &transmitToken)
+                status = gBS->CreateEvent(0, TPL_APPLICATION, null, null, &token->CompletionToken.Event);
+            if ((ulong)status != EFI_SUCCESS)
+                return status;
+            fixed (EFI_TCP4_CLOSE_TOKEN* token = &closeToken)
+                status = gBS->CreateEvent(0, TPL_APPLICATION, null, null, &token->CompletionToken.Event);
             return status;
         }
 
@@ -352,6 +1002,65 @@ namespace System.Net.Sockets
                 UpdatePollingRegistration();
             else
                 CompleteConnect(status);
+        }
+
+        private void SubmitAccept()
+        {
+            if (acceptCompletion == null || tcp == null)
+                return;
+            listenToken.CompletionToken.Status = EFI_NOT_READY;
+            listenToken.NewChildHandle = default;
+            EFI_STATUS status;
+            fixed (EFI_TCP4_LISTEN_TOKEN* token = &listenToken)
+                status = tcp->Accept(tcp, token);
+            if ((ulong)status == EFI_SUCCESS)
+                UpdatePollingRegistration();
+            else
+                CompleteAccept(status);
+        }
+
+        private void CompleteAccept(EFI_STATUS status)
+        {
+            TaskCompletionSource<Socket> completion = acceptCompletion;
+            acceptCompletion = null;
+            if (completion == null)
+                return;
+
+            if ((ulong)status != EFI_SUCCESS)
+            {
+                completion.TrySetException(new SocketException(status));
+                UpdatePollingRegistration();
+                return;
+            }
+
+            EFI_HANDLE childHandle = listenToken.NewChildHandle;
+            EFI_TCP4* child = null;
+            EFI_STATUS openStatus;
+            openStatus = gBS->OpenProtocol(
+                childHandle,
+                (EFI_GUID*)EFI_TCP4_PROTOCOL,
+                (void**)&child,
+                gImageHandle,
+                default,
+                EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+            if ((ulong)openStatus != EFI_SUCCESS)
+            {
+                if ((void*)serviceBinding != null)
+                    serviceBinding->DestroyChild(serviceBinding, childHandle);
+                completion.TrySetException(new SocketException(openStatus));
+                UpdatePollingRegistration();
+                return;
+            }
+
+            Socket accepted = new Socket(child, childHandle, serviceBinding, serviceHandle);
+            if (accepted.tcp == null)
+            {
+                completion.TrySetException(new SocketException(EFI_OUT_OF_RESOURCES));
+                UpdatePollingRegistration();
+                return;
+            }
+            completion.TrySetResult(accepted);
+            UpdatePollingRegistration();
         }
 
         private void StartConnectTimeout()
@@ -400,8 +1109,10 @@ namespace System.Net.Sockets
 
         private EFI_STATUS ConfigureTcp()
         {
+            uint maxSynBackLog = controlOption.MaxSynBackLog;
             controlOption = new EFI_TCP4_OPTION();
             controlOption.ConnectionTimeout = DefaultConnectionTimeoutSeconds;
+            controlOption.MaxSynBackLog = maxSynBackLog;
 
             EFI_STATUS status;
             fixed (EFI_TCP4_OPTION* options = &controlOption)
@@ -425,7 +1136,12 @@ namespace System.Net.Sockets
             waitingForAddress = false;
             connected = (ulong)status == EFI_SUCCESS;
             if (!connected && (ulong)status == EFI_TIMEOUT)
-                ReleaseTcp();
+            {
+                if (socketType == SocketType.Dgram)
+                    ReleaseUdp();
+                else
+                    ReleaseTcp();
+            }
             UpdatePollingRegistration();
 
             if (completion == null)
@@ -479,21 +1195,39 @@ namespace System.Net.Sockets
             if ((ulong)status == EFI_SUCCESS)
             {
                 connected = false;
+                listening = false;
                 ReleaseTcp();
             }
-            UpdatePollingRegistration();
-
+            TaskCompletionSource pendingConnect = connectCompletion;
+            connectCompletion = null;
+            if (pendingConnect != null)
+                pendingConnect.TrySetException(new SocketException(status));
             if (completion == null)
+            {
+                TaskCompletionSource<Socket> pendingAccept = acceptCompletion;
+                acceptCompletion = null;
+                if (pendingAccept != null)
+                    pendingAccept.TrySetException(new SocketException(status));
+                UpdatePollingRegistration();
                 return;
+            }
             if ((ulong)status == EFI_SUCCESS)
                 completion.TrySetResult();
             else
                 completion.TrySetException(new SocketException(status));
+
+            TaskCompletionSource<Socket> accept = acceptCompletion;
+            acceptCompletion = null;
+            if (accept != null)
+                accept.TrySetException(new SocketException(status));
+            UpdatePollingRegistration();
         }
 
         private void UpdatePollingRegistration()
         {
-            if (waitingForAddress || connectCompletion != null || receiveCompletion != null || transmitCompletion != null || closeCompletion != null)
+            if (waitingForAddress || connectCompletion != null || receiveCompletion != null || transmitCompletion != null ||
+                closeCompletion != null || acceptCompletion != null || receiveFromCompletion != null ||
+                udpReceiveCompletion != null || udpTransmitCompletion != null || udpCloseCompletion != null)
                 TaskScheduler.Register(poller);
             else
                 TaskScheduler.Unregister(poller);
@@ -507,6 +1241,7 @@ namespace System.Net.Sockets
             CloseEvent(ref receiveToken.CompletionToken.Event);
             CloseEvent(ref transmitToken.CompletionToken.Event);
             CloseEvent(ref closeToken.CompletionToken.Event);
+            CloseEvent(ref listenToken.CompletionToken.Event);
 
             if (tcp != null)
                 gBS->CloseProtocol(tcpHandle, (EFI_GUID*)EFI_TCP4_PROTOCOL, gImageHandle, default);
@@ -516,10 +1251,13 @@ namespace System.Net.Sockets
                 serviceBinding->DestroyChild(serviceBinding, tcpHandle);
             tcpHandle = default;
 
-            if (serviceBinding != null && (void*)serviceHandle != null)
+            if (ownsServiceBinding && serviceBinding != null && (void*)serviceHandle != null)
                 gBS->CloseProtocol(serviceHandle, (EFI_GUID*)EFI_TCP4_SERVICE_BINDING_PROTOCOL, gImageHandle, default);
-            serviceBinding = null;
-            serviceHandle = default;
+            if (ownsServiceBinding)
+            {
+                serviceBinding = null;
+                serviceHandle = default;
+            }
         }
 
         private static void CloseEvent(ref EFI_EVENT e)
@@ -532,9 +1270,23 @@ namespace System.Net.Sockets
         }
     }
 
+    public sealed class SocketReceiveResult
+    {
+        internal SocketReceiveResult(int bytesReceived, IPAddress remoteAddress, int remotePort)
+        {
+            BytesReceived = bytesReceived;
+            RemoteAddress = remoteAddress;
+            RemotePort = remotePort;
+        }
+
+        public int BytesReceived { get; }
+        public IPAddress RemoteAddress { get; }
+        public int RemotePort { get; }
+    }
+
     public sealed class SocketException : Exception
     {
-        public SocketException(EFI_STATUS status) : base("The UEFI TCP operation failed.")
+        public SocketException(EFI_STATUS status) : base("The UEFI socket operation failed.")
             => Status = status;
 
         public EFI_STATUS Status { get; }
