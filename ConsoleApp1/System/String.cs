@@ -34,7 +34,7 @@
             if (args == null)
                 throw new ArgumentNullException("The format arguments cannot be null.");
 
-            System.Text.StringBuilder result = new System.Text.StringBuilder(format.Length + 16);
+            Text.StringBuilder result = new Text.StringBuilder(format.Length + 16);
             int index = 0;
             while (index < format.Length)
             {
@@ -150,7 +150,7 @@
                     width = width * 10 + (specifier[i] - '0');
                 }
                 string text = value.ToString();
-                System.Text.StringBuilder padded = new System.Text.StringBuilder(text.Length + width);
+                Text.StringBuilder padded = new Text.StringBuilder(text.Length + width);
                 int start = text.Length > 0 && text[0] == '-' ? 1 : 0;
                 if (start != 0)
                 {

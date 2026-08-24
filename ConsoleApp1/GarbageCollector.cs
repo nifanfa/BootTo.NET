@@ -74,14 +74,12 @@ internal static unsafe class GarbageCollector
             s_stackUpperBound = upperBound;
     }
 
-    [RuntimeExport("GcRegisterStatics")]
     internal static void RegisterStatics(IntPtr start, IntPtr end)
     {
         s_gcStaticsStart = start;
         s_gcStaticsEnd = end;
     }
 
-    [RuntimeExport("MarshalAllocHGlobal")]
     internal static void* AllocateNative(ulong size)
     {
         void* allocation = null;
@@ -92,7 +90,6 @@ internal static unsafe class GarbageCollector
         return allocation;
     }
 
-    [RuntimeExport("GcAllocate")]
     public static void* Allocate(ulong size)
     {
         if (size > MaximumUnsignedValue - 7)
@@ -142,7 +139,6 @@ internal static unsafe class GarbageCollector
         return objectAddress;
     }
 
-    [RuntimeExport("MarshalFreeHGlobal")]
     internal static void FreeNative(void* pointer)
     {
         if (pointer == null)
@@ -151,7 +147,6 @@ internal static unsafe class GarbageCollector
         gBS->FreePool(pointer);
     }
 
-    [RuntimeExport("GcCollect")]
     internal static int Collect()
     {
         if (s_collecting || s_allocations == null || s_stackUpperBound == 0)

@@ -26,7 +26,7 @@ namespace System
         CommonProgramFiles = 43,
     }
 
-    [System.Flags]
+    [Flags]
     public enum SpecialFolderOption
     {
         None = 0,

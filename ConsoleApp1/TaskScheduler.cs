@@ -73,7 +73,6 @@ internal static class TaskScheduler
         poller.Next = null;
     }
 
-    [RuntimeExport("TaskYield")]
     internal static bool Yield()
     {
         // A poller can complete a task and run a continuation synchronously.

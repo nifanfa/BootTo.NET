@@ -1,6 +1,6 @@
 namespace System.Reflection.PortableExecutable
 {
-    [System.Flags]
+    [Flags]
     public enum PEStreamOptions
     {
         Default = 0,

@@ -4,13 +4,13 @@
     {
         private sealed class ReadKeyOperation : TaskPoller
         {
-            private System.Threading.Tasks.TaskCompletionSource<ConsoleKeyInfo> _completion;
+            private Threading.Tasks.TaskCompletionSource<ConsoleKeyInfo> _completion;
             private bool _useUsbKeyboard;
 
-            internal System.Threading.Tasks.Task<ConsoleKeyInfo> Start()
+            internal Threading.Tasks.Task<ConsoleKeyInfo> Start()
             {
-                System.Threading.Tasks.TaskCompletionSource<ConsoleKeyInfo> completion =
-                    new System.Threading.Tasks.TaskCompletionSource<ConsoleKeyInfo>();
+                Threading.Tasks.TaskCompletionSource<ConsoleKeyInfo> completion =
+                    new Threading.Tasks.TaskCompletionSource<ConsoleKeyInfo>();
                 _completion = completion;
                 _useUsbKeyboard = UsbKeyboard.TryStart();
                 TaskScheduler.Register(this);
@@ -58,7 +58,7 @@
 
             private void Complete(ConsoleKeyInfo key)
             {
-                System.Threading.Tasks.TaskCompletionSource<ConsoleKeyInfo> completion = _completion;
+                Threading.Tasks.TaskCompletionSource<ConsoleKeyInfo> completion = _completion;
                 _completion = null;
                 TaskScheduler.Unregister(this);
                 if (completion != null)
@@ -67,7 +67,7 @@
 
             private void CompleteException()
             {
-                System.Threading.Tasks.TaskCompletionSource<ConsoleKeyInfo> completion = _completion;
+                Threading.Tasks.TaskCompletionSource<ConsoleKeyInfo> completion = _completion;
                 _completion = null;
                 TaskScheduler.Unregister(this);
                 if (completion != null)
@@ -77,12 +77,12 @@
 
         private sealed class ReadKeyEventOperation : TaskPoller
         {
-            private System.Threading.Tasks.TaskCompletionSource<ConsoleKeyEvent> _completion;
+            private Threading.Tasks.TaskCompletionSource<ConsoleKeyEvent> _completion;
 
-            internal System.Threading.Tasks.Task<ConsoleKeyEvent> Start()
+            internal Threading.Tasks.Task<ConsoleKeyEvent> Start()
             {
-                System.Threading.Tasks.TaskCompletionSource<ConsoleKeyEvent> completion =
-                    new System.Threading.Tasks.TaskCompletionSource<ConsoleKeyEvent>();
+                Threading.Tasks.TaskCompletionSource<ConsoleKeyEvent> completion =
+                    new Threading.Tasks.TaskCompletionSource<ConsoleKeyEvent>();
                 _completion = completion;
                 TaskScheduler.Register(this);
                 Poll();
@@ -94,7 +94,7 @@
                 if (!UsbKeyboard.TryDequeue(out ConsoleKeyEvent keyEvent))
                     return;
 
-                System.Threading.Tasks.TaskCompletionSource<ConsoleKeyEvent> completion = _completion;
+                Threading.Tasks.TaskCompletionSource<ConsoleKeyEvent> completion = _completion;
                 _completion = null;
                 TaskScheduler.Unregister(this);
                 if (completion != null)
@@ -168,7 +168,7 @@
                 &rows);
 
             if ((ulong)status != EFI_SUCCESS)
-                throw new System.IO.IOException("The console output mode could not be queried.");
+                throw new IO.IOException("The console output mode could not be queried.");
             if (columns > (ulong)int.MaxValue || rows > (ulong)int.MaxValue)
                 throw new OverflowException("The console dimensions exceed the supported integer range.");
 
@@ -210,7 +210,7 @@
 
                     status = consoleOut->SetMode(consoleOut, (ulong)mode);
                     if ((ulong)status != EFI_SUCCESS)
-                        throw new System.IO.IOException("The console output mode could not be selected.");
+                        throw new IO.IOException("The console output mode could not be selected.");
                     s_lineWrapped = false;
                     return;
                 }
@@ -481,7 +481,7 @@
             return ReadKeyAsync().GetAwaiter().GetResult();
         }
 
-        public static System.Threading.Tasks.Task<ConsoleKeyInfo> ReadKeyAsync()
+        public static Threading.Tasks.Task<ConsoleKeyInfo> ReadKeyAsync()
             => new ReadKeyOperation().Start();
 
         public static string ReadLine()
@@ -515,7 +515,7 @@
             }
         }
 
-        public static System.Threading.Tasks.Task<ConsoleKeyEvent> ReadKeyEventAsync()
+        public static Threading.Tasks.Task<ConsoleKeyEvent> ReadKeyEventAsync()
         {
             if (!UsbKeyboard.TryStart())
                 throw new Exception("A USB HID boot keyboard is unavailable.");

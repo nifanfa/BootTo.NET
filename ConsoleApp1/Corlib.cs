@@ -872,9 +872,7 @@ namespace System
 
     public static class GC
     {
-        [RuntimeImport("*", "GcCollect")]
-        [MethodImpl(MethodImplOptions.InternalCall)]
-        public static extern int Collect();
+        public static int Collect() => GarbageCollector.Collect();
 
         [Intrinsic]
         public static void KeepAlive(object obj) { }
@@ -1325,9 +1323,7 @@ namespace System.Threading.Tasks
             ThrowIfFaulted();
         }
 
-        [RuntimeImport("*", "TaskYield")]
-        [MethodImpl(MethodImplOptions.InternalCall)]
-        public static extern bool Yield();
+        public static bool Yield() => TaskScheduler.Yield();
 
         internal void AddContinuation(Action continuation)
         {
@@ -1475,13 +1471,9 @@ namespace System.Threading
             Enter(obj, ref lockTaken);
         }
 
-        [RuntimeImport("*", "MonitorEnter")]
-        [MethodImpl(MethodImplOptions.InternalCall)]
-        public static extern void Enter(object obj, ref bool lockTaken);
+        public static void Enter(object obj, ref bool lockTaken) => Lock.Enter(obj, ref lockTaken);
 
-        [RuntimeImport("*", "MonitorExit")]
-        [MethodImpl(MethodImplOptions.InternalCall)]
-        public static extern void Exit(object obj);
+        public static void Exit(object obj) => Lock.Exit(obj);
     }
 }
 
@@ -1498,13 +1490,9 @@ namespace System.Runtime.InteropServices
 
     public class Marshal
     {
-        [RuntimeImport("*", "MarshalAllocHGlobal")]
-        [MethodImpl(MethodImplOptions.InternalCall)]
-        public static extern nint AllocHGlobal(int cb);
+        public static unsafe nint AllocHGlobal(int cb) => (nint)GarbageCollector.AllocateNative((ulong)cb);
 
-        [RuntimeImport("*", "MarshalFreeHGlobal")]
-        [MethodImpl(MethodImplOptions.InternalCall)]
-        public static extern void FreeHGlobal(IntPtr hglobal);
+        public static unsafe void FreeHGlobal(IntPtr hglobal) => GarbageCollector.FreeNative((void*)hglobal);
 
         public static IntPtr AllocCoTaskMem(int cb) => AllocHGlobal(cb);
 
@@ -2250,14 +2238,10 @@ namespace System.Runtime
             byte* stackPointer,
             byte* framePointer);
 
-        [RuntimeImport("*", "GcAllocate")]
-        [MethodImpl(MethodImplOptions.InternalCall)]
-        static extern void* GcAllocate(ulong size);
-
         [RuntimeExport("RhpNewFast")]
         internal static object RhpNewFast(EEType* pEEType)
         {
-            void* ptr = GcAllocate(pEEType->BaseSize);
+            void* ptr = GarbageCollector.Allocate(pEEType->BaseSize);
             if (ptr == null)
                 return null;
 
@@ -2278,7 +2262,7 @@ namespace System.Runtime
                 return null;
 
             ulong size = pEEType->BaseSize + (ulong)length * componentSize;
-            void* ptr = GcAllocate(size);
+            void* ptr = GarbageCollector.Allocate(size);
             if (ptr == null)
                 return null;
 
@@ -2302,7 +2286,7 @@ namespace System.Runtime
                 return null;
 
             ulong size = pEEType->BaseSize + (ulong)length * componentSize;
-            void* ptr = GcAllocate(size);
+            void* ptr = GarbageCollector.Allocate(size);
             if (ptr == null)
                 return null;
 
@@ -2867,10 +2851,6 @@ namespace Internal.Runtime
                 return s_mainMethodArguments;
             }
 
-            [RuntimeImport("*", "GcRegisterStatics")]
-            [MethodImpl(MethodImplOptions.InternalCall)]
-            internal static extern void RegisterStatics(IntPtr start, IntPtr end);
-
             public static unsafe void InitializeModules(byte* ImageBase, IntPtr Modules, byte* ExceptionTable, uint ExceptionTableSize)
             {
                 var header = (ReadyToRunHeader*)*(IntPtr*)Modules;
@@ -2882,7 +2862,7 @@ namespace Internal.Runtime
                     {
                         if (sections[k].SectionId == ReadyToRunSectionType.GCStaticRegion)
                         {
-                            RegisterStatics(sections[k].Start, sections[k].End);
+                            GarbageCollector.RegisterStatics(sections[k].Start, sections[k].End);
                             InitializeStatics(sections[k].Start, sections[k].End);
                         }
 

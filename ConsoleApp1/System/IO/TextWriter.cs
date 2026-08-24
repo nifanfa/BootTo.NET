@@ -2,7 +2,7 @@ namespace System.IO
 {
     public abstract class TextWriter : IDisposable
     {
-        public abstract System.Text.Encoding Encoding { get; }
+        public abstract Text.Encoding Encoding { get; }
         public virtual string NewLine { get; set; } = "\r\n";
 
         public virtual void Write(char value) { }

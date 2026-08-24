@@ -138,7 +138,7 @@ namespace System.Collections.Concurrent
         IEnumerator<KeyValuePair<TKey, TValue>> IEnumerable<KeyValuePair<TKey, TValue>>.GetEnumerator()
             => GetEnumerator();
 
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+        IEnumerator IEnumerable.GetEnumerator()
             => GetEnumerator();
 
         public struct Enumerator : IEnumerator<KeyValuePair<TKey, TValue>>
@@ -155,7 +155,7 @@ namespace System.Collections.Concurrent
             }
 
             public KeyValuePair<TKey, TValue> Current => _current;
-            object System.Collections.IEnumerator.Current => _current;
+            object IEnumerator.Current => _current;
 
             public bool MoveNext()
             {

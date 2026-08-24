@@ -1,6 +1,6 @@
 namespace System.Reflection.PortableExecutable
 {
-    [System.Flags]
+    [Flags]
     public enum CorFlags
     {
         ILOnly = 0x00000001,

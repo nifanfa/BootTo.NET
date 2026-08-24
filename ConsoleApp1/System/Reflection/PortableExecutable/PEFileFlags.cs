@@ -1,6 +1,6 @@
 namespace System.Reflection.PortableExecutable
 {
-    [System.Flags]
+    [Flags]
     public enum Characteristics : ushort
     {
         RelocsStripped = 0x0001,
@@ -44,7 +44,7 @@ namespace System.Reflection.PortableExecutable
         WindowsBootApplication = 16,
     }
 
-    [System.Flags]
+    [Flags]
     public enum DllCharacteristics : ushort
     {
         ProcessInit = 0x0001,
@@ -62,7 +62,7 @@ namespace System.Reflection.PortableExecutable
         TerminalServerAware = 0x8000,
     }
 
-    [System.Flags]
+    [Flags]
     public enum SectionCharacteristics : uint
     {
         TypeReg = 0x00000000,

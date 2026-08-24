@@ -98,7 +98,7 @@ namespace System.Collections.Generic
 
         IEnumerator<T> IEnumerable<T>.GetEnumerator() => new Enumerator(this);
 
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => new Enumerator(this);
+        IEnumerator IEnumerable.GetEnumerator() => new Enumerator(this);
 
         private void EnsureCapacity(int minimum)
         {
@@ -132,7 +132,7 @@ namespace System.Collections.Generic
 
             public T Current => _current;
 
-            object System.Collections.IEnumerator.Current => _current;
+            object IEnumerator.Current => _current;
 
             public bool MoveNext()
             {

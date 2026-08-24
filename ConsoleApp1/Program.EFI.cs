@@ -25,7 +25,7 @@ partial class Program
         @"\EFI\Drivers\UsbMouseDxe.efi"
     };
 
-    [System.Runtime.RuntimeExport("EfiMain")]
+    [RuntimeExport("EfiMain")]
     unsafe static EFI_STATUS EfiMain(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* systemTable)
     {
         ulong stackMarker = 0;
@@ -287,7 +287,7 @@ partial class Program
     {
         public async Task Run()
         {
-            System.Net.IPAddress address = System.Net.IPAddress.Parse("192.168.0.102");
+            IPAddress address = System.Net.IPAddress.Parse("192.168.0.102");
 
             System.Net.Sockets.Socket socket = new System.Net.Sockets.Socket(System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
             await socket.ConnectAsync(address, 54188);
@@ -307,7 +307,7 @@ partial class Program
     {
         public async Task Run()
         {
-            System.Net.IPAddress address = System.Net.IPAddress.Parse("192.168.0.102");
+            IPAddress address = System.Net.IPAddress.Parse("192.168.0.102");
 
             System.Net.Sockets.Socket socket = new System.Net.Sockets.Socket(System.Net.Sockets.SocketType.Dgram, System.Net.Sockets.ProtocolType.Udp);
             await socket.ConnectAsync(address, 54188);
