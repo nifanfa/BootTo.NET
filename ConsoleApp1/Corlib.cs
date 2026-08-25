@@ -22,6 +22,12 @@ namespace System
 
         internal EEType* EEType => m_pEEType;
 
+        [Intrinsic]
+        public Type GetType()
+        {
+            return Type.GetTypeFromEETypePtr(new EETypePtr((IntPtr)m_pEEType));
+        }
+
         public virtual bool Equals(object b)
         {
             object a = this;
@@ -214,9 +220,71 @@ namespace System
         public const double MinValue = -1.7976931348623157E+308;
         public const double MaxValue = 1.7976931348623157E+308;
     }
-    public class Type
+    public unsafe class Type
     {
-        public static Type GetTypeFromHandle(RuntimeTypeHandle handle) => new Type();
+        private readonly EEType* _eeType;
+
+        private Type(EEType* eeType)
+        {
+            _eeType = eeType;
+        }
+
+        [Intrinsic]
+        public static Type GetTypeFromHandle(RuntimeTypeHandle handle)
+        {
+            return handle.IsNull ? null : GetTypeFromEETypePtr(new EETypePtr((IntPtr)handle.EEType));
+        }
+
+        internal static Type GetTypeFromEETypePtr(EETypePtr eeType)
+        {
+            return eeType.Value == null ? null : new Type(eeType.Value);
+        }
+
+        public string FullName => GetFullName();
+
+        public string Name
+        {
+            get
+            {
+                return TryGetName(out string name) ? name : "EEType";
+            }
+        }
+
+        public string Namespace
+        {
+            get
+            {
+                if (!TryGetNamespace(out string namespaceName) || namespaceName.Length == 0)
+                    return null;
+
+                return namespaceName;
+            }
+        }
+
+        public override string ToString() => GetFullName();
+
+        private string GetFullName()
+        {
+            return TryGetFullName(out string name) ? name : "EEType";
+        }
+
+        private bool TryGetFullName(out string name)
+        {
+            name = null;
+            return _eeType != null && Internal.Runtime.TypeLoader.TypeLoaderEnvironment.Instance.TryGetTypeFullName(_eeType, out name);
+        }
+
+        private bool TryGetName(out string name)
+        {
+            name = null;
+            return _eeType != null && Internal.Runtime.TypeLoader.TypeLoaderEnvironment.Instance.TryGetTypeName(_eeType, out name);
+        }
+
+        private bool TryGetNamespace(out string namespaceName)
+        {
+            namespaceName = null;
+            return _eeType != null && Internal.Runtime.TypeLoader.TypeLoaderEnvironment.Instance.TryGetTypeNamespace(_eeType, out namespaceName);
+        }
     }
     public delegate void EventHandler(object? sender, EventArgs e);
     public class EventArgs
@@ -906,7 +974,19 @@ namespace System
         }
     }
 
-    public struct RuntimeTypeHandle { }
+    public unsafe struct RuntimeTypeHandle
+    {
+        private IntPtr _value;
+
+        internal RuntimeTypeHandle(EETypePtr eeType)
+        {
+            _value = (IntPtr)eeType.Value;
+        }
+
+        internal EEType* EEType => (EEType*)(void*)_value;
+
+        internal bool IsNull => _value == IntPtr.Zero;
+    }
     public struct RuntimeMethodHandle { }
     public struct RuntimeFieldHandle { }
 
@@ -1669,6 +1749,8 @@ namespace Internal.Runtime
 
     internal enum ReflectionMapBlob
     {
+        TypeMap = 1,
+        CommonFixupsTable = 8,
         EmbeddedMetadata = 13,
         BlobIdStackTraceMethodRvaToTokenMapping = 27,
     }
@@ -1720,6 +1802,629 @@ namespace Internal.Runtime
         }
     }
 
+}
+
+namespace Internal.Metadata.NativeFormat
+{
+    public sealed unsafe partial class MetadataReader
+    {
+        private const byte MetadataHandleConstantString = 0x1a;
+        private const byte MetadataHandleMethod = 0x28;
+        private const byte MetadataHandleNamespaceDefinition = 0x2f;
+        private const byte MetadataHandleNamespaceReference = 0x30;
+        private const byte MetadataHandleMemberReference = 0x27;
+        private const byte MetadataHandleQualifiedMethod = 0x36;
+        private const byte MetadataHandleTypeDefinition = 0x3a;
+        private const byte MetadataHandleTypeReference = 0x3d;
+
+        private readonly byte* _nativeMetadata;
+        private readonly byte* _nativeMetadataEnd;
+
+        public MetadataReader(IntPtr pBuffer, int cbBuffer)
+        {
+            _nativeMetadata = (byte*)pBuffer;
+            _nativeMetadataEnd = _nativeMetadata + cbBuffer;
+        }
+
+        internal bool TryGetTypeFullName(uint token, out string typeName) =>
+            TryFormatTypeName(token, 0, out typeName);
+
+        internal bool TryGetTypeName(uint token, out string typeName) =>
+            TryGetTypeSimpleName(token, out typeName);
+
+        internal bool TryGetTypeNamespace(uint token, out string namespaceName) =>
+            TryGetTypeNamespace(token, 0, out namespaceName);
+
+        internal bool TryFormatMethodName(uint token, out string methodName) =>
+            TryFormatStackTraceMethod(token, out methodName);
+
+        private bool TryFormatStackTraceMethod(uint token, out string methodName)
+        {
+            byte type = (byte)(token >> 24);
+            if (type == MetadataHandleQualifiedMethod)
+                return TryFormatQualifiedMethod(token, out methodName);
+            if (type == MetadataHandleMemberReference)
+                return TryFormatMemberReference(token, out methodName);
+
+            methodName = null;
+            return false;
+        }
+
+        private bool TryFormatQualifiedMethod(uint token, out string methodName)
+        {
+            methodName = null;
+            if (!TryGetMetadataCursor(token, MetadataHandleQualifiedMethod, out byte* cursor) ||
+                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleMethod, out uint methodToken) ||
+                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleTypeDefinition, out uint typeToken) ||
+                !TryReadMethodName(methodToken, out string name) ||
+                !TryFormatTypeName(typeToken, 0, out string typeName))
+                return false;
+
+            methodName = typeName.Length == 0 ? name + "()" : typeName + "." + name + "()";
+            return true;
+        }
+
+        private bool TryFormatMemberReference(uint token, out string methodName)
+        {
+            methodName = null;
+            if (!TryGetMetadataCursor(token, MetadataHandleMemberReference, out byte* cursor) ||
+                !TryReadMetadataHandle(ref cursor, out uint parentTypeToken) ||
+                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleConstantString, out uint nameToken) ||
+                !TryReadMetadataHandle(ref cursor, out _) ||
+                !TryReadMetadataString(nameToken, out string name) ||
+                !TryFormatTypeName(parentTypeToken, 0, out string typeName))
+                return false;
+
+            methodName = typeName.Length == 0 ? name + "()" : typeName + "." + name + "()";
+            return true;
+        }
+
+        private bool TryReadMethodName(uint token, out string methodName)
+        {
+            methodName = null;
+            if (!TryGetMetadataCursor(token, MetadataHandleMethod, out byte* cursor) ||
+                !TryReadMetadataUnsigned(ref cursor, out _) ||
+                !TryReadMetadataUnsigned(ref cursor, out _) ||
+                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleConstantString, out uint nameToken))
+                return false;
+
+            return TryReadMetadataString(nameToken, out methodName);
+        }
+
+        private bool TryGetTypeSimpleName(uint token, out string typeName)
+        {
+            typeName = null;
+            byte type = (byte)(token >> 24);
+            if (type == MetadataHandleTypeDefinition)
+            {
+                return TryReadTypeDefinition(token, out _, out uint nameToken, out _) &&
+                    TryReadMetadataString(nameToken, out typeName);
+            }
+
+            if (type == MetadataHandleTypeReference)
+            {
+                return TryReadTypeReference(token, out _, out uint nameToken) &&
+                    TryReadMetadataString(nameToken, out typeName);
+            }
+
+            return false;
+        }
+
+        private bool TryGetTypeNamespace(uint token, int depth, out string namespaceName)
+        {
+            namespaceName = null;
+            if (depth == 16)
+                return false;
+
+            byte type = (byte)(token >> 24);
+            if (type == MetadataHandleTypeDefinition)
+            {
+                if (!TryReadTypeDefinition(token, out uint namespaceToken, out _, out uint enclosingTypeToken))
+                    return false;
+
+                if ((enclosingTypeToken >> 24) == MetadataHandleTypeDefinition)
+                    return TryGetTypeNamespace(enclosingTypeToken, depth + 1, out namespaceName);
+
+                return TryFormatNamespaceName(namespaceToken, depth, out namespaceName);
+            }
+
+            if (type == MetadataHandleTypeReference)
+            {
+                if (!TryReadTypeReference(token, out uint parentToken, out _))
+                    return false;
+
+                if ((parentToken >> 24) == MetadataHandleTypeReference)
+                    return TryGetTypeNamespace(parentToken, depth + 1, out namespaceName);
+
+                return TryFormatNamespaceName(parentToken, depth, out namespaceName);
+            }
+
+            return false;
+        }
+
+        private bool TryFormatTypeName(uint token, int depth, out string typeName)
+        {
+            typeName = null;
+            if (depth == 16)
+                return false;
+
+            byte type = (byte)(token >> 24);
+            if (type == MetadataHandleTypeReference)
+                return TryFormatTypeReferenceName(token, depth, out typeName);
+
+            if (type != MetadataHandleTypeDefinition ||
+                !TryReadTypeDefinition(token, out uint namespaceToken, out uint nameToken, out uint enclosingTypeToken) ||
+                !TryReadMetadataString(nameToken, out string name))
+                return false;
+
+            if ((enclosingTypeToken >> 24) == MetadataHandleTypeDefinition &&
+                TryFormatTypeName(enclosingTypeToken, depth + 1, out string enclosingTypeName))
+            {
+                typeName = enclosingTypeName + "+" + name;
+                return true;
+            }
+
+            if (TryFormatNamespaceName(namespaceToken, depth, out string namespaceName) && namespaceName.Length != 0)
+                typeName = namespaceName + "." + name;
+            else
+                typeName = name;
+
+            return true;
+        }
+
+        private bool TryFormatTypeReferenceName(uint token, int depth, out string typeName)
+        {
+            typeName = null;
+            if (!TryReadTypeReference(token, out uint parentToken, out uint nameToken) ||
+                !TryReadMetadataString(nameToken, out string name))
+                return false;
+
+            byte parentType = (byte)(parentToken >> 24);
+            if (parentType == MetadataHandleTypeReference &&
+                TryFormatTypeReferenceName(parentToken, depth + 1, out string enclosingTypeName))
+            {
+                typeName = enclosingTypeName + "+" + name;
+                return true;
+            }
+
+            if (TryFormatNamespaceName(parentToken, depth, out string namespaceName) && namespaceName.Length != 0)
+                typeName = namespaceName + "." + name;
+            else
+                typeName = name;
+
+            return true;
+        }
+
+        private bool TryReadTypeDefinition(
+            uint token,
+            out uint namespaceToken,
+            out uint nameToken,
+            out uint enclosingTypeToken)
+        {
+            namespaceToken = 0;
+            nameToken = 0;
+            enclosingTypeToken = 0;
+            if (!TryGetMetadataCursor(token, MetadataHandleTypeDefinition, out byte* cursor) ||
+                !TryReadMetadataUnsigned(ref cursor, out _) ||
+                !TryReadMetadataHandle(ref cursor, out _) ||
+                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleNamespaceDefinition, out namespaceToken) ||
+                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleConstantString, out nameToken) ||
+                !TryReadMetadataUnsigned(ref cursor, out _) ||
+                !TryReadMetadataUnsigned(ref cursor, out _) ||
+                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleTypeDefinition, out enclosingTypeToken))
+                return false;
+
+            return true;
+        }
+
+        private bool TryReadTypeReference(uint token, out uint parentToken, out uint nameToken)
+        {
+            parentToken = 0;
+            nameToken = 0;
+            if (!TryGetMetadataCursor(token, MetadataHandleTypeReference, out byte* cursor) ||
+                !TryReadMetadataHandle(ref cursor, out parentToken) ||
+                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleConstantString, out nameToken))
+                return false;
+
+            return true;
+        }
+
+        private bool TryFormatNamespaceName(uint token, int depth, out string namespaceName)
+        {
+            namespaceName = string.Empty;
+            if (token == 0)
+                return true;
+
+            byte type = (byte)(token >> 24);
+            if (depth == 16)
+                return false;
+
+            if (type != MetadataHandleNamespaceDefinition && type != MetadataHandleNamespaceReference)
+                return true;
+
+            if (!TryGetMetadataCursor(token, type, out byte* cursor) ||
+                !TryReadMetadataHandle(ref cursor, out uint parentToken) ||
+                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleConstantString, out uint nameToken) ||
+                !TryReadMetadataString(nameToken, out string name) ||
+                !TryFormatNamespaceName(parentToken, depth + 1, out string parentName))
+                return false;
+
+            namespaceName = parentName.Length == 0 ? name : parentName + "." + name;
+            return true;
+        }
+
+        private bool TryReadMetadataString(uint token, out string value)
+        {
+            value = null;
+            if (token == 0)
+            {
+                value = string.Empty;
+                return true;
+            }
+
+            if (!TryGetMetadataCursor(token, MetadataHandleConstantString, out byte* cursor) ||
+                !TryReadMetadataUnsigned(ref cursor, out uint byteCount) ||
+                byteCount > int.MaxValue || cursor + byteCount > _nativeMetadataEnd)
+                return false;
+
+            byte[] bytes = new byte[byteCount];
+            for (int i = 0; i < bytes.Length; i++)
+                bytes[i] = cursor[i];
+
+            value = System.Text.Encoding.UTF8.GetString(bytes);
+            return true;
+        }
+
+        private bool TryGetMetadataCursor(uint token, byte expectedType, out byte* cursor)
+        {
+            cursor = null;
+            if ((token >> 24) != expectedType || _nativeMetadata == null || _nativeMetadataEnd <= _nativeMetadata)
+                return false;
+
+            uint offset = token & 0x00FFFFFF;
+            if (offset >= (uint)(_nativeMetadataEnd - _nativeMetadata))
+                return false;
+
+            cursor = _nativeMetadata + offset;
+            return true;
+        }
+
+        private bool TryReadMetadataHandle(ref byte* cursor, out uint token)
+        {
+            token = 0;
+            if (!TryReadMetadataUnsigned(ref cursor, out uint value))
+                return false;
+
+            token = ((value & 0xFF) << 24) | (value >> 8);
+            return true;
+        }
+
+        private bool TryReadMetadataTypedHandle(ref byte* cursor, byte type, out uint token)
+        {
+            token = 0;
+            if (!TryReadMetadataUnsigned(ref cursor, out uint offset))
+                return false;
+
+            token = offset == 0 ? 0u : ((uint)type << 24) | offset;
+            return true;
+        }
+
+        private bool TryReadMetadataUnsigned(ref byte* cursor, out uint value)
+        {
+            value = 0;
+            if (cursor >= _nativeMetadataEnd)
+                return false;
+
+            byte first = *cursor;
+            if ((first & 1) == 0)
+            {
+                value = (uint)(first >> 1);
+                cursor += 1;
+                return true;
+            }
+
+            if ((first & 2) == 0)
+            {
+                if (cursor + 1 >= _nativeMetadataEnd)
+                    return false;
+                value = (uint)((first >> 2) | (cursor[1] << 6));
+                cursor += 2;
+                return true;
+            }
+
+            if ((first & 4) == 0)
+            {
+                if (cursor + 2 >= _nativeMetadataEnd)
+                    return false;
+                value = (uint)((first >> 3) | (cursor[1] << 5) | (cursor[2] << 13));
+                cursor += 3;
+                return true;
+            }
+
+            if ((first & 8) == 0)
+            {
+                if (cursor + 3 >= _nativeMetadataEnd)
+                    return false;
+                value = (uint)((first >> 4) | (cursor[1] << 4) | (cursor[2] << 12) | (cursor[3] << 20));
+                cursor += 4;
+                return true;
+            }
+
+            if ((first & 16) != 0 || cursor + 4 >= _nativeMetadataEnd)
+                return false;
+
+            value = *(uint*)(cursor + 1);
+            cursor += 5;
+            return true;
+        }
+    }
+}
+
+namespace Internal.StackTraceMetadata
+{
+    internal static unsafe class StackTraceMetadata
+    {
+        private static byte* s_imageBase;
+        private static Internal.Metadata.NativeFormat.MetadataReader s_metadataReader;
+        private static byte* s_methodRvaToTokenMap;
+        private static byte* s_methodRvaToTokenMapEnd;
+
+        internal static void Initialize(
+            byte* imageBase,
+            Internal.Metadata.NativeFormat.MetadataReader metadataReader,
+            IntPtr methodRvaToTokenMapStart,
+            IntPtr methodRvaToTokenMapEnd)
+        {
+            s_imageBase = imageBase;
+            s_metadataReader = metadataReader;
+            s_methodRvaToTokenMap = (byte*)methodRvaToTokenMapStart;
+            s_methodRvaToTokenMapEnd = (byte*)methodRvaToTokenMapEnd;
+        }
+
+        public static string GetMethodNameFromStartAddressIfAvailable(IntPtr methodStartAddress)
+        {
+            if (s_imageBase == null || methodStartAddress == IntPtr.Zero || s_metadataReader == null ||
+                s_methodRvaToTokenMap == null || s_methodRvaToTokenMapEnd <= s_methodRvaToTokenMap)
+                return null;
+
+            uint methodRva = (uint)((byte*)methodStartAddress - s_imageBase);
+
+            for (System.Runtime.StackTraceMethodMapEntry* entry = (System.Runtime.StackTraceMethodMapEntry*)s_methodRvaToTokenMap;
+                (byte*)(entry + 1) <= s_methodRvaToTokenMapEnd;
+                entry++)
+            {
+                byte* mappedMethodAddress = (byte*)entry + entry->MethodStartRelPtr;
+                if ((uint)(mappedMethodAddress - s_imageBase) != methodRva)
+                    continue;
+
+                return s_metadataReader.TryFormatMethodName(unchecked((uint)entry->MetadataToken), out string methodName)
+                    ? methodName
+                    : null;
+            }
+
+            return null;
+        }
+    }
+}
+
+namespace Internal.Runtime.TypeLoader
+{
+    public sealed unsafe partial class TypeLoaderEnvironment
+    {
+        public static TypeLoaderEnvironment Instance { get; } = new TypeLoaderEnvironment();
+
+        private byte* _typeMap;
+        private byte* _typeMapEnd;
+        private byte* _commonFixups;
+        private byte* _commonFixupsEnd;
+        private Internal.Metadata.NativeFormat.MetadataReader _metadataReader;
+
+        internal void Initialize(
+            Internal.Metadata.NativeFormat.MetadataReader metadataReader,
+            IntPtr typeMapStart,
+            IntPtr typeMapEnd,
+            IntPtr commonFixupsStart,
+            IntPtr commonFixupsEnd)
+        {
+            _metadataReader = metadataReader;
+            _typeMap = (byte*)typeMapStart;
+            _typeMapEnd = (byte*)typeMapEnd;
+            _commonFixups = (byte*)commonFixupsStart;
+            _commonFixupsEnd = (byte*)commonFixupsEnd;
+        }
+
+        internal bool TryGetTypeFullName(EEType* eeType, out string typeName)
+        {
+            typeName = null;
+            return _metadataReader != null && TryGetMetadataForNamedType(eeType, out uint token) &&
+                _metadataReader.TryGetTypeFullName(token, out typeName);
+        }
+
+        internal bool TryGetTypeName(EEType* eeType, out string typeName)
+        {
+            typeName = null;
+            return _metadataReader != null && TryGetMetadataForNamedType(eeType, out uint token) &&
+                _metadataReader.TryGetTypeName(token, out typeName);
+        }
+
+        internal bool TryGetTypeNamespace(EEType* eeType, out string namespaceName)
+        {
+            namespaceName = null;
+            return _metadataReader != null && TryGetMetadataForNamedType(eeType, out uint token) &&
+                _metadataReader.TryGetTypeNamespace(token, out namespaceName);
+        }
+
+        private bool TryGetMetadataForNamedType(EEType* eeType, out uint metadataToken)
+        {
+            metadataToken = 0;
+            if (eeType == null || _typeMap == null || _typeMapEnd <= _typeMap ||
+                _commonFixups == null || _commonFixupsEnd <= _commonFixups)
+                return false;
+
+            byte header = *_typeMap;
+            int entryIndexSize = header & 3;
+            int bucketShift = header >> 2;
+            if (entryIndexSize > 2 || bucketShift > 31)
+                return false;
+
+            uint bucketMask = bucketShift == 31 ? 0x7FFFFFFFu : (1u << bucketShift) - 1;
+            uint indexEntrySize = 1u << entryIndexSize;
+            byte* tableBase = _typeMap + 1;
+            ulong indexTableSize = ((ulong)bucketMask + 2) * indexEntrySize;
+            if (tableBase + indexTableSize > _typeMapEnd)
+                return false;
+
+            uint typeHashCode = eeType->HashCode;
+            uint bucket = (typeHashCode >> 8) & bucketMask;
+            uint start = ReadIndex(tableBase + (ulong)bucket * indexEntrySize, entryIndexSize);
+            uint end = ReadIndex(tableBase + ((ulong)bucket + 1) * indexEntrySize, entryIndexSize);
+            if (end < start || tableBase + end > _typeMapEnd)
+                return false;
+
+            byte* entry = tableBase + start;
+            byte* entryEnd = tableBase + end;
+            byte lowHashCode = (byte)typeHashCode;
+            uint fixupCount = (uint)((_commonFixupsEnd - _commonFixups) / sizeof(int));
+            while (entry < entryEnd)
+            {
+                byte entryLowHashCode = *entry++;
+                if (entryLowHashCode > lowHashCode)
+                    break;
+
+                byte* relativeOffset = entry;
+                if (!TryReadSigned(ref entry, entryEnd, out int delta))
+                    return false;
+
+                if (entryLowHashCode != lowHashCode)
+                    continue;
+
+                byte* value = relativeOffset + delta;
+                if (value < _typeMap || value >= _typeMapEnd ||
+                    !TryReadUnsigned(ref value, _typeMapEnd, out uint fixupIndex) ||
+                    !TryReadUnsigned(ref value, _typeMapEnd, out uint token) ||
+                    fixupIndex >= fixupCount)
+                    return false;
+
+                int* fixup = (int*)_commonFixups + fixupIndex;
+                EEType* candidate = (EEType*)((byte*)fixup + *fixup);
+                if (candidate == eeType)
+                {
+                    metadataToken = token;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static uint ReadIndex(byte* address, int entryIndexSize)
+        {
+            if (entryIndexSize == 0)
+                return *address;
+            if (entryIndexSize == 1)
+                return (uint)(address[0] | (address[1] << 8));
+
+            return (uint)(address[0] | (address[1] << 8) | (address[2] << 16) | (address[3] << 24));
+        }
+
+        private static bool TryReadUnsigned(ref byte* cursor, byte* end, out uint value)
+        {
+            value = 0;
+            if (cursor >= end)
+                return false;
+
+            byte first = *cursor;
+            if ((first & 1) == 0)
+            {
+                value = (uint)(first >> 1);
+                cursor += 1;
+                return true;
+            }
+
+            if ((first & 2) == 0)
+            {
+                if (cursor + 1 >= end)
+                    return false;
+                value = (uint)((first >> 2) | (cursor[1] << 6));
+                cursor += 2;
+                return true;
+            }
+
+            if ((first & 4) == 0)
+            {
+                if (cursor + 2 >= end)
+                    return false;
+                value = (uint)((first >> 3) | (cursor[1] << 5) | (cursor[2] << 13));
+                cursor += 3;
+                return true;
+            }
+
+            if ((first & 8) == 0)
+            {
+                if (cursor + 3 >= end)
+                    return false;
+                value = (uint)((first >> 4) | (cursor[1] << 4) | (cursor[2] << 12) | (cursor[3] << 20));
+                cursor += 4;
+                return true;
+            }
+
+            if ((first & 16) != 0 || cursor + 4 >= end)
+                return false;
+
+            value = *(uint*)(cursor + 1);
+            cursor += 5;
+            return true;
+        }
+
+        private static bool TryReadSigned(ref byte* cursor, byte* end, out int value)
+        {
+            value = 0;
+            if (cursor >= end)
+                return false;
+
+            int first = *cursor;
+            if ((first & 1) == 0)
+            {
+                value = ((sbyte)first) >> 1;
+                cursor += 1;
+                return true;
+            }
+
+            if ((first & 2) == 0)
+            {
+                if (cursor + 1 >= end)
+                    return false;
+                value = (first >> 2) | ((sbyte)cursor[1] << 6);
+                cursor += 2;
+                return true;
+            }
+
+            if ((first & 4) == 0)
+            {
+                if (cursor + 2 >= end)
+                    return false;
+                value = (first >> 3) | (cursor[1] << 5) | ((sbyte)cursor[2] << 13);
+                cursor += 3;
+                return true;
+            }
+
+            if ((first & 8) == 0)
+            {
+                if (cursor + 3 >= end)
+                    return false;
+                value = (first >> 4) | (cursor[1] << 4) | (cursor[2] << 12) | ((sbyte)cursor[3] << 20);
+                cursor += 4;
+                return true;
+            }
+
+            if ((first & 16) != 0 || cursor + 4 >= end)
+                return false;
+
+            value = *(int*)(cursor + 1);
+            cursor += 5;
+            return true;
+        }
+    }
 }
 
 namespace System.Runtime
@@ -1791,10 +2496,6 @@ namespace System.Runtime
         internal static byte* s_imageBase;
         internal static RuntimeFunction* s_exceptionTable;
         internal static int s_runtimeFunctionCount;
-        private static byte* s_nativeMetadata;
-        private static byte* s_nativeMetadataEnd;
-        private static byte* s_stackTraceMethodMap;
-        private static byte* s_stackTraceMethodMapEnd;
         private static readonly ActiveExceptionState[] s_activeExceptions = new ActiveExceptionState[64];
         private static int s_activeExceptionCount;
 
@@ -1816,15 +2517,6 @@ namespace System.Runtime
         private const byte EhClauseTyped = 0;
         private const byte EhClauseFault = 1;
         private const byte EhClauseFilter = 2;
-
-        private const byte MetadataHandleConstantString = 0x1a;
-        private const byte MetadataHandleMethod = 0x28;
-        private const byte MetadataHandleNamespaceDefinition = 0x2f;
-        private const byte MetadataHandleNamespaceReference = 0x30;
-        private const byte MetadataHandleMemberReference = 0x27;
-        private const byte MetadataHandleQualifiedMethod = 0x36;
-        private const byte MetadataHandleTypeDefinition = 0x3a;
-        private const byte MetadataHandleTypeReference = 0x3d;
 
         // RhpThrowEx is the native entry point in ExceptionHandling.asm.
         // This managed method has the CoreRT name and performs the metadata
@@ -1920,7 +2612,7 @@ namespace System.Runtime
 
         private static void ReportUnhandledException(object exception, ref ExInfo exInfo)
         {
-            Console.WriteLine("Unhandled exception: " + ((Exception)exception).Message);
+            Console.WriteLine("Unhandled exception: " + exception.GetType().ToString() + ": " + ((Exception)exception).Message);
             for (int depth = 0; depth < 64 && exInfo.ControlPC != null; depth++)
             {
                 byte* controlPC = exInfo.ControlPC;
@@ -1941,18 +2633,6 @@ namespace System.Runtime
             }
         }
 
-        internal static void InitializeStackTraceMetadata(
-            IntPtr nativeMetadataStart,
-            IntPtr nativeMetadataEnd,
-            IntPtr methodMapStart,
-            IntPtr methodMapEnd)
-        {
-            s_nativeMetadata = (byte*)nativeMetadataStart;
-            s_nativeMetadataEnd = (byte*)nativeMetadataEnd;
-            s_stackTraceMethodMap = (byte*)methodMapStart;
-            s_stackTraceMethodMapEnd = (byte*)methodMapEnd;
-        }
-
         private static void WriteStackFrame(byte* controlPC, RuntimeFunction* function)
         {
             ulong address = (ulong)controlPC;
@@ -1961,7 +2641,11 @@ namespace System.Runtime
                 ? null
                 : FindRootFunction(s_exceptionTable, function, s_imageBase);
 
-            if (root != null && TryGetMethodName(root->BeginAddress, out string methodName))
+            string methodName = root == null
+                ? null
+                : Internal.StackTraceMetadata.StackTraceMetadata.GetMethodNameFromStartAddressIfAvailable(
+                    (IntPtr)(s_imageBase + root->BeginAddress));
+            if (methodName != null)
             {
                 uint offset = rva - root->BeginAddress;
                 Console.WriteLine($"   at {methodName} + 0x{offset:X}");
@@ -1969,275 +2653,6 @@ namespace System.Runtime
             }
 
             Console.WriteLine($"   at 0x{address:X16} (RVA 0x{rva:X8})");
-        }
-
-        private static bool TryGetMethodName(uint methodRva, out string methodName)
-        {
-            methodName = null;
-            if (s_nativeMetadata == null || s_nativeMetadataEnd <= s_nativeMetadata ||
-                s_stackTraceMethodMap == null || s_stackTraceMethodMapEnd <= s_stackTraceMethodMap)
-                return false;
-
-            for (StackTraceMethodMapEntry* entry = (StackTraceMethodMapEntry*)s_stackTraceMethodMap;
-                (byte*)(entry + 1) <= s_stackTraceMethodMapEnd;
-                entry++)
-            {
-                byte* methodAddress = (byte*)entry + entry->MethodStartRelPtr;
-                if ((uint)(methodAddress - s_imageBase) != methodRva)
-                    continue;
-
-                return TryFormatStackTraceMethod(unchecked((uint)entry->MetadataToken), out methodName);
-            }
-
-            return false;
-        }
-
-        private static bool TryFormatStackTraceMethod(uint token, out string methodName)
-        {
-            byte type = (byte)(token >> 24);
-            if (type == MetadataHandleQualifiedMethod)
-                return TryFormatQualifiedMethod(token, out methodName);
-            if (type == MetadataHandleMemberReference)
-                return TryFormatMemberReference(token, out methodName);
-
-            methodName = null;
-            return false;
-        }
-
-        private static bool TryFormatQualifiedMethod(uint token, out string methodName)
-        {
-            methodName = null;
-            if (!TryGetMetadataCursor(token, MetadataHandleQualifiedMethod, out byte* cursor) ||
-                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleMethod, out uint methodToken) ||
-                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleTypeDefinition, out uint typeToken) ||
-                !TryReadMethodName(methodToken, out string name) ||
-                !TryFormatTypeName(typeToken, 0, out string typeName))
-                return false;
-
-            methodName = typeName.Length == 0 ? name + "()" : typeName + "." + name + "()";
-            return true;
-        }
-
-        private static bool TryFormatMemberReference(uint token, out string methodName)
-        {
-            methodName = null;
-            if (!TryGetMetadataCursor(token, MetadataHandleMemberReference, out byte* cursor) ||
-                !TryReadMetadataHandle(ref cursor, out uint parentTypeToken) ||
-                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleConstantString, out uint nameToken) ||
-                !TryReadMetadataHandle(ref cursor, out _) ||
-                !TryReadMetadataString(nameToken, out string name) ||
-                !TryFormatTypeName(parentTypeToken, 0, out string typeName))
-                return false;
-
-            methodName = typeName.Length == 0 ? name + "()" : typeName + "." + name + "()";
-            return true;
-        }
-
-        private static bool TryReadMethodName(uint token, out string methodName)
-        {
-            methodName = null;
-            if (!TryGetMetadataCursor(token, MetadataHandleMethod, out byte* cursor) ||
-                !TryReadMetadataUnsigned(ref cursor, out _) ||
-                !TryReadMetadataUnsigned(ref cursor, out _) ||
-                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleConstantString, out uint nameToken))
-                return false;
-
-            return TryReadMetadataString(nameToken, out methodName);
-        }
-
-        private static bool TryFormatTypeName(uint token, int depth, out string typeName)
-        {
-            typeName = null;
-            if (depth == 16)
-                return false;
-
-            byte type = (byte)(token >> 24);
-            if (type == MetadataHandleTypeReference)
-                return TryFormatTypeReferenceName(token, depth, out typeName);
-
-            if (type != MetadataHandleTypeDefinition ||
-                !TryGetMetadataCursor(token, MetadataHandleTypeDefinition, out byte* cursor) ||
-                !TryReadMetadataUnsigned(ref cursor, out _) ||
-                !TryReadMetadataHandle(ref cursor, out _) ||
-                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleNamespaceDefinition, out uint namespaceToken) ||
-                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleConstantString, out uint nameToken) ||
-                !TryReadMetadataUnsigned(ref cursor, out _) ||
-                !TryReadMetadataUnsigned(ref cursor, out _) ||
-                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleTypeDefinition, out uint enclosingTypeToken) ||
-                !TryReadMetadataString(nameToken, out string name))
-                return false;
-
-            if ((enclosingTypeToken >> 24) == MetadataHandleTypeDefinition &&
-                TryFormatTypeName(enclosingTypeToken, depth + 1, out string enclosingTypeName))
-            {
-                typeName = enclosingTypeName + "+" + name;
-                return true;
-            }
-
-            if (TryFormatNamespaceName(namespaceToken, depth, out string namespaceName) && namespaceName.Length != 0)
-                typeName = namespaceName + "." + name;
-            else
-                typeName = name;
-
-            return true;
-        }
-
-        private static bool TryFormatTypeReferenceName(uint token, int depth, out string typeName)
-        {
-            typeName = null;
-            if (!TryGetMetadataCursor(token, MetadataHandleTypeReference, out byte* cursor) ||
-                !TryReadMetadataHandle(ref cursor, out uint parentToken) ||
-                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleConstantString, out uint nameToken) ||
-                !TryReadMetadataString(nameToken, out string name))
-                return false;
-
-            byte parentType = (byte)(parentToken >> 24);
-            if (parentType == MetadataHandleTypeReference &&
-                TryFormatTypeReferenceName(parentToken, depth + 1, out string enclosingTypeName))
-            {
-                typeName = enclosingTypeName + "+" + name;
-                return true;
-            }
-
-            if (TryFormatNamespaceName(parentToken, depth, out string namespaceName) && namespaceName.Length != 0)
-                typeName = namespaceName + "." + name;
-            else
-                typeName = name;
-
-            return true;
-        }
-
-        private static bool TryFormatNamespaceName(uint token, int depth, out string namespaceName)
-        {
-            namespaceName = string.Empty;
-            if (token == 0)
-                return true;
-
-            byte type = (byte)(token >> 24);
-            if (depth == 16)
-                return false;
-
-            if (type != MetadataHandleNamespaceDefinition && type != MetadataHandleNamespaceReference)
-                return true;
-
-            if (
-                !TryGetMetadataCursor(token, type, out byte* cursor) ||
-                !TryReadMetadataHandle(ref cursor, out uint parentToken) ||
-                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleConstantString, out uint nameToken) ||
-                !TryReadMetadataString(nameToken, out string name) ||
-                !TryFormatNamespaceName(parentToken, depth + 1, out string parentName))
-                return false;
-
-            namespaceName = parentName.Length == 0 ? name : parentName + "." + name;
-            return true;
-        }
-
-        private static bool TryReadMetadataString(uint token, out string value)
-        {
-            value = null;
-            if (token == 0)
-            {
-                value = string.Empty;
-                return true;
-            }
-
-            if (!TryGetMetadataCursor(token, MetadataHandleConstantString, out byte* cursor) ||
-                !TryReadMetadataUnsigned(ref cursor, out uint byteCount) ||
-                byteCount > int.MaxValue || cursor + byteCount > s_nativeMetadataEnd)
-                return false;
-
-            byte[] bytes = new byte[byteCount];
-            for (int i = 0; i < bytes.Length; i++)
-                bytes[i] = cursor[i];
-
-            value = System.Text.Encoding.UTF8.GetString(bytes);
-            return true;
-        }
-
-        private static bool TryGetMetadataCursor(uint token, byte expectedType, out byte* cursor)
-        {
-            cursor = null;
-            if ((token >> 24) != expectedType || s_nativeMetadata == null || s_nativeMetadataEnd <= s_nativeMetadata)
-                return false;
-
-            uint offset = token & 0x00FFFFFF;
-            if (offset >= (uint)(s_nativeMetadataEnd - s_nativeMetadata))
-                return false;
-
-            cursor = s_nativeMetadata + offset;
-            return true;
-        }
-
-        private static bool TryReadMetadataHandle(ref byte* cursor, out uint token)
-        {
-            token = 0;
-            if (!TryReadMetadataUnsigned(ref cursor, out uint value))
-                return false;
-
-            token = ((value & 0xFF) << 24) | (value >> 8);
-            return true;
-        }
-
-        private static bool TryReadMetadataTypedHandle(ref byte* cursor, byte type, out uint token)
-        {
-            token = 0;
-            if (!TryReadMetadataUnsigned(ref cursor, out uint offset))
-                return false;
-
-            // NativeFormat serializes a strongly typed handle as its offset only.
-            // The handle type comes from the field being read. In contrast, an
-            // untyped Handle stores its type in the low byte of the encoded value.
-            token = offset == 0 ? 0u : ((uint)type << 24) | offset;
-            return true;
-        }
-
-        private static bool TryReadMetadataUnsigned(ref byte* cursor, out uint value)
-        {
-            value = 0;
-            if (cursor >= s_nativeMetadataEnd)
-                return false;
-
-            byte first = *cursor;
-            if ((first & 1) == 0)
-            {
-                value = (uint)(first >> 1);
-                cursor += 1;
-                return true;
-            }
-
-            if ((first & 2) == 0)
-            {
-                if (cursor + 1 >= s_nativeMetadataEnd)
-                    return false;
-                value = (uint)((first >> 2) | (cursor[1] << 6));
-                cursor += 2;
-                return true;
-            }
-
-            if ((first & 4) == 0)
-            {
-                if (cursor + 2 >= s_nativeMetadataEnd)
-                    return false;
-                value = (uint)((first >> 3) | (cursor[1] << 5) | (cursor[2] << 13));
-                cursor += 3;
-                return true;
-            }
-
-            if ((first & 8) == 0)
-            {
-                if (cursor + 3 >= s_nativeMetadataEnd)
-                    return false;
-                value = (uint)((first >> 4) | (cursor[1] << 4) | (cursor[2] << 12) | (cursor[3] << 20));
-                cursor += 4;
-                return true;
-            }
-
-            if ((first & 16) != 0 || cursor + 4 >= s_nativeMetadataEnd)
-                return false;
-
-            value = *(uint*)(cursor + 1);
-            cursor += 5;
-            return true;
         }
 
         private static bool TryFindHandler(
@@ -3233,6 +3648,10 @@ namespace Internal.Runtime
                 IntPtr nativeMetadataEnd = IntPtr.Zero;
                 IntPtr stackTraceMethodMapStart = IntPtr.Zero;
                 IntPtr stackTraceMethodMapEnd = IntPtr.Zero;
+                IntPtr typeMapStart = IntPtr.Zero;
+                IntPtr typeMapEnd = IntPtr.Zero;
+                IntPtr commonFixupsStart = IntPtr.Zero;
+                IntPtr commonFixupsEnd = IntPtr.Zero;
 
                 if (header->Signature == ReadyToRunHeaderConstants.Signature)
                 {
@@ -3263,17 +3682,40 @@ namespace Internal.Runtime
                             stackTraceMethodMapStart = sections[k].Start;
                             stackTraceMethodMapEnd = sections[k].End;
                         }
+
+                        if (sections[k].SectionId == (ReadyToRunSectionType)(
+                            (int)ReadyToRunSectionType.ReadonlyBlobRegionStart + (int)ReflectionMapBlob.TypeMap))
+                        {
+                            typeMapStart = sections[k].Start;
+                            typeMapEnd = sections[k].End;
+                        }
+
+                        if (sections[k].SectionId == (ReadyToRunSectionType)(
+                            (int)ReadyToRunSectionType.ReadonlyBlobRegionStart + (int)ReflectionMapBlob.CommonFixupsTable))
+                        {
+                            commonFixupsStart = sections[k].Start;
+                            commonFixupsEnd = sections[k].End;
+                        }
                     }
                 }
 
                 EH.s_imageBase = ImageBase;
                 EH.s_exceptionTable = (RuntimeFunction*)ExceptionTable;
                 EH.s_runtimeFunctionCount = (int)(ExceptionTableSize / EH.RuntimeFunctionSize);
-                EH.InitializeStackTraceMetadata(
+                var metadataReader = new Internal.Metadata.NativeFormat.MetadataReader(
                     nativeMetadataStart,
-                    nativeMetadataEnd,
+                    (int)((byte*)nativeMetadataEnd - (byte*)nativeMetadataStart));
+                StackTraceMetadata.StackTraceMetadata.Initialize(
+                    ImageBase,
+                    metadataReader,
                     stackTraceMethodMapStart,
                     stackTraceMethodMapEnd);
+                TypeLoader.TypeLoaderEnvironment.Instance.Initialize(
+                    metadataReader,
+                    typeMapStart,
+                    typeMapEnd,
+                    commonFixupsStart,
+                    commonFixupsEnd);
             }
 
             private static unsafe void RunEagerClassConstructors(IntPtr cctorTableStart, IntPtr cctorTableEnd)
@@ -3417,13 +3859,13 @@ namespace Internal.Runtime.CompilerHelpers
 {
     internal static class LdTokenHelpers
     {
-        private static RuntimeTypeHandle GetRuntimeTypeHandle(IntPtr pEEType) => new RuntimeTypeHandle();
+        private static RuntimeTypeHandle GetRuntimeTypeHandle(IntPtr pEEType) => new RuntimeTypeHandle(new EETypePtr(pEEType));
 
         private static RuntimeMethodHandle GetRuntimeMethodHandle(IntPtr pHandleSignature) => new RuntimeMethodHandle();
 
         private static RuntimeFieldHandle GetRuntimeFieldHandle(IntPtr pHandleSignature) => new RuntimeFieldHandle();
 
-        private static Type GetRuntimeType(IntPtr pEEType) => Type.GetTypeFromHandle(new RuntimeTypeHandle());
+        private static Type GetRuntimeType(IntPtr pEEType) => Type.GetTypeFromEETypePtr(new EETypePtr(pEEType));
     }
 
     // Entry point used by ILC for array constructors emitted as newobj.
