@@ -376,6 +376,25 @@ namespace System
     public abstract class ValueType { }
     public abstract class Enum : ValueType
     {
+        public override unsafe string ToString()
+        {
+            ref byte data = ref GetRawData();
+            EETypeElementType elementType = (EETypeElementType)(((ushort)EEType->Flags & (ushort)EETypeFlags.ElementTypeMask) >> (int)EETypeFlags.ElementTypeShift);
+
+            return elementType switch
+            {
+                EETypeElementType.SByte => Unsafe.As<byte, sbyte>(ref data).ToString(),
+                EETypeElementType.Byte => data.ToString(),
+                EETypeElementType.Int16 => Unsafe.As<byte, short>(ref data).ToString(),
+                EETypeElementType.UInt16 => Unsafe.As<byte, ushort>(ref data).ToString(),
+                EETypeElementType.Int32 => Unsafe.As<byte, int>(ref data).ToString(),
+                EETypeElementType.UInt32 => Unsafe.As<byte, uint>(ref data).ToString(),
+                EETypeElementType.Int64 => Unsafe.As<byte, long>(ref data).ToString(),
+                EETypeElementType.UInt64 => Unsafe.As<byte, ulong>(ref data).ToString(),
+                _ => throw new InvalidOperationException("The enum has an unsupported underlying type."),
+            };
+        }
+
         [Intrinsic]
         public extern bool HasFlag(Enum flag);
     }
