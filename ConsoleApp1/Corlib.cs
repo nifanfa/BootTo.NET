@@ -1667,6 +1667,12 @@ namespace Internal.Runtime
         ReadonlyBlobRegionEnd = 399,
     }
 
+    internal enum ReflectionMapBlob
+    {
+        EmbeddedMetadata = 13,
+        BlobIdStackTraceMethodRvaToTokenMapping = 27,
+    }
+
     internal static class GCStaticRegionConstants
     {
         public const int Uninitialized = 0x1;
@@ -1763,6 +1769,13 @@ namespace System.Runtime
         internal uint UnwindData;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct StackTraceMethodMapEntry
+    {
+        internal int MethodStartRelPtr;
+        internal int MetadataToken;
+    }
+
     internal static unsafe class EH
     {
         private struct ActiveExceptionState
@@ -1778,6 +1791,10 @@ namespace System.Runtime
         internal static byte* s_imageBase;
         internal static RuntimeFunction* s_exceptionTable;
         internal static int s_runtimeFunctionCount;
+        private static byte* s_nativeMetadata;
+        private static byte* s_nativeMetadataEnd;
+        private static byte* s_stackTraceMethodMap;
+        private static byte* s_stackTraceMethodMapEnd;
         private static readonly ActiveExceptionState[] s_activeExceptions = new ActiveExceptionState[64];
         private static int s_activeExceptionCount;
 
@@ -1800,6 +1817,15 @@ namespace System.Runtime
         private const byte EhClauseFault = 1;
         private const byte EhClauseFilter = 2;
 
+        private const byte MetadataHandleConstantString = 0x1a;
+        private const byte MetadataHandleMethod = 0x28;
+        private const byte MetadataHandleNamespaceDefinition = 0x2f;
+        private const byte MetadataHandleNamespaceReference = 0x30;
+        private const byte MetadataHandleMemberReference = 0x27;
+        private const byte MetadataHandleQualifiedMethod = 0x36;
+        private const byte MetadataHandleTypeDefinition = 0x3a;
+        private const byte MetadataHandleTypeReference = 0x3d;
+
         // RhpThrowEx is the native entry point in ExceptionHandling.asm.
         // This managed method has the CoreRT name and performs the metadata
         // lookup before the assembly helper calls the selected funclet.
@@ -1809,16 +1835,21 @@ namespace System.Runtime
             if (exception == null)
                 exception = new Exception("The runtime raised an exception without an exception object.");
 
+            // Handler search unwinds its ExInfo as it walks callers. Keep the
+            // throw-site context intact so an unhandled exception reports the
+            // actual frame where it was raised.
+            ExInfo searchInfo = exInfo;
             if (s_imageBase != null &&
                 s_exceptionTable != null &&
                 s_runtimeFunctionCount > 0 &&
-                TryFindHandler(exception, ref exInfo, 0, out uint clauseIndex))
+                TryFindHandler(exception, ref searchInfo, 0, out uint clauseIndex))
             {
+                exInfo = searchInfo;
                 PushActiveException(exception, ref exInfo, clauseIndex);
                 return;
             }
 
-            Console.WriteLine("Unhandled exception: " + ((Exception)exception).Message);
+            ReportUnhandledException(exception, ref exInfo);
             exInfo.Handler = null;
         }
 
@@ -1830,7 +1861,7 @@ namespace System.Runtime
             if (s_activeExceptionCount == 0)
             {
                 object missingException = new Exception("The runtime attempted to rethrow without an active exception.");
-                Console.WriteLine("Unhandled exception: " + ((Exception)missingException).Message);
+                ReportUnhandledException(missingException, ref exInfo);
                 exInfo.Handler = null;
                 return missingException;
             }
@@ -1844,18 +1875,20 @@ namespace System.Runtime
             // Resume from the logical frame saved when this catch was chosen.
             exInfo = active.ExInfo;
 
+            ExInfo searchInfo = exInfo;
             if (s_imageBase != null &&
                 s_exceptionTable != null &&
                 s_runtimeFunctionCount > 0 &&
-                TryFindHandler(exception, ref exInfo, active.ClauseIndex + 1, out uint clauseIndex))
+                TryFindHandler(exception, ref searchInfo, active.ClauseIndex + 1, out uint clauseIndex))
             {
+                exInfo = searchInfo;
                 s_activeExceptions[activeIndex].Exception = exception;
                 s_activeExceptions[activeIndex].ExInfo = exInfo;
                 s_activeExceptions[activeIndex].ClauseIndex = clauseIndex;
                 return exception;
             }
 
-            Console.WriteLine("Unhandled exception: " + ((Exception)exception).Message);
+            ReportUnhandledException(exception, ref exInfo);
             exInfo.Handler = null;
             return exception;
         }
@@ -1874,7 +1907,7 @@ namespace System.Runtime
         {
             if (s_activeExceptionCount == s_activeExceptions.Length)
             {
-                Console.WriteLine("Unhandled exception: exception nesting is too deep.");
+                ReportUnhandledException(new InvalidProgramException("Exception nesting is too deep."), ref exInfo);
                 exInfo.Handler = null;
                 return;
             }
@@ -1883,6 +1916,328 @@ namespace System.Runtime
             s_activeExceptions[index].Exception = exception;
             s_activeExceptions[index].ExInfo = exInfo;
             s_activeExceptions[index].ClauseIndex = clauseIndex;
+        }
+
+        private static void ReportUnhandledException(object exception, ref ExInfo exInfo)
+        {
+            Console.WriteLine("Unhandled exception: " + ((Exception)exception).Message);
+            for (int depth = 0; depth < 64 && exInfo.ControlPC != null; depth++)
+            {
+                byte* controlPC = exInfo.ControlPC;
+                RuntimeFunction* function = FindRuntimeFunction(
+                    s_exceptionTable,
+                    s_runtimeFunctionCount,
+                    s_imageBase,
+                    controlPC);
+
+                // A return address outside the image has no unwind record. It is
+                // stack data, not another managed frame.
+                if (function == null)
+                    break;
+
+                WriteStackFrame(controlPC, function);
+                if (!UnwindFrame(s_imageBase, function, ref exInfo))
+                    break;
+            }
+        }
+
+        internal static void InitializeStackTraceMetadata(
+            IntPtr nativeMetadataStart,
+            IntPtr nativeMetadataEnd,
+            IntPtr methodMapStart,
+            IntPtr methodMapEnd)
+        {
+            s_nativeMetadata = (byte*)nativeMetadataStart;
+            s_nativeMetadataEnd = (byte*)nativeMetadataEnd;
+            s_stackTraceMethodMap = (byte*)methodMapStart;
+            s_stackTraceMethodMapEnd = (byte*)methodMapEnd;
+        }
+
+        private static void WriteStackFrame(byte* controlPC, RuntimeFunction* function)
+        {
+            ulong address = (ulong)controlPC;
+            uint rva = unchecked((uint)(address - (ulong)s_imageBase));
+            RuntimeFunction* root = function == null
+                ? null
+                : FindRootFunction(s_exceptionTable, function, s_imageBase);
+
+            if (root != null && TryGetMethodName(root->BeginAddress, out string methodName))
+            {
+                uint offset = rva - root->BeginAddress;
+                Console.WriteLine($"   at {methodName} + 0x{offset:X}");
+                return;
+            }
+
+            Console.WriteLine($"   at 0x{address:X16} (RVA 0x{rva:X8})");
+        }
+
+        private static bool TryGetMethodName(uint methodRva, out string methodName)
+        {
+            methodName = null;
+            if (s_nativeMetadata == null || s_nativeMetadataEnd <= s_nativeMetadata ||
+                s_stackTraceMethodMap == null || s_stackTraceMethodMapEnd <= s_stackTraceMethodMap)
+                return false;
+
+            for (StackTraceMethodMapEntry* entry = (StackTraceMethodMapEntry*)s_stackTraceMethodMap;
+                (byte*)(entry + 1) <= s_stackTraceMethodMapEnd;
+                entry++)
+            {
+                byte* methodAddress = (byte*)entry + entry->MethodStartRelPtr;
+                if ((uint)(methodAddress - s_imageBase) != methodRva)
+                    continue;
+
+                return TryFormatStackTraceMethod(unchecked((uint)entry->MetadataToken), out methodName);
+            }
+
+            return false;
+        }
+
+        private static bool TryFormatStackTraceMethod(uint token, out string methodName)
+        {
+            byte type = (byte)(token >> 24);
+            if (type == MetadataHandleQualifiedMethod)
+                return TryFormatQualifiedMethod(token, out methodName);
+            if (type == MetadataHandleMemberReference)
+                return TryFormatMemberReference(token, out methodName);
+
+            methodName = null;
+            return false;
+        }
+
+        private static bool TryFormatQualifiedMethod(uint token, out string methodName)
+        {
+            methodName = null;
+            if (!TryGetMetadataCursor(token, MetadataHandleQualifiedMethod, out byte* cursor) ||
+                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleMethod, out uint methodToken) ||
+                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleTypeDefinition, out uint typeToken) ||
+                !TryReadMethodName(methodToken, out string name) ||
+                !TryFormatTypeName(typeToken, 0, out string typeName))
+                return false;
+
+            methodName = typeName.Length == 0 ? name + "()" : typeName + "." + name + "()";
+            return true;
+        }
+
+        private static bool TryFormatMemberReference(uint token, out string methodName)
+        {
+            methodName = null;
+            if (!TryGetMetadataCursor(token, MetadataHandleMemberReference, out byte* cursor) ||
+                !TryReadMetadataHandle(ref cursor, out uint parentTypeToken) ||
+                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleConstantString, out uint nameToken) ||
+                !TryReadMetadataHandle(ref cursor, out _) ||
+                !TryReadMetadataString(nameToken, out string name) ||
+                !TryFormatTypeName(parentTypeToken, 0, out string typeName))
+                return false;
+
+            methodName = typeName.Length == 0 ? name + "()" : typeName + "." + name + "()";
+            return true;
+        }
+
+        private static bool TryReadMethodName(uint token, out string methodName)
+        {
+            methodName = null;
+            if (!TryGetMetadataCursor(token, MetadataHandleMethod, out byte* cursor) ||
+                !TryReadMetadataUnsigned(ref cursor, out _) ||
+                !TryReadMetadataUnsigned(ref cursor, out _) ||
+                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleConstantString, out uint nameToken))
+                return false;
+
+            return TryReadMetadataString(nameToken, out methodName);
+        }
+
+        private static bool TryFormatTypeName(uint token, int depth, out string typeName)
+        {
+            typeName = null;
+            if (depth == 16)
+                return false;
+
+            byte type = (byte)(token >> 24);
+            if (type == MetadataHandleTypeReference)
+                return TryFormatTypeReferenceName(token, depth, out typeName);
+
+            if (type != MetadataHandleTypeDefinition ||
+                !TryGetMetadataCursor(token, MetadataHandleTypeDefinition, out byte* cursor) ||
+                !TryReadMetadataUnsigned(ref cursor, out _) ||
+                !TryReadMetadataHandle(ref cursor, out _) ||
+                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleNamespaceDefinition, out uint namespaceToken) ||
+                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleConstantString, out uint nameToken) ||
+                !TryReadMetadataUnsigned(ref cursor, out _) ||
+                !TryReadMetadataUnsigned(ref cursor, out _) ||
+                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleTypeDefinition, out uint enclosingTypeToken) ||
+                !TryReadMetadataString(nameToken, out string name))
+                return false;
+
+            if ((enclosingTypeToken >> 24) == MetadataHandleTypeDefinition &&
+                TryFormatTypeName(enclosingTypeToken, depth + 1, out string enclosingTypeName))
+            {
+                typeName = enclosingTypeName + "+" + name;
+                return true;
+            }
+
+            if (TryFormatNamespaceName(namespaceToken, depth, out string namespaceName) && namespaceName.Length != 0)
+                typeName = namespaceName + "." + name;
+            else
+                typeName = name;
+
+            return true;
+        }
+
+        private static bool TryFormatTypeReferenceName(uint token, int depth, out string typeName)
+        {
+            typeName = null;
+            if (!TryGetMetadataCursor(token, MetadataHandleTypeReference, out byte* cursor) ||
+                !TryReadMetadataHandle(ref cursor, out uint parentToken) ||
+                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleConstantString, out uint nameToken) ||
+                !TryReadMetadataString(nameToken, out string name))
+                return false;
+
+            byte parentType = (byte)(parentToken >> 24);
+            if (parentType == MetadataHandleTypeReference &&
+                TryFormatTypeReferenceName(parentToken, depth + 1, out string enclosingTypeName))
+            {
+                typeName = enclosingTypeName + "+" + name;
+                return true;
+            }
+
+            if (TryFormatNamespaceName(parentToken, depth, out string namespaceName) && namespaceName.Length != 0)
+                typeName = namespaceName + "." + name;
+            else
+                typeName = name;
+
+            return true;
+        }
+
+        private static bool TryFormatNamespaceName(uint token, int depth, out string namespaceName)
+        {
+            namespaceName = string.Empty;
+            if (token == 0)
+                return true;
+
+            byte type = (byte)(token >> 24);
+            if (depth == 16)
+                return false;
+
+            if (type != MetadataHandleNamespaceDefinition && type != MetadataHandleNamespaceReference)
+                return true;
+
+            if (
+                !TryGetMetadataCursor(token, type, out byte* cursor) ||
+                !TryReadMetadataHandle(ref cursor, out uint parentToken) ||
+                !TryReadMetadataTypedHandle(ref cursor, MetadataHandleConstantString, out uint nameToken) ||
+                !TryReadMetadataString(nameToken, out string name) ||
+                !TryFormatNamespaceName(parentToken, depth + 1, out string parentName))
+                return false;
+
+            namespaceName = parentName.Length == 0 ? name : parentName + "." + name;
+            return true;
+        }
+
+        private static bool TryReadMetadataString(uint token, out string value)
+        {
+            value = null;
+            if (token == 0)
+            {
+                value = string.Empty;
+                return true;
+            }
+
+            if (!TryGetMetadataCursor(token, MetadataHandleConstantString, out byte* cursor) ||
+                !TryReadMetadataUnsigned(ref cursor, out uint byteCount) ||
+                byteCount > int.MaxValue || cursor + byteCount > s_nativeMetadataEnd)
+                return false;
+
+            byte[] bytes = new byte[byteCount];
+            for (int i = 0; i < bytes.Length; i++)
+                bytes[i] = cursor[i];
+
+            value = System.Text.Encoding.UTF8.GetString(bytes);
+            return true;
+        }
+
+        private static bool TryGetMetadataCursor(uint token, byte expectedType, out byte* cursor)
+        {
+            cursor = null;
+            if ((token >> 24) != expectedType || s_nativeMetadata == null || s_nativeMetadataEnd <= s_nativeMetadata)
+                return false;
+
+            uint offset = token & 0x00FFFFFF;
+            if (offset >= (uint)(s_nativeMetadataEnd - s_nativeMetadata))
+                return false;
+
+            cursor = s_nativeMetadata + offset;
+            return true;
+        }
+
+        private static bool TryReadMetadataHandle(ref byte* cursor, out uint token)
+        {
+            token = 0;
+            if (!TryReadMetadataUnsigned(ref cursor, out uint value))
+                return false;
+
+            token = ((value & 0xFF) << 24) | (value >> 8);
+            return true;
+        }
+
+        private static bool TryReadMetadataTypedHandle(ref byte* cursor, byte type, out uint token)
+        {
+            token = 0;
+            if (!TryReadMetadataUnsigned(ref cursor, out uint offset))
+                return false;
+
+            // NativeFormat serializes a strongly typed handle as its offset only.
+            // The handle type comes from the field being read. In contrast, an
+            // untyped Handle stores its type in the low byte of the encoded value.
+            token = offset == 0 ? 0u : ((uint)type << 24) | offset;
+            return true;
+        }
+
+        private static bool TryReadMetadataUnsigned(ref byte* cursor, out uint value)
+        {
+            value = 0;
+            if (cursor >= s_nativeMetadataEnd)
+                return false;
+
+            byte first = *cursor;
+            if ((first & 1) == 0)
+            {
+                value = (uint)(first >> 1);
+                cursor += 1;
+                return true;
+            }
+
+            if ((first & 2) == 0)
+            {
+                if (cursor + 1 >= s_nativeMetadataEnd)
+                    return false;
+                value = (uint)((first >> 2) | (cursor[1] << 6));
+                cursor += 2;
+                return true;
+            }
+
+            if ((first & 4) == 0)
+            {
+                if (cursor + 2 >= s_nativeMetadataEnd)
+                    return false;
+                value = (uint)((first >> 3) | (cursor[1] << 5) | (cursor[2] << 13));
+                cursor += 3;
+                return true;
+            }
+
+            if ((first & 8) == 0)
+            {
+                if (cursor + 3 >= s_nativeMetadataEnd)
+                    return false;
+                value = (uint)((first >> 4) | (cursor[1] << 4) | (cursor[2] << 12) | (cursor[3] << 20));
+                cursor += 4;
+                return true;
+            }
+
+            if ((first & 16) != 0 || cursor + 4 >= s_nativeMetadataEnd)
+                return false;
+
+            value = *(uint*)(cursor + 1);
+            cursor += 5;
+            return true;
         }
 
         private static bool TryFindHandler(
@@ -2874,6 +3229,10 @@ namespace Internal.Runtime
             {
                 var header = (ReadyToRunHeader*)*(IntPtr*)Modules;
                 var sections = (ModuleInfoRow*)(header + 1);
+                IntPtr nativeMetadataStart = IntPtr.Zero;
+                IntPtr nativeMetadataEnd = IntPtr.Zero;
+                IntPtr stackTraceMethodMapStart = IntPtr.Zero;
+                IntPtr stackTraceMethodMapEnd = IntPtr.Zero;
 
                 if (header->Signature == ReadyToRunHeaderConstants.Signature)
                 {
@@ -2890,12 +3249,31 @@ namespace Internal.Runtime
 
                         if (sections[k].SectionId == ReadyToRunSectionType.EagerCctor)
                             RunEagerClassConstructors(sections[k].Start, sections[k].End);
+
+                        if (sections[k].SectionId == (ReadyToRunSectionType)(
+                            (int)ReadyToRunSectionType.ReadonlyBlobRegionStart + (int)ReflectionMapBlob.EmbeddedMetadata))
+                        {
+                            nativeMetadataStart = sections[k].Start;
+                            nativeMetadataEnd = sections[k].End;
+                        }
+
+                        if (sections[k].SectionId == (ReadyToRunSectionType)(
+                            (int)ReadyToRunSectionType.ReadonlyBlobRegionStart + (int)ReflectionMapBlob.BlobIdStackTraceMethodRvaToTokenMapping))
+                        {
+                            stackTraceMethodMapStart = sections[k].Start;
+                            stackTraceMethodMapEnd = sections[k].End;
+                        }
                     }
                 }
 
                 EH.s_imageBase = ImageBase;
                 EH.s_exceptionTable = (RuntimeFunction*)ExceptionTable;
                 EH.s_runtimeFunctionCount = (int)(ExceptionTableSize / EH.RuntimeFunctionSize);
+                EH.InitializeStackTraceMetadata(
+                    nativeMetadataStart,
+                    nativeMetadataEnd,
+                    stackTraceMethodMapStart,
+                    stackTraceMethodMapEnd);
             }
 
             private static unsafe void RunEagerClassConstructors(IntPtr cctorTableStart, IntPtr cctorTableEnd)
