@@ -25,7 +25,7 @@ QEMU mounts the bundled UEFI variable template through a temporary snapshot. Var
 
 # Tested and working on real hardware
 <p align="center">
-  <img alt="d7b1ceeba65ec34d3c0600ed842a86ff_720" src="https://github.com/user-attachments/assets/2d0dfe09-6878-4739-9d61-02507890fe31" />
+  <img alt="image" src="https://github.com/user-attachments/assets/2e3c3f70-965b-4dfc-b75f-e52e832f4c99" />
 </p>
 
 ## NES Emulator
