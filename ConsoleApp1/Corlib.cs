@@ -467,7 +467,52 @@ namespace System
         public extern bool HasFlag(Enum flag);
     }
 
-    public struct Nullable<T> where T : struct { }
+    // Nullable<T> has special boxing support in the runtime, so it must not
+    // implement interfaces: T itself is not required to implement them.
+    public struct Nullable<T> where T : struct
+    {
+        private readonly bool hasValue;
+        internal T value;
+
+        public Nullable(T value)
+        {
+            this.value = value;
+            hasValue = true;
+        }
+
+        public bool HasValue => hasValue;
+
+        public T Value
+        {
+            get
+            {
+                if (!hasValue)
+                    throw new InvalidOperationException("Nullable object must have a value.");
+
+                return value;
+            }
+        }
+
+        public T GetValueOrDefault() => value;
+
+        public T GetValueOrDefault(T defaultValue) => hasValue ? value : defaultValue;
+
+        public override bool Equals(object other)
+        {
+            if (!hasValue)
+                return other == null;
+
+            return other != null && value.Equals(other);
+        }
+
+        public override int GetHashCode() => hasValue ? value.GetHashCode() : 0;
+
+        public override string ToString() => hasValue ? value.ToString() : string.Empty;
+
+        public static implicit operator Nullable<T>(T value) => new Nullable<T>(value);
+
+        public static explicit operator T(Nullable<T> value) => value.Value;
+    }
 
     public static partial class Convert
     {
@@ -2612,7 +2657,7 @@ namespace System.Runtime
 
         private static void ReportUnhandledException(object exception, ref ExInfo exInfo)
         {
-            Console.WriteLine("Unhandled exception: " + exception.GetType().ToString() + ": " + ((Exception)exception).Message);
+            Console.WriteLine("Unhandled exception. " + exception.GetType().ToString() + ": " + ((Exception)exception).Message);
             for (int depth = 0; depth < 64 && exInfo.ControlPC != null; depth++)
             {
                 byte* controlPC = exInfo.ControlPC;
@@ -2959,7 +3004,10 @@ namespace System.Runtime
 
             ulong returnAddress = *(ulong*)stackPointer;
             stackPointer += 8;
-            exInfo.ControlPC = (byte*)returnAddress;
+            // A return address points immediately after the call instruction.
+            // EH regions are half-open, so use the call site when matching the
+            // caller's try range, as CoreRT's stack walker does.
+            exInfo.ControlPC = (byte*)(returnAddress - 1);
             exInfo.StackPointer = (byte*)stackPointer;
             return returnAddress != 0;
         }

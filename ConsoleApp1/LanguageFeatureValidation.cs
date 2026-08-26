@@ -35,6 +35,16 @@ public static partial class LanguageFeatureValidation
         int Value { get; }
     }
 
+    private interface IExplicitFeature
+    {
+        int Add(int value);
+    }
+
+    private interface IGenericFeature<T>
+    {
+        T GetValue();
+    }
+
     private readonly struct FeatureValue : IFeatureValue
     {
         private readonly int _value;
@@ -77,6 +87,38 @@ public static partial class LanguageFeatureValidation
         public void RaiseChanged() => Changed?.Invoke();
     }
 
+    private sealed class InitializerFeature : IExplicitFeature
+    {
+        public int Value { get; set; }
+        public string Label { get; set; }
+
+        int IExplicitFeature.Add(int value) => Value + value;
+    }
+
+    private sealed class IndexedFeature
+    {
+        private readonly int[] _values = new int[2];
+
+        public int this[int index]
+        {
+            get => _values[index];
+            set => _values[index] = value;
+        }
+    }
+
+    private sealed class GenericFeature<T> : IGenericFeature<T>
+        where T : IFeatureValue
+    {
+        private readonly T _value;
+
+        public GenericFeature(T value)
+        {
+            _value = value;
+        }
+
+        public T GetValue() => _value;
+    }
+
     private sealed class DisposableFeature : IDisposable
     {
         public bool IsDisposed { get; private set; }
@@ -102,6 +144,8 @@ public static partial class LanguageFeatureValidation
         for (int index = 0; index < values.Length; index++)
             list.Add(values[index]);
         VerifyTypes(values, list);
+        VerifyObjectAndGenericFeatures(values);
+        VerifyModernLanguageFeatures(values);
         VerifyArrays();
         VerifyDelegatesAndLinq(values);
         VerifyControlFlow(values);
@@ -136,8 +180,17 @@ public static partial class LanguageFeatureValidation
         Type intType = typeof(int);
         Type stringType = typeof(string);
         Type localType = typeof(FeatureObject);
-        if (intType == null || stringType == null || localType == null)
+        Type validationType = typeof(LanguageFeatureValidation);
+        if (intType == null || stringType == null || localType == null || validationType == null)
             Fail("typeof");
+
+        if (validationType.Name != nameof(LanguageFeatureValidation) ||
+            validationType.Namespace != null ||
+            validationType.FullName != nameof(LanguageFeatureValidation) ||
+            localType.Name != nameof(FeatureObject) ||
+            localType.Namespace != null ||
+            localType.FullName != nameof(LanguageFeatureValidation) + "+" + nameof(FeatureObject))
+            Fail("type metadata");
 
         FeatureValue first = values[0];
         FeatureValue second = RuntimeValue(2);
@@ -179,7 +232,109 @@ public static partial class LanguageFeatureValidation
             Fail("nameof");
 
         if (default(FeatureValue).Value != RuntimeValue(0) || list.Count != values.Length)
-            Fail("default or collection expression");
+            Fail("default or collection");
+    }
+
+    private static void VerifyObjectAndGenericFeatures(int[] values)
+    {
+        FeatureValue value = values[0];
+        object boxedValue = value;
+        if (!(boxedValue is FeatureValue unboxedValue) ||
+            ((FeatureValue)boxedValue).Value != RuntimeValue(1) ||
+            ((IFeatureValue)boxedValue).Value != RuntimeValue(1) ||
+            unboxedValue.Value != RuntimeValue(1))
+            Fail("boxing or unboxing");
+
+        FeatureObject feature = new FeatureObject(RuntimeValue(4));
+        FeatureBase baseFeature = feature;
+        if (EvaluateBase(baseFeature) != RuntimeValue(5))
+            Fail("virtual dispatch");
+
+        FeatureObject[] derivedArray = new[] { feature };
+        FeatureBase[] baseArray = derivedArray;
+        if (baseArray[0] != feature || baseArray[0].Evaluate() != RuntimeValue(5))
+            Fail("array covariance");
+
+        IGenericFeature<FeatureValue> valueReader = new GenericFeature<FeatureValue>(value);
+        IGenericFeature<FeatureObject> objectReader = new GenericFeature<FeatureObject>(feature);
+        if (ReadGenericValue(valueReader.GetValue()) != RuntimeValue(1) ||
+            ReadGenericValue(objectReader.GetValue()) != RuntimeValue(5) ||
+            PreserveReference(feature) != feature)
+            Fail("generic constraint or interface dispatch");
+    }
+
+    private static unsafe void VerifyModernLanguageFeatures(int[] values)
+    {
+        string fallback = null;
+        fallback ??= "fallback";
+        InitializerFeature initialized = new InitializerFeature
+        {
+            Value = RuntimeValue(8),
+            Label = "initializer",
+        };
+        IndexedFeature indexed = new IndexedFeature
+        {
+            [0] = RuntimeValue(3),
+            [1] = RuntimeValue(4),
+        };
+        List<int> initializedList = new List<int>
+        {
+            RuntimeValue(1),
+            RuntimeValue(2),
+            RuntimeValue(3),
+        };
+        int? present = RuntimeValue(8);
+        int? absent = null;
+        int? conditionalValue = initialized?.Value;
+
+        if (fallback?.ToString() != "fallback" ||
+            initialized is not { Value: >= 8 and <= 8, Label: "initializer" } ||
+            ((IExplicitFeature)initialized).Add(RuntimeValue(1)) != RuntimeValue(9) ||
+            indexed[0] + indexed[1] != RuntimeValue(7) ||
+            initializedList.Count != RuntimeValue(3) ||
+            !present.HasValue || present.Value != RuntimeValue(8) ||
+            (int)present != RuntimeValue(8) || absent.HasValue ||
+            absent.GetValueOrDefault(RuntimeValue(6)) != RuntimeValue(6) ||
+            !conditionalValue.HasValue || conditionalValue.Value != RuntimeValue(8))
+            Fail("initializers, null handling, nullable values, or patterns");
+
+        string category = initialized switch
+        {
+            { Value: < 0 } => "negative",
+            { Value: >= 8 and <= 8 } => "expected",
+            _ => "unexpected",
+        };
+        object boxedNumber = RuntimeValue(3);
+        string matched = boxedNumber switch
+        {
+            int number when number == RuntimeValue(3) => "matched",
+            _ => "unexpected",
+        };
+        if (category != "expected" || matched != "matched")
+            Fail("switch patterns");
+
+        int optional = CombineValues(right: RuntimeValue(3), left: RuntimeValue(2), multiplier: RuntimeValue(2));
+        if (optional != RuntimeValue(10) || Sum(RuntimeValue(1), RuntimeValue(2), RuntimeValue(3)) != RuntimeValue(6) || Sum() != RuntimeValue(0))
+            Fail("optional, named, or params arguments");
+
+        int original = values[1];
+        ref int second = ref GetElement(values, RuntimeValue(1));
+        second = RuntimeValue(9);
+        bool finallyRan = false;
+        int returnValue = ReturnFromFinally(ref finallyRan);
+        second = original;
+        if (returnValue != RuntimeValue(6) || !finallyRan || values[1] != RuntimeValue(2))
+            Fail("ref return or finally return");
+
+        int captured = RuntimeValue(4);
+        int CapturingLocalFunction(int value) => value + captured;
+        static int StaticLocalFunction(int left, int right) => left * right;
+
+        delegate* managed<int, int> doubleValue = &DoubleValue;
+        if (CapturingLocalFunction(RuntimeValue(3)) != RuntimeValue(7) ||
+            StaticLocalFunction(RuntimeValue(2), RuntimeValue(3)) != RuntimeValue(6) ||
+            doubleValue(RuntimeValue(5)) != RuntimeValue(10))
+            Fail("local function or function pointer");
     }
 
     private static void VerifyArrays()
@@ -212,6 +367,36 @@ public static partial class LanguageFeatureValidation
             jagged[1].Length != RuntimeValue(1) || jagged[0][columns - 1] != RuntimeValue(8))
             Fail("jagged array");
     }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static int EvaluateBase(FeatureBase feature) => feature.Evaluate();
+
+    private static int ReadGenericValue<T>(T value)
+        where T : IFeatureValue
+        => value.Value;
+
+    private static T PreserveReference<T>(T value)
+        where T : class
+        => value;
+
+    private static int CombineValues(int left, int right = 4, int multiplier = 1)
+        => (left + right) * multiplier;
+
+    private static ref int GetElement(int[] values, int index) => ref values[index];
+
+    private static int ReturnFromFinally(ref bool finallyRan)
+    {
+        try
+        {
+            return RuntimeValue(6);
+        }
+        finally
+        {
+            finallyRan = true;
+        }
+    }
+
+    private static int DoubleValue(int value) => value * 2;
 
     private static void VerifyDelegatesAndLinq(int[] values)
     {
@@ -442,11 +627,54 @@ public static partial class LanguageFeatureValidation
         if (result != RuntimeValue(7))
             Fail("async or await");
 
+        TaskCompletionSource<int> completion = new TaskCompletionSource<int>();
+        Task<int> pending = AwaitPending(completion.Task);
+        if (pending.IsCompleted)
+            Fail("pending async state");
+
+        completion.SetResult(RuntimeValue(10));
+        if (pending.GetAwaiter().GetResult() != RuntimeValue(11))
+            Fail("async continuation");
+
+        Exception expected = new Exception("async exception validation");
+        TaskCompletionSource failedCompletion = new TaskCompletionSource();
+        Task<bool> recovered = CatchPendingException(failedCompletion.Task, expected);
+        if (recovered.IsCompleted)
+            Fail("pending async exception state");
+
+        failedCompletion.SetException(expected);
+        if (!recovered.GetAwaiter().GetResult())
+            Fail("async exception");
+
+        int count = 0;
+        int total = 0;
         foreach (int value in YieldValues())
         {
-            if (value < RuntimeValue(0))
-                Fail("yield");
+            count++;
+            total += value;
         }
+        if (count != RuntimeValue(2) || total != RuntimeValue(3))
+            Fail("yield");
+    }
+
+    private static async Task<int> AwaitPending(Task<int> task)
+    {
+        int value = await task.ConfigureAwait(false);
+        return value + RuntimeValue(1);
+    }
+
+    private static async Task<bool> CatchPendingException(Task task, Exception expected)
+    {
+        try
+        {
+            await task.ConfigureAwait(false);
+        }
+        catch (Exception actual)
+        {
+            return actual == expected;
+        }
+
+        return false;
     }
 
     private static IEnumerable<int> YieldValues()
