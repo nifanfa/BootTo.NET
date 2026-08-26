@@ -41,6 +41,25 @@ partial class Program
         //Disable watchdog timer
         gBS->SetWatchdogTimer(0, 0, 0, null);
 
+#if false
+        #region Change resolution
+        {
+            EFI_GRAPHICS_OUTPUT_PROTOCOL* gop;
+            gBS->LocateProtocol((EFI_GUID*)EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID, null, (void**)&gop);
+            uint numModes = gop->Mode->MaxMode;
+            ulong sizeofMode = 0;
+            for (uint u = 0; u < numModes; u++)
+            {
+                EFI_GRAPHICS_OUTPUT_MODE_INFORMATION* modeinfo;
+                gop->QueryMode(gop, u, &sizeofMode, &modeinfo);
+                printf("GOP Mode %d: %dx%d\r\n"u8, u, modeinfo->HorizontalResolution, modeinfo->VerticalResolution);
+            }
+            Console.Write("Please select mode: ");
+            gop->SetMode(gop, Convert.ToUInt32(Console.ReadLine()));
+        }
+        #endregion
+#endif
+
         EFI_STATUS certificateStatus = InstallTlsCaCertificates(@"\EFI\Certificates\TlsCaCertificate.esl");
         Console.WriteLine($"TLS CA certificates {(certificateStatus == EFI_SUCCESS ? "are available!" : "are unavailable!")}");
 
@@ -121,36 +140,6 @@ partial class Program
         {
             FileTest test = new FileTest();
             _ = test.Run();
-        }
-        #endregion
-#endif
-
-#if false
-        #region GOP Test
-        {
-            EFI_GRAPHICS_OUTPUT_PROTOCOL* gop;
-            gBS->LocateProtocol((EFI_GUID*)EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID, null, (void**)&gop);
-            uint numModes = gop->Mode->MaxMode;
-            ulong sizeofMode = 0;
-            for (uint u = 0; u < numModes; u++)
-            {
-                EFI_GRAPHICS_OUTPUT_MODE_INFORMATION* modeinfo;
-                gop->QueryMode(gop, u, &sizeofMode, &modeinfo);
-                printf("GOP Mode %d: %dx%d\r\n"u8, u, modeinfo->HorizontalResolution, modeinfo->VerticalResolution);
-            }
-            //gop->SetMode(gop,7);
-            Console.WriteLine("Press any key to continue...");
-            Console.ReadKey();
-            Console.Clear();
-            var fb = (uint*)gop->Mode->FrameBufferBase;
-            for (uint w = 0; w < gop->Mode->Info->HorizontalResolution; w++)
-            {
-                for (uint h = 0; h < gop->Mode->Info->VerticalResolution; h++)
-                {
-                    fb[h * gop->Mode->Info->HorizontalResolution + w] = 0xFFFF0000;
-                }
-            }
-            Console.WriteLine("The background should be red when you see this message");
         }
         #endregion
 #endif
