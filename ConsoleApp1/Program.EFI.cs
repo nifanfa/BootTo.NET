@@ -311,7 +311,7 @@ partial class Program
                 WebClient wc = new WebClient();
                 Console.WriteLine(wc.DownloadString("https://example.com"));
             }
-            catch(Exception e) 
+            catch (Exception e)
             {
                 Console.WriteLine($"Unable to run {nameof(WebClientTest)}: {e.Message}");
             }

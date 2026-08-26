@@ -29,7 +29,7 @@ namespace System.IO
         {
             get
             {
-                if (!FileSystem.TryGetInfo(_fullName, out FileMetadata metadata))
+                if (!File.TryGetInfo(_fullName, out File.FileMetadata metadata))
                     return false;
                 return (metadata.Attribute & EFI_FILE_DIRECTORY) == 0;
             }
@@ -39,7 +39,7 @@ namespace System.IO
         {
             get
             {
-                if (!FileSystem.TryGetInfo(_fullName, out FileMetadata metadata))
+                if (!File.TryGetInfo(_fullName, out File.FileMetadata metadata))
                     throw new IOException("The file metadata could not be read.");
                 return (long)metadata.FileSize;
             }
@@ -56,7 +56,7 @@ namespace System.IO
 
         public void Delete()
         {
-            if (!FileSystem.Delete(_fullName))
+            if (!File.TryDelete(_fullName))
                 throw new IOException("The file could not be deleted.");
         }
 
@@ -66,9 +66,9 @@ namespace System.IO
         public FileStream OpenWrite()
             => new FileStream(_fullName, FileMode.OpenOrCreate);
 
-        private FileMetadata GetMetadata()
+        private File.FileMetadata GetMetadata()
         {
-            if (!FileSystem.TryGetInfo(_fullName, out FileMetadata metadata))
+            if (!File.TryGetInfo(_fullName, out File.FileMetadata metadata))
                 throw new IOException("The file metadata could not be read.");
             return metadata;
         }

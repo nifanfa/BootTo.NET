@@ -7,7 +7,7 @@ namespace System.IO
             if (string.IsNullOrEmpty(path))
                 return false;
 
-            if (!FileSystem.TryGetInfo(path, out FileMetadata metadata))
+            if (!File.TryGetInfo(path, out File.FileMetadata metadata))
                 return false;
             return (metadata.Attribute & EFI_FILE_DIRECTORY) != 0;
         }
@@ -16,7 +16,7 @@ namespace System.IO
         {
             if (string.IsNullOrEmpty(path))
                 throw new ArgumentNullException("The directory path cannot be null or empty.");
-            if (!FileSystem.CreateDirectory(path))
+            if (!File.TryCreateDirectory(path))
                 throw new IOException("The directory could not be created.");
         }
 
@@ -24,7 +24,7 @@ namespace System.IO
         {
             if (string.IsNullOrEmpty(path))
                 throw new ArgumentNullException("The directory path cannot be null or empty.");
-            if (!FileSystem.Delete(path))
+            if (!File.TryDelete(path))
                 throw new IOException("The directory could not be deleted.");
         }
 
@@ -32,14 +32,14 @@ namespace System.IO
         {
             if (string.IsNullOrEmpty(path))
                 throw new ArgumentNullException("The directory path cannot be null or empty.");
-            return AddDirectoryPrefix(path, FileSystem.ReadDirectory(path, false));
+            return AddDirectoryPrefix(path, File.ReadDirectory(path, false));
         }
 
         public static string[] GetDirectories(string path)
         {
             if (string.IsNullOrEmpty(path))
                 throw new ArgumentNullException("The directory path cannot be null or empty.");
-            return AddDirectoryPrefix(path, FileSystem.ReadDirectory(path, true));
+            return AddDirectoryPrefix(path, File.ReadDirectory(path, true));
         }
 
         private static string[] AddDirectoryPrefix(string path, string[] names)

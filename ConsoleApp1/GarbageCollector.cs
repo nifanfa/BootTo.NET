@@ -1,6 +1,5 @@
 using Internal.Runtime;
 using System;
-using System.Runtime;
 using System.Runtime.InteropServices;
 
 // BootTo.NET is single-threaded while UEFI boot services are active. This collector

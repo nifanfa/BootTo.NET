@@ -1,18 +1,18 @@
-﻿namespace System
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+namespace System
 {
     public static unsafe class Console
     {
         private sealed class ReadKeyOperation : TaskPoller
         {
             private Threading.Tasks.TaskCompletionSource<ConsoleKeyInfo> _completion;
-            private bool _useUsbKeyboard;
 
             internal Threading.Tasks.Task<ConsoleKeyInfo> Start()
             {
                 Threading.Tasks.TaskCompletionSource<ConsoleKeyInfo> completion =
                     new Threading.Tasks.TaskCompletionSource<ConsoleKeyInfo>();
                 _completion = completion;
-                _useUsbKeyboard = UsbKeyboard.TryStart();
                 TaskScheduler.Register(this);
                 Poll();
                 return completion.Task;
@@ -20,19 +20,6 @@
 
             internal override void Poll()
             {
-                if (_useUsbKeyboard)
-                {
-                    while (UsbKeyboard.TryDequeue(out ConsoleKeyEvent keyEvent))
-                    {
-                        if (keyEvent.IsKeyDown)
-                        {
-                            Complete(keyEvent.KeyInfo);
-                            return;
-                        }
-                    }
-                    return;
-                }
-
                 if ((void*)gST->ConIn == null)
                 {
                     CompleteException();
@@ -91,7 +78,7 @@
 
             internal override void Poll()
             {
-                if (!UsbKeyboard.TryDequeue(out ConsoleKeyEvent keyEvent))
+                if (!TryDequeueUsbKey(out ConsoleKeyEvent keyEvent))
                     return;
 
                 Threading.Tasks.TaskCompletionSource<ConsoleKeyEvent> completion = _completion;
@@ -542,14 +529,9 @@
 
         public static Threading.Tasks.Task<ConsoleKeyEvent> ReadKeyEventAsync()
         {
-            if (!UsbKeyboard.TryStart())
+            if (!TryStartUsbKeyboard())
                 throw new Exception("A USB HID boot keyboard is unavailable.");
             return new ReadKeyEventOperation().Start();
-        }
-
-        public static bool IsKeyDown(ConsoleKey key)
-        {
-            return UsbKeyboard.TryStart() && UsbKeyboard.IsKeyDown(key);
         }
 
         private static ConsoleKeyInfo CreateKeyInfo(EFI_INPUT_KEY key)
@@ -617,6 +599,369 @@
                 case ']': return ConsoleKey.Oem6;
                 case '\'': return ConsoleKey.Oem7;
                 default: return (ConsoleKey)character;
+            }
+        }
+
+        private enum EFI_USB_DATA_DIRECTION : uint
+        {
+            EfiUsbDataIn,
+            EfiUsbDataOut,
+            EfiUsbNoData
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        private struct EFI_USB_DEVICE_REQUEST
+        {
+            public byte RequestType;
+            public byte Request;
+            public ushort Value;
+            public ushort Index;
+            public ushort Length;
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        private struct EFI_USB_INTERFACE_DESCRIPTOR
+        {
+            public byte Length;
+            public byte DescriptorType;
+            public byte InterfaceNumber;
+            public byte AlternateSetting;
+            public byte NumEndpoints;
+            public byte InterfaceClass;
+            public byte InterfaceSubClass;
+            public byte InterfaceProtocol;
+            public byte Interface;
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        private struct EFI_USB_ENDPOINT_DESCRIPTOR
+        {
+            public byte Length;
+            public byte DescriptorType;
+            public byte EndpointAddress;
+            public byte Attributes;
+            public ushort MaxPacketSize;
+            public byte Interval;
+        }
+
+        private struct EFI_USB_IO_PROTOCOL
+        {
+            public readonly delegate* unmanaged<EFI_USB_IO_PROTOCOL*, EFI_USB_DEVICE_REQUEST*, EFI_USB_DATA_DIRECTION, uint, void*, ulong, uint*, EFI_STATUS> UsbControlTransfer;
+            public readonly void* UsbBulkTransfer;
+            public readonly void* UsbAsyncInterruptTransfer;
+            public readonly delegate* unmanaged<EFI_USB_IO_PROTOCOL*, byte, void*, ulong*, ulong, uint*, EFI_STATUS> UsbSyncInterruptTransfer;
+            public readonly void* UsbIsochronousTransfer;
+            public readonly void* UsbAsyncIsochronousTransfer;
+            public readonly void* UsbGetDeviceDescriptor;
+            public readonly void* UsbGetConfigDescriptor;
+            public readonly delegate* unmanaged<EFI_USB_IO_PROTOCOL*, EFI_USB_INTERFACE_DESCRIPTOR*, EFI_STATUS> UsbGetInterfaceDescriptor;
+            public readonly delegate* unmanaged<EFI_USB_IO_PROTOCOL*, byte, EFI_USB_ENDPOINT_DESCRIPTOR*, EFI_STATUS> UsbGetEndpointDescriptor;
+            public readonly delegate* unmanaged<EFI_USB_IO_PROTOCOL*, ushort, byte, char**, EFI_STATUS> UsbGetStringDescriptor;
+            public readonly delegate* unmanaged<EFI_USB_IO_PROTOCOL*, ushort**, ushort*, EFI_STATUS> UsbGetSupportedLanguages;
+            public readonly delegate* unmanaged<EFI_USB_IO_PROTOCOL*, EFI_STATUS> UsbPortReset;
+        }
+
+        private const byte UsbClassHid = 0x03;
+        private const byte UsbSubclassBoot = 0x01;
+        private const byte UsbProtocolKeyboard = 0x01;
+        private const byte UsbEndpointInterrupt = 0x03;
+        private const byte UsbEndpointDirectionIn = 0x80;
+        private const byte UsbRequestTypeClassInterfaceOut = 0x21;
+        private const byte UsbSetProtocol = 0x0B;
+
+        private static EFI_GUID EFI_USB_IO_PROTOCOL_GUID => new EFI_GUID(0x2b2f68d6, 0x0cd2, 0x44cf, 0x8e, 0x8b, 0xbb, 0xa2, 0x0b, 0x1b, 0x5b, 0x75);
+
+        private static byte s_usbEndpoint;
+        private static ulong s_usbReportLength;
+        private static readonly byte[] s_usbPreviousKeys = new byte[6];
+        private static byte s_usbPreviousModifiers;
+        private static readonly Queue<ConsoleKeyEvent> s_usbEvents = new Queue<ConsoleKeyEvent>();
+        private static bool s_usbStartAttempted;
+        private static bool s_usbStarted;
+
+        private static bool TryStartUsbKeyboard()
+        {
+            return StartUsbKeyboard();
+        }
+
+        private static bool TryDequeueUsbKey(out ConsoleKeyEvent keyEvent)
+        {
+            return DequeueUsbKey(out keyEvent);
+        }
+
+        private static bool StartUsbKeyboard()
+        {
+            if (s_usbStarted)
+                return true;
+            if (s_usbStartAttempted)
+                return false;
+
+            s_usbStartAttempted = true;
+
+            EFI_HANDLE* handles = null;
+            ulong handleCount = 0;
+            EFI_STATUS status = gBS->LocateHandleBuffer(
+                ByProtocol,
+                (EFI_GUID*)EFI_USB_IO_PROTOCOL_GUID,
+                null,
+                &handleCount,
+                &handles);
+            if ((ulong)status != EFI_SUCCESS)
+                return false;
+
+            bool started = false;
+            for (ulong i = 0; i < handleCount && !started; i++)
+            {
+                EFI_USB_IO_PROTOCOL* usb = null;
+                status = gBS->HandleProtocol(
+                    handles[i],
+                    (EFI_GUID*)EFI_USB_IO_PROTOCOL_GUID,
+                    (void**)&usb);
+                if ((ulong)status != EFI_SUCCESS || usb == null)
+                    continue;
+
+                EFI_USB_INTERFACE_DESCRIPTOR interfaceDescriptor = default;
+                status = usb->UsbGetInterfaceDescriptor(usb, &interfaceDescriptor);
+                if ((ulong)status != EFI_SUCCESS ||
+                    interfaceDescriptor.InterfaceClass != UsbClassHid ||
+                    interfaceDescriptor.InterfaceSubClass != UsbSubclassBoot ||
+                    interfaceDescriptor.InterfaceProtocol != UsbProtocolKeyboard)
+                {
+                    continue;
+                }
+
+                EFI_USB_ENDPOINT_DESCRIPTOR endpoint = default;
+                byte endpointAddress = 0;
+                for (byte endpointIndex = 0; endpointIndex < interfaceDescriptor.NumEndpoints; endpointIndex++)
+                {
+                    status = usb->UsbGetEndpointDescriptor(usb, endpointIndex, &endpoint);
+                    if ((ulong)status == EFI_SUCCESS &&
+                        (endpoint.Attributes & 0x03) == UsbEndpointInterrupt &&
+                        (endpoint.EndpointAddress & UsbEndpointDirectionIn) != 0)
+                    {
+                        endpointAddress = endpoint.EndpointAddress;
+                        break;
+                    }
+                }
+
+                if (endpointAddress == 0 || endpoint.MaxPacketSize < 8)
+                    continue;
+
+                if (usb->UsbAsyncInterruptTransfer == null)
+                    continue;
+
+                // UsbKbDxe normally owns this interface and has its own asynchronous
+                // transfer active. Release that driver before taking the endpoint.
+                gBS->DisconnectController(handles[i], null, null);
+
+                EFI_USB_DEVICE_REQUEST request = new EFI_USB_DEVICE_REQUEST
+                {
+                    RequestType = UsbRequestTypeClassInterfaceOut,
+                    Request = UsbSetProtocol,
+                    Value = 0,
+                    Index = interfaceDescriptor.InterfaceNumber,
+                    Length = 0
+                };
+                uint transferStatus = 0;
+                status = usb->UsbControlTransfer(
+                    usb,
+                    &request,
+                    EFI_USB_DATA_DIRECTION.EfiUsbNoData,
+                    100,
+                    null,
+                    0,
+                    &transferStatus);
+                if ((ulong)status != EFI_SUCCESS)
+                    continue;
+
+                s_usbEndpoint = endpointAddress;
+                s_usbReportLength = endpoint.MaxPacketSize;
+                if (s_usbReportLength > 64)
+                    s_usbReportLength = 64;
+                for (int keyIndex = 0; keyIndex < s_usbPreviousKeys.Length; keyIndex++)
+                    s_usbPreviousKeys[keyIndex] = 0;
+                s_usbPreviousModifiers = 0;
+
+                s_usbStarted = true;
+                void* callback = (void*)(delegate* unmanaged<void*, ulong, void*, uint, EFI_STATUS>)&KeyboardCallback;
+                status = ((delegate* unmanaged<EFI_USB_IO_PROTOCOL*, byte, bool, ulong, ulong, void*, void*, EFI_STATUS>)usb->UsbAsyncInterruptTransfer)(
+                    usb,
+                    s_usbEndpoint,
+                    true,
+                    endpoint.Interval,
+                    s_usbReportLength,
+                    callback,
+                    null);
+                if ((ulong)status != EFI_SUCCESS)
+                {
+                    s_usbStarted = false;
+                    continue;
+                }
+
+                started = true;
+            }
+
+            if (handles != null)
+                gBS->FreePool(handles);
+            return started;
+        }
+
+        [UnmanagedCallersOnly]
+        private static EFI_STATUS KeyboardCallback(void* data, ulong dataLength, void* context, uint transferStatus)
+        {
+            if (transferStatus == 0 && data != null)
+                ProcessUsbReport((byte*)data, dataLength);
+            return (EFI_STATUS)EFI_SUCCESS;
+        }
+
+        private static void ProcessUsbReport(byte* report, ulong length)
+        {
+            if (length < 8)
+                return;
+
+            byte modifiers = report[0];
+            for (int i = 0; i < s_usbPreviousKeys.Length; i++)
+            {
+                byte usage = s_usbPreviousKeys[i];
+                if (usage != 0 && !ContainsUsage(report + 2, 6, usage))
+                {
+                    ConsoleKey key = MapUsage(usage);
+                    if (key != (ConsoleKey)0)
+                        EnqueueUsbKey(new ConsoleKeyEvent(CreateKeyInfo(usage, s_usbPreviousModifiers), false));
+                }
+            }
+
+            for (int i = 0; i < 6; i++)
+            {
+                byte usage = report[2 + i];
+                if (usage != 0 && !ContainsUsage(s_usbPreviousKeys, s_usbPreviousKeys.Length, usage))
+                {
+                    ConsoleKey key = MapUsage(usage);
+                    if (key != (ConsoleKey)0)
+                        EnqueueUsbKey(new ConsoleKeyEvent(CreateKeyInfo(usage, modifiers), true));
+                }
+            }
+
+            for (int i = 0; i < s_usbPreviousKeys.Length; i++)
+                s_usbPreviousKeys[i] = report[2 + i];
+
+            s_usbPreviousModifiers = modifiers;
+        }
+
+        private static bool ContainsUsage(byte* values, int length, byte usage)
+        {
+            for (int i = 0; i < length; i++)
+            {
+                if (values[i] == usage)
+                    return true;
+            }
+            return false;
+        }
+
+        private static bool ContainsUsage(byte[] values, int length, byte usage)
+        {
+            for (int i = 0; i < length; i++)
+            {
+                if (values[i] == usage)
+                    return true;
+            }
+            return false;
+        }
+
+        private static void EnqueueUsbKey(ConsoleKeyEvent keyEvent)
+        {
+            if (s_usbEvents.Count == 64)
+                s_usbEvents.Dequeue();
+            s_usbEvents.Enqueue(keyEvent);
+        }
+
+        private static bool DequeueUsbKey(out ConsoleKeyEvent keyEvent)
+        {
+            return s_usbEvents.TryDequeue(out keyEvent);
+        }
+
+        private static ConsoleKeyInfo CreateKeyInfo(byte usage, byte modifiers)
+        {
+            ConsoleKey key = MapUsage(usage);
+            bool shift = (modifiers & 0x22) != 0;
+            bool alt = (modifiers & 0x44) != 0;
+            bool control = (modifiers & 0x11) != 0;
+            char character = MapCharacter(usage, shift);
+            return new ConsoleKeyInfo(character, key, shift, alt, control);
+        }
+
+        private static char MapCharacter(byte usage, bool shift)
+        {
+            if (usage >= 0x04 && usage <= 0x1D)
+                return (char)('A' + usage - 0x04);
+            if (usage >= 0x1E && usage <= 0x26)
+                return (char)('1' + usage - 0x1E);
+            if (usage == 0x27)
+                return '0';
+            if (usage == 0x28)
+                return '\r';
+            if (usage == 0x29)
+                return '\x1B';
+            if (usage == 0x2A)
+                return '\b';
+            if (usage == 0x2B)
+                return '\t';
+            if (usage == 0x2C)
+                return ' ';
+            return '\0';
+        }
+
+        private static ConsoleKey MapUsage(byte usage)
+        {
+            if (usage >= 0x04 && usage <= 0x1D)
+                return (ConsoleKey)('A' + usage - 0x04);
+            if (usage >= 0x1E && usage <= 0x26)
+                return (ConsoleKey)(ConsoleKey.D1 + usage - 0x1E);
+            if (usage == 0x27)
+                return ConsoleKey.D0;
+
+            switch (usage)
+            {
+                case 0x28: return ConsoleKey.Enter;
+                case 0x29: return ConsoleKey.Escape;
+                case 0x2A: return ConsoleKey.Backspace;
+                case 0x2B: return ConsoleKey.Tab;
+                case 0x2C: return ConsoleKey.Spacebar;
+                case 0x2D: return ConsoleKey.OemMinus;
+                case 0x2E: return ConsoleKey.OemPlus;
+                case 0x2F: return ConsoleKey.Oem4;
+                case 0x30: return ConsoleKey.Oem6;
+                case 0x31: return ConsoleKey.Oem5;
+                case 0x33: return ConsoleKey.Oem1;
+                case 0x34: return ConsoleKey.Oem7;
+                case 0x35: return ConsoleKey.Oem3;
+                case 0x36: return ConsoleKey.OemComma;
+                case 0x37: return ConsoleKey.OemPeriod;
+                case 0x38: return ConsoleKey.Oem2;
+                case 0x39: return (ConsoleKey)20;
+                case 0x3A: return ConsoleKey.F1;
+                case 0x3B: return ConsoleKey.F2;
+                case 0x3C: return ConsoleKey.F3;
+                case 0x3D: return ConsoleKey.F4;
+                case 0x3E: return ConsoleKey.F5;
+                case 0x3F: return ConsoleKey.F6;
+                case 0x40: return ConsoleKey.F7;
+                case 0x41: return ConsoleKey.F8;
+                case 0x42: return ConsoleKey.F9;
+                case 0x43: return ConsoleKey.F10;
+                case 0x44: return ConsoleKey.F11;
+                case 0x45: return ConsoleKey.F12;
+                case 0x49: return ConsoleKey.Insert;
+                case 0x4A: return ConsoleKey.Home;
+                case 0x4B: return ConsoleKey.PageUp;
+                case 0x4C: return ConsoleKey.Delete;
+                case 0x4D: return ConsoleKey.End;
+                case 0x4E: return ConsoleKey.PageDown;
+                case 0x4F: return ConsoleKey.RightArrow;
+                case 0x50: return ConsoleKey.LeftArrow;
+                case 0x51: return ConsoleKey.DownArrow;
+                case 0x52: return ConsoleKey.UpArrow;
+                default: return (ConsoleKey)0;
             }
         }
     }

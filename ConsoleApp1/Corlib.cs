@@ -1615,9 +1615,9 @@ namespace System.Threading
             Enter(obj, ref lockTaken);
         }
 
-        public static void Enter(object obj, ref bool lockTaken) => Lock.Enter(obj, ref lockTaken);
+        public static void Enter(object obj, ref bool lockTaken) => TaskScheduler.Enter(obj, ref lockTaken);
 
-        public static void Exit(object obj) => Lock.Exit(obj);
+        public static void Exit(object obj) => TaskScheduler.Exit(obj);
     }
 }
 

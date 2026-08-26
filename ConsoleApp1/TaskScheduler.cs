@@ -1,5 +1,4 @@
 using System;
-using System.Runtime;
 using System.Timers;
 
 internal abstract class TaskPoller
@@ -16,6 +15,33 @@ internal static class TaskScheduler
     private static bool s_yielding;
     private static bool s_yieldAgain;
     private static Timer s_schedulerTimer;
+
+    private static EFI_TPL s_previousTpl;
+    private static int s_lockDepth;
+
+    internal static unsafe void Enter(object obj, ref bool lockTaken)
+    {
+        if (obj == null)
+            throw new Exception("The lock object cannot be null.");
+        if (lockTaken)
+            throw new Exception("The lock is already held.");
+
+        if (s_lockDepth == 0)
+            s_previousTpl = gBS->RaiseTPL(TPL_NOTIFY);
+
+        s_lockDepth++;
+        lockTaken = true;
+    }
+
+    internal static unsafe void Exit(object obj)
+    {
+        if (obj == null || s_lockDepth == 0)
+            throw new Exception("The lock is not held.");
+
+        s_lockDepth--;
+        if (s_lockDepth == 0)
+            gBS->RestoreTPL(s_previousTpl);
+    }
 
     internal static void Register(TaskPoller poller)
     {
