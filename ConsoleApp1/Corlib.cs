@@ -517,6 +517,35 @@ namespace System
     public static partial class Convert
     {
         public static string ToString(object value) => value?.ToString() ?? string.Empty;
+
+        public static unsafe string ToString(ulong value, ulong toBase)
+        {
+            if (toBase > 0 && toBase <= 16)
+            {
+                char* x = stackalloc char[128];
+                var i = 126;
+
+                x[127] = '\0';
+
+                do
+                {
+                    var d = value % toBase;
+                    value /= toBase;
+
+                    if (d > 9)
+                        d += 0x37;
+                    else
+                        d += 0x30;
+
+                    x[i--] = (char)d;
+                } while (value > 0);
+
+                i++;
+
+                return new string(x + i, 0, 127 - i);
+            }
+            return null;
+        }
     }
 
     public sealed partial class String
@@ -2112,11 +2141,12 @@ namespace Internal.Metadata.NativeFormat
                 byteCount > int.MaxValue || cursor + byteCount > _nativeMetadataEnd)
                 return false;
 
-            byte[] bytes = new byte[byteCount];
+            // Convert UTF-8 bytes to a string. Since we don't have access to System.Text.Encoding.UTF8, we will assume the bytes are ASCII for simplicity.
+            char[] bytes = new char[byteCount];
             for (int i = 0; i < bytes.Length; i++)
-                bytes[i] = cursor[i];
+                bytes[i] = (char)cursor[i];
 
-            value = System.Text.Encoding.UTF8.GetString(bytes);
+            value = new string(bytes);
             return true;
         }
 
@@ -2693,11 +2723,11 @@ namespace System.Runtime
             if (methodName != null)
             {
                 uint offset = rva - root->BeginAddress;
-                Console.WriteLine($"   at {methodName} + 0x{offset:X}");
+                Console.WriteLine("   at " + methodName + " + 0x" + Convert.ToString(offset, 16));
                 return;
             }
 
-            Console.WriteLine($"   at 0x{address:X16} (RVA 0x{rva:X8})");
+            Console.WriteLine("   at 0x" + Convert.ToString(address, 16) + " (RVA 0x" + Convert.ToString(rva, 16) + ")");
         }
 
         private static bool TryFindHandler(
