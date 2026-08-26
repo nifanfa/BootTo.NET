@@ -34,6 +34,8 @@
 
   <Import Project="..\uefi-cs\uefi-cs.projitems" Label="Shared" />
 
+  <Import Project="..\NES\NES.projitems" Label="Shared" />
+
   <!--CustomizeReferences-->
   <Target Name="CustomizeReferences" BeforeTargets="BeforeCompile" AfterTargets="FindReferenceAssembliesForReferences">
     <ItemGroup>

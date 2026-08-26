@@ -12,6 +12,8 @@ Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "uefi-cs", "uefi-cs\uefi-cs.
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NativeLib", "NativeLib\NativeLib.vcxproj", "{D51F9603-001B-4272-ABA9-62FDB20453BC}"
 EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "NES", "NES\NES.shproj", "{43696811-9920-486A-8F6C-88B6F7F0B089}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -55,6 +57,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		uefi-cs\uefi-cs.projitems*{03406847-825a-4359-8159-e1769bee543f}*SharedItemsImports = 13
+		NES\NES.projitems*{43696811-9920-486a-8f6c-88b6f7f0b089}*SharedItemsImports = 13
+		NES\NES.projitems*{86af0ae0-bf6e-4532-8e9e-7f6d8b7de644}*SharedItemsImports = 5
 		uefi-cs\uefi-cs.projitems*{86af0ae0-bf6e-4532-8e9e-7f6d8b7de644}*SharedItemsImports = 5
 	EndGlobalSection
 EndGlobal

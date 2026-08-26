@@ -4,8 +4,6 @@ namespace Playground.NES
 {
     public class GameRender
     {
-        Emulator NES;
-
         Graphics graphics;
         public int screenWidth = 256, screenHeight = 240;
 
@@ -35,9 +33,8 @@ namespace Playground.NES
             }
         }
 
-        public GameRender(Emulator formObject)
+        public GameRender()
         {
-            NES = formObject;
             graphics = CreateGraphics();
         }
     }

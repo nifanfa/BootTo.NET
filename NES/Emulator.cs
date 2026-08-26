@@ -147,7 +147,7 @@ namespace Playground.NES
             ppu = new PPU(memory, this);
             cpu = new CPU(memory, input, ppu, registers);
 
-            gameRender = new GameRender(this);
+            gameRender = new GameRender();
 
             bolStartFrame = true;
             bolReset = true;
