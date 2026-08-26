@@ -7,7 +7,6 @@ namespace System.Drawing
     public unsafe sealed class Graphics : IDisposable
     {
         private EFI_GRAPHICS_OUTPUT_PROTOCOL* _graphics;
-        private Color[] _cache;
 
         internal Graphics(EFI_GRAPHICS_OUTPUT_PROTOCOL* graphics)
         {
@@ -16,18 +15,15 @@ namespace System.Drawing
             _graphics = graphics;
         }
 
-        public RectangleF VisibleClipBounds => GetDisplayBounds();
+        public Rectangle VisibleClipBounds => GetDisplayBounds();
 
         public void DrawPoint(int x, int y, Color color)
         {
             EnsureOpen();
             if (x < 0 || y < 0 ||
-                (uint)x >= _graphics->Mode->Info->HorizontalResolution ||
-                (uint)y >= _graphics->Mode->Info->VerticalResolution)
+                x >= VisibleClipBounds.Width ||
+                y >= VisibleClipBounds.Height)
                 return;
-
-            if (_cache[_graphics->Mode->Info->HorizontalResolution * y + x] == color) return;
-            _cache[_graphics->Mode->Info->HorizontalResolution * y + x] = color;
 
             EFI_GRAPHICS_OUTPUT_BLT_PIXEL pixel = new EFI_GRAPHICS_OUTPUT_BLT_PIXEL
             {
@@ -52,6 +48,53 @@ namespace System.Drawing
                 throw new InvalidOperationException("The graphics protocol could not draw the pixel.");
         }
 
+        public void DrawImage(Image image, int x, int y)
+        {
+            EnsureOpen();
+            if (image == null)
+                throw new ArgumentNullException(nameof(image));
+            if (image.pixels == null)
+                throw new InvalidOperationException("The image has been disposed.");
+
+            Rectangle visibleClipBounds = VisibleClipBounds;
+            int displayWidth = visibleClipBounds.Width;
+            int displayHeight = visibleClipBounds.Height;
+            if (x >= displayWidth || y >= displayHeight || x <= -image.Width || y <= -image.Height)
+                return;
+
+            int sourceX = x < 0 ? -x : 0;
+            int sourceY = y < 0 ? -y : 0;
+            int destinationX = x < 0 ? 0 : x;
+            int destinationY = y < 0 ? 0 : y;
+            int width = image.Width - sourceX;
+            int height = image.Height - sourceY;
+
+            if (width <= 0 || height <= 0)
+                return;
+
+            if (width > displayWidth - destinationX)
+                width = displayWidth - destinationX;
+            if (height > displayHeight - destinationY)
+                height = displayHeight - destinationY;
+
+            fixed (Color* buffer = image.pixels)
+            {
+                EFI_STATUS status = _graphics->Blt(
+                    _graphics,
+                    (EFI_GRAPHICS_OUTPUT_BLT_PIXEL*)buffer,
+                    EfiBltBufferToVideo,
+                    (ulong)sourceX,
+                    (ulong)sourceY,
+                    (ulong)destinationX,
+                    (ulong)destinationY,
+                    (ulong)width,
+                    (ulong)height,
+                    (ulong)image.Width * (ulong)sizeof(EFI_GRAPHICS_OUTPUT_BLT_PIXEL));
+                if ((ulong)status != EFI_SUCCESS)
+                    throw new InvalidOperationException("The graphics protocol could not draw the pixel.");
+            }
+        }
+
         public void Dispose()
         {
             _graphics = null;
@@ -61,20 +104,17 @@ namespace System.Drawing
         {
             if (_graphics == null || _graphics->Mode == null || _graphics->Mode->Info == null)
                 throw new InvalidOperationException("The graphics object has been disposed or is unavailable.");
-            if(_cache == null || _cache.Length != _graphics->Mode->Info->HorizontalResolution * _graphics->Mode->Info->VerticalResolution)
-            {
-                _cache = new Color[_graphics->Mode->Info->HorizontalResolution * _graphics->Mode->Info->VerticalResolution];
-            }
+
         }
 
-        private RectangleF GetDisplayBounds()
+        private Rectangle GetDisplayBounds()
         {
             EnsureOpen();
-            return new RectangleF(
+            return new Rectangle(
                 0,
                 0,
-                _graphics->Mode->Info->HorizontalResolution,
-                _graphics->Mode->Info->VerticalResolution);
+                (int)_graphics->Mode->Info->HorizontalResolution,
+                (int)_graphics->Mode->Info->VerticalResolution);
         }
 
         public static unsafe Graphics CreateGraphics()
