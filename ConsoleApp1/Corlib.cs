@@ -509,9 +509,9 @@ namespace System
 
         public override string ToString() => hasValue ? value.ToString() : string.Empty;
 
-        public static implicit operator Nullable<T>(T value) => new Nullable<T>(value);
+        public static implicit operator T?(T value) => new T?(value);
 
-        public static explicit operator T(Nullable<T> value) => value.Value;
+        public static explicit operator T(T? value) => value.Value;
     }
 
     public static partial class Convert
@@ -1269,22 +1269,33 @@ namespace System
 
             public void SetException(Exception exception) => Task.TrySetException(exception);
 
+            private AsyncStateMachineBox<TStateMachine> GetStateMachineBox<TStateMachine>(ref TStateMachine stateMachine)
+                where TStateMachine : IAsyncStateMachine
+            {
+                if (_task is AsyncStateMachineBox<TStateMachine> box)
+                {
+                    box.StateMachine = stateMachine;
+                    return box;
+                }
+
+                box = new AsyncStateMachineBox<TStateMachine>();
+                _task = box;
+                box.StateMachine = stateMachine;
+                return box;
+            }
+
             public void AwaitOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
                 where TAwaiter : INotifyCompletion
                 where TStateMachine : IAsyncStateMachine
             {
-                Task outputTask = Task;
-                AsyncStateMachineContinuation<TStateMachine> continuation = new AsyncStateMachineContinuation<TStateMachine>(stateMachine);
-                awaiter.OnCompleted(continuation.Invoke);
+                awaiter.OnCompleted(GetStateMachineBox(ref stateMachine).MoveNextAction);
             }
 
             public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
                 where TAwaiter : ICriticalNotifyCompletion
                 where TStateMachine : IAsyncStateMachine
             {
-                Task outputTask = Task;
-                AsyncStateMachineContinuation<TStateMachine> continuation = new AsyncStateMachineContinuation<TStateMachine>(stateMachine);
-                awaiter.UnsafeOnCompleted(continuation.Invoke);
+                awaiter.UnsafeOnCompleted(GetStateMachineBox(ref stateMachine).MoveNextAction);
             }
         }
 
@@ -1314,22 +1325,33 @@ namespace System
 
             public void SetException(Exception exception) => Task.TrySetException(exception);
 
+            private AsyncStateMachineBox<TStateMachine, TResult> GetStateMachineBox<TStateMachine>(ref TStateMachine stateMachine)
+                where TStateMachine : IAsyncStateMachine
+            {
+                if (_task is AsyncStateMachineBox<TStateMachine, TResult> box)
+                {
+                    box.StateMachine = stateMachine;
+                    return box;
+                }
+
+                box = new AsyncStateMachineBox<TStateMachine, TResult>();
+                _task = box;
+                box.StateMachine = stateMachine;
+                return box;
+            }
+
             public void AwaitOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
                 where TAwaiter : INotifyCompletion
                 where TStateMachine : IAsyncStateMachine
             {
-                Task<TResult> outputTask = Task;
-                AsyncStateMachineContinuation<TStateMachine> continuation = new AsyncStateMachineContinuation<TStateMachine>(stateMachine);
-                awaiter.OnCompleted(continuation.Invoke);
+                awaiter.OnCompleted(GetStateMachineBox(ref stateMachine).MoveNextAction);
             }
 
             public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
                 where TAwaiter : ICriticalNotifyCompletion
                 where TStateMachine : IAsyncStateMachine
             {
-                Task<TResult> outputTask = Task;
-                AsyncStateMachineContinuation<TStateMachine> continuation = new AsyncStateMachineContinuation<TStateMachine>(stateMachine);
-                awaiter.UnsafeOnCompleted(continuation.Invoke);
+                awaiter.UnsafeOnCompleted(GetStateMachineBox(ref stateMachine).MoveNextAction);
             }
         }
 
@@ -1349,7 +1371,8 @@ namespace System
                 where TAwaiter : INotifyCompletion
                 where TStateMachine : IAsyncStateMachine
             {
-                AsyncStateMachineContinuation<TStateMachine> continuation = new AsyncStateMachineContinuation<TStateMachine>(stateMachine);
+                IAsyncStateMachine boxedStateMachine = stateMachine;
+                AsyncStateMachineContinuation continuation = new AsyncStateMachineContinuation(boxedStateMachine.MoveNext);
                 awaiter.OnCompleted(continuation.Invoke);
             }
 
@@ -1357,7 +1380,8 @@ namespace System
                 where TAwaiter : ICriticalNotifyCompletion
                 where TStateMachine : IAsyncStateMachine
             {
-                AsyncStateMachineContinuation<TStateMachine> continuation = new AsyncStateMachineContinuation<TStateMachine>(stateMachine);
+                IAsyncStateMachine boxedStateMachine = stateMachine;
+                AsyncStateMachineContinuation continuation = new AsyncStateMachineContinuation(boxedStateMachine.MoveNext);
                 awaiter.UnsafeOnCompleted(continuation.Invoke);
             }
         }
@@ -1425,14 +1449,47 @@ namespace System.Threading.Tasks
         internal override void Invoke() => _continuation();
     }
 
-    internal sealed class AsyncStateMachineContinuation<TStateMachine> : TaskContinuation
+    internal sealed class AsyncStateMachineContinuation : TaskContinuation
+    {
+        private readonly Action _moveNext;
+
+        internal AsyncStateMachineContinuation(Action moveNext) => _moveNext = moveNext;
+
+        internal override void Invoke() => _moveNext();
+    }
+
+    internal sealed class AsyncStateMachineBox<TStateMachine> : Task
         where TStateMachine : IAsyncStateMachine
     {
-        private TStateMachine _stateMachine;
+        private readonly Action _moveNextAction;
 
-        internal AsyncStateMachineContinuation(TStateMachine stateMachine) => _stateMachine = stateMachine;
+        internal TStateMachine StateMachine;
 
-        internal override void Invoke() => _stateMachine.MoveNext();
+        internal AsyncStateMachineBox()
+        {
+            _moveNextAction = MoveNext;
+        }
+
+        internal Action MoveNextAction => _moveNextAction;
+
+        private void MoveNext() => StateMachine.MoveNext();
+    }
+
+    internal sealed class AsyncStateMachineBox<TStateMachine, TResult> : Task<TResult>
+        where TStateMachine : IAsyncStateMachine
+    {
+        private readonly Action _moveNextAction;
+
+        internal TStateMachine StateMachine;
+
+        internal AsyncStateMachineBox()
+        {
+            _moveNextAction = MoveNext;
+        }
+
+        internal Action MoveNextAction => _moveNextAction;
+
+        private void MoveNext() => StateMachine.MoveNext();
     }
 
     public partial class Task
@@ -2240,13 +2297,13 @@ namespace Internal.StackTraceMetadata
     internal static unsafe class StackTraceMetadata
     {
         private static byte* s_imageBase;
-        private static Internal.Metadata.NativeFormat.MetadataReader s_metadataReader;
+        private static Metadata.NativeFormat.MetadataReader s_metadataReader;
         private static byte* s_methodRvaToTokenMap;
         private static byte* s_methodRvaToTokenMapEnd;
 
         internal static void Initialize(
             byte* imageBase,
-            Internal.Metadata.NativeFormat.MetadataReader metadataReader,
+            Metadata.NativeFormat.MetadataReader metadataReader,
             IntPtr methodRvaToTokenMapStart,
             IntPtr methodRvaToTokenMapEnd)
         {
@@ -2264,7 +2321,7 @@ namespace Internal.StackTraceMetadata
 
             uint methodRva = (uint)((byte*)methodStartAddress - s_imageBase);
 
-            for (System.Runtime.StackTraceMethodMapEntry* entry = (System.Runtime.StackTraceMethodMapEntry*)s_methodRvaToTokenMap;
+            for (StackTraceMethodMapEntry* entry = (StackTraceMethodMapEntry*)s_methodRvaToTokenMap;
                 (byte*)(entry + 1) <= s_methodRvaToTokenMapEnd;
                 entry++)
             {
@@ -2292,10 +2349,10 @@ namespace Internal.Runtime.TypeLoader
         private byte* _typeMapEnd;
         private byte* _commonFixups;
         private byte* _commonFixupsEnd;
-        private Internal.Metadata.NativeFormat.MetadataReader _metadataReader;
+        private Metadata.NativeFormat.MetadataReader _metadataReader;
 
         internal void Initialize(
-            Internal.Metadata.NativeFormat.MetadataReader metadataReader,
+            Metadata.NativeFormat.MetadataReader metadataReader,
             IntPtr typeMapStart,
             IntPtr typeMapEnd,
             IntPtr commonFixupsStart,
@@ -2823,6 +2880,8 @@ namespace System.Runtime
             handlerClauseIndex = uint.MaxValue;
             byte* unwind = GetUnwindInfo(imageBase, root);
             byte* cursor = GetEhInfoCursor(unwind, imageBase);
+            if (cursor == null)
+                return false;
 
             uint clauseCount = ReadVarUInt(ref cursor);
             byte* methodStart = imageBase + root->BeginAddress;
@@ -2890,24 +2949,26 @@ namespace System.Runtime
 
         private static byte* GetUnwindInfo(byte* imageBase, RuntimeFunction* function) => imageBase + function->UnwindData;
 
+        // This is GetUnwindDataBlob from CoreRT's CoffNativeCodeManager.
+        // The UBF byte immediately follows the raw unwind-code array unless
+        // Windows supplied a personality routine, which adds an aligned RVA.
+        private static int GetUnwindDataBlobSize(byte* unwind)
+        {
+            int size = 4 + unwind[2] * 2;
+            if (((unwind[0] >> 3) & UnwindFlagHandlerMask) != 0)
+                size = (size + 3 & ~3) + sizeof(uint);
+
+            return size;
+        }
+
         private static byte GetFunctionBlockFlags(byte* unwind)
         {
-            int codeSize = 4 + unwind[2] * 2;
-            codeSize = (codeSize + 3) & ~3;
-            if ((unwind[0] >> 3 & UnwindFlagHandlerMask) != 0)
-                codeSize += sizeof(uint);
-
-            return unwind[codeSize];
+            return unwind[GetUnwindDataBlobSize(unwind)];
         }
 
         private static byte* GetEhInfoCursor(byte* unwind, byte* imageBase)
         {
-            int codeSize = 4 + unwind[2] * 2;
-            codeSize = (codeSize + 3) & ~3;
-            if ((unwind[0] >> 3 & UnwindFlagHandlerMask) != 0)
-                codeSize += sizeof(uint);
-
-            byte* cursor = unwind + codeSize;
+            byte* cursor = unwind + GetUnwindDataBlobSize(unwind);
             byte blockFlags = *cursor++;
             if ((blockFlags & FunctionHasAssociatedData) != 0)
                 cursor += sizeof(uint);
@@ -3780,7 +3841,7 @@ namespace Internal.Runtime
                 EH.s_imageBase = ImageBase;
                 EH.s_exceptionTable = (RuntimeFunction*)ExceptionTable;
                 EH.s_runtimeFunctionCount = (int)(ExceptionTableSize / EH.RuntimeFunctionSize);
-                var metadataReader = new Internal.Metadata.NativeFormat.MetadataReader(
+                var metadataReader = new Metadata.NativeFormat.MetadataReader(
                     nativeMetadataStart,
                     (int)((byte*)nativeMetadataEnd - (byte*)nativeMetadataStart));
                 StackTraceMetadata.StackTraceMetadata.Initialize(

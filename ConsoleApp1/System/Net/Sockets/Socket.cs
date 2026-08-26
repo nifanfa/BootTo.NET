@@ -114,8 +114,17 @@ namespace System.Net.Sockets
                 throw new ArgumentNullException("The remote address cannot be null.");
             if ((uint)port > ushort.MaxValue)
                 throw new ArgumentException("The remote port must be between 0 and 65535.");
-            if (socketType == SocketType.Dgram)
-                return ConnectUdpAsync(address, port);
+
+            return socketType switch
+            {
+                SocketType.Stream => ConnectTcpAsync(address, port),
+                SocketType.Dgram => ConnectUdpAsync(address, port),
+                _ => Task.FromException(new SocketException(EFI_UNSUPPORTED))
+            };
+        }
+
+        private Task ConnectTcpAsync(IPAddress address, int port)
+        {
             if (connected)
                 return Task.CompletedTask;
             if (connectCompletion != null)
@@ -179,8 +188,17 @@ namespace System.Net.Sockets
         {
             if (buffer == null)
                 return Task.FromException<int>(new Exception("The send buffer cannot be null."));
-            if (socketType == SocketType.Dgram)
-                return SendUdpAsync(buffer, remoteAddress, remotePort);
+
+            return socketType switch
+            {
+                SocketType.Stream => SendTcpAsync(buffer),
+                SocketType.Dgram => SendUdpAsync(buffer, remoteAddress, remotePort),
+                _ => Task.FromException<int>(new SocketException(EFI_UNSUPPORTED))
+            };
+        }
+
+        private Task<int> SendTcpAsync(byte[] buffer)
+        {
             if (!connected)
                 return Task.FromException<int>(new SocketException(EFI_NOT_STARTED));
             if (transmitCompletion != null)
@@ -218,8 +236,17 @@ namespace System.Net.Sockets
         {
             if (buffer == null)
                 return Task.FromException<int>(new Exception("The receive buffer cannot be null."));
-            if (socketType == SocketType.Dgram)
-                return ReceiveUdpAsync(buffer);
+
+            return socketType switch
+            {
+                SocketType.Stream => ReceiveTcpAsync(buffer),
+                SocketType.Dgram => ReceiveUdpAsync(buffer),
+                _ => Task.FromException<int>(new SocketException(EFI_UNSUPPORTED))
+            };
+        }
+
+        private Task<int> ReceiveTcpAsync(byte[] buffer)
+        {
             if (!connected)
                 return Task.FromException<int>(new SocketException(EFI_NOT_STARTED));
             if (receiveCompletion != null)
@@ -260,20 +287,38 @@ namespace System.Net.Sockets
 
             localAddress = address;
             localPort = port;
-            if (socketType == SocketType.Dgram)
+
+            switch (socketType)
             {
-                EFI_STATUS status = InitializeUdp();
-                if ((ulong)status != EFI_SUCCESS)
-                    throw new SocketException(status);
-                status = ConfigureUdp(null, 0);
-                if ((ulong)status != EFI_SUCCESS && (ulong)status != EFI_NO_MAPPING)
-                {
-                    ReleaseUdp();
-                    throw new SocketException(status);
-                }
-                if ((ulong)status == EFI_NO_MAPPING)
-                    BeginUdpAddressConfigurationWait();
+                case SocketType.Stream:
+                    BindTcp();
+                    break;
+                case SocketType.Dgram:
+                    BindUdp();
+                    break;
+                default:
+                    throw new SocketException(EFI_UNSUPPORTED);
             }
+        }
+
+        private void BindTcp()
+        {
+            bound = true;
+        }
+
+        private void BindUdp()
+        {
+            EFI_STATUS status = InitializeUdp();
+            if ((ulong)status != EFI_SUCCESS)
+                throw new SocketException(status);
+            status = ConfigureUdp(null, 0);
+            if ((ulong)status != EFI_SUCCESS && (ulong)status != EFI_NO_MAPPING)
+            {
+                ReleaseUdp();
+                throw new SocketException(status);
+            }
+            if ((ulong)status == EFI_NO_MAPPING)
+                BeginUdpAddressConfigurationWait();
             bound = true;
         }
 
@@ -385,8 +430,16 @@ namespace System.Net.Sockets
 
         public Task CloseAsync()
         {
-            if (socketType == SocketType.Dgram)
-                return CloseUdpAsync();
+            return socketType switch
+            {
+                SocketType.Stream => CloseTcpAsync(),
+                SocketType.Dgram => CloseUdpAsync(),
+                _ => Task.FromException(new SocketException(EFI_UNSUPPORTED))
+            };
+        }
+
+        private Task CloseTcpAsync()
+        {
             if (tcp == null)
                 return Task.CompletedTask;
             if (closeCompletion != null)
@@ -411,8 +464,16 @@ namespace System.Net.Sockets
 
         public EFI_STATUS Poll()
         {
-            if (socketType == SocketType.Dgram)
-                return PollUdp();
+            return socketType switch
+            {
+                SocketType.Stream => PollTcp(),
+                SocketType.Dgram => PollUdp(),
+                _ => EFI_UNSUPPORTED
+            };
+        }
+
+        private EFI_STATUS PollTcp()
+        {
             if (tcp == null)
                 return EFI_NOT_STARTED;
 
@@ -1199,10 +1260,15 @@ namespace System.Net.Sockets
             connected = (ulong)status == EFI_SUCCESS;
             if (!connected && (ulong)status == EFI_TIMEOUT)
             {
-                if (socketType == SocketType.Dgram)
-                    ReleaseUdp();
-                else
-                    ReleaseTcp();
+                switch (socketType)
+                {
+                    case SocketType.Stream:
+                        ReleaseTcp();
+                        break;
+                    case SocketType.Dgram:
+                        ReleaseUdp();
+                        break;
+                }
             }
             UpdatePollingRegistration();
 
