@@ -14,7 +14,6 @@ namespace System.Drawing
             if (graphics == null || graphics->Mode == null || graphics->Mode->Info == null || graphics->Blt == null)
                 throw new ArgumentException("The graphics protocol is incomplete or unavailable.");
             _graphics = graphics;
-            _cache = new Color[_graphics->Mode->Info->HorizontalResolution * _graphics->Mode->Info->VerticalResolution];
         }
 
         public RectangleF VisibleClipBounds => GetDisplayBounds();
@@ -62,6 +61,10 @@ namespace System.Drawing
         {
             if (_graphics == null || _graphics->Mode == null || _graphics->Mode->Info == null)
                 throw new InvalidOperationException("The graphics object has been disposed or is unavailable.");
+            if(_cache == null || _cache.Length != _graphics->Mode->Info->HorizontalResolution * _graphics->Mode->Info->VerticalResolution)
+            {
+                _cache = new Color[_graphics->Mode->Info->HorizontalResolution * _graphics->Mode->Info->VerticalResolution];
+            }
         }
 
         private RectangleF GetDisplayBounds()
