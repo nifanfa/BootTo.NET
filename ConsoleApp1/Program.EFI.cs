@@ -110,7 +110,7 @@ partial class Program
 
         printf("GC.Collect freed %d unreferenced objects!\r\n"u8, GC.Collect());
 
-#if false
+#if true
         Console.WriteLine("Press any key to continue...");
 
         Console.ReadKey();
