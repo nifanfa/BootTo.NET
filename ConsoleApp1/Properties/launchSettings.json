@@ -5,10 +5,6 @@
       "executablePath": "dotnet",
       "commandLineArgs": "publish --tl:off -r win-x64 -c Debug ConsoleApp1",
       "workingDirectory": "../"
-    },
-    "WSL": {
-      "commandName": "WSL2",
-      "distributionName": ""
     }
   }
 }

@@ -4,8 +4,6 @@
 
 #include "../NativeLib/printf.h"
 
-char* gameBinary;
-
 #define KEYQUEUE_SIZE 48
 
 static unsigned short s_KeyQueue[KEYQUEUE_SIZE];
@@ -52,26 +50,72 @@ static unsigned char convertToDoomKey(unsigned char key)
 	case 27:
 		key = KEY_ESCAPE;
 		break;
-	case 87:
+	case 8:
+		key = KEY_BACKSPACE;
+		break;
+	case 9:
+		key = KEY_TAB;
+		break;
+	case 37:
+		key = KEY_LEFTARROW;
+		break;
+	case 38:
 		key = KEY_UPARROW;
 		break;
-	case 83:
+	case 39:
+		key = KEY_RIGHTARROW;
+		break;
+	case 40:
 		key = KEY_DOWNARROW;
 		break;
-	case 65:
-		key = KEY_STRAFE_L;
+	case 112:
+		key = KEY_F1;
 		break;
-	case 68:
-		key = KEY_STRAFE_R;
+	case 113:
+		key = KEY_F2;
 		break;
-	case 69:
-		key = KEY_USE;
+	case 114:
+		key = KEY_F3;
+		break;
+	case 115:
+		key = KEY_F4;
+		break;
+	case 116:
+		key = KEY_F5;
+		break;
+	case 117:
+		key = KEY_F6;
+		break;
+	case 118:
+		key = KEY_F7;
+		break;
+	case 119:
+		key = KEY_F8;
+		break;
+	case 120:
+		key = KEY_F9;
+		break;
+	case 121:
+		key = KEY_F10;
+		break;
+	case 122:
+		key = KEY_F11;
+		break;
+	case 123:
+		key = KEY_F12;
 		break;
 	case 160:
 		key = KEY_RSHIFT;
 		break;
 	default:
-		key = 0;
+		if (key >= 'A' && key <= 'Z')
+		{
+			key = key - 'A' + 'a';
+		}
+		else if (key < ' ' || key > '~')
+		{
+			key = 0;
+		}
 		break;
 	}
 

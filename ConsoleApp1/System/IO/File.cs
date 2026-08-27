@@ -40,6 +40,12 @@ namespace System.IO
 
         public static void Delete(string path) => TryDelete(path);
 
+        public static void Move(string sourceFileName, string destFileName)
+        {
+            if (!TryMove(sourceFileName, destFileName))
+                throw new IOException("The file could not be moved.");
+        }
+
         private static bool OpenVolume(out EFI_FILE_HANDLE* volume)
         {
             volume = null;
@@ -214,6 +220,67 @@ namespace System.IO
                 EFI_STATUS status = file->Delete(file);
                 file = null;
                 return (ulong)status == EFI_SUCCESS;
+            }
+            finally
+            {
+                if (file != null)
+                    file->Close(file);
+                volume->Close(volume);
+            }
+        }
+
+        internal static bool TryMove(string sourceFileName, string destFileName)
+        {
+            if (string.IsNullOrEmpty(sourceFileName) || string.IsNullOrEmpty(destFileName))
+                return false;
+
+            if (Path.GetDirectoryName(sourceFileName) != Path.GetDirectoryName(destFileName))
+                return false;
+
+            string destinationName = Path.GetFileName(destFileName);
+            if (string.IsNullOrEmpty(destinationName) || !OpenVolume(out EFI_FILE_HANDLE* volume))
+                return false;
+
+            EFI_FILE_HANDLE* file = null;
+            try
+            {
+                fixed (char* sourcePath = sourceFileName)
+                {
+                    EFI_STATUS status = volume->Open(volume, &file, sourcePath,
+                        EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE, 0);
+                    if ((ulong)status != EFI_SUCCESS || file == null)
+                        return false;
+                }
+
+                ulong currentInfoSize = 0;
+                if ((ulong)file->GetInfo(file, (EFI_GUID*)EFI_FILE_INFO_ID,
+                    &currentInfoSize, null) != EFI_BUFFER_TOO_SMALL || currentInfoSize == 0)
+                    return false;
+
+                ulong destinationNameSize = ((ulong)destinationName.Length + 1UL) * sizeof(char);
+                byte[] buffer = new byte[currentInfoSize + destinationNameSize];
+                fixed (byte* infoBuffer = buffer)
+                {
+                    ulong infoSize = (ulong)buffer.Length;
+                    if ((ulong)file->GetInfo(file, (EFI_GUID*)EFI_FILE_INFO_ID,
+                        &infoSize, infoBuffer) != EFI_SUCCESS)
+                        return false;
+
+                    EFI_FILE_INFO* info = (EFI_FILE_INFO*)infoBuffer;
+                    char* fileName = info->FileName;
+                    ulong fileNameOffset = (ulong)((byte*)fileName - infoBuffer);
+                    ulong renameInfoSize = fileNameOffset + destinationNameSize;
+                    if (renameInfoSize > (ulong)buffer.Length)
+                        return false;
+
+                    for (int i = 0; i < destinationName.Length; i++)
+                        fileName[i] = destinationName[i];
+                    fileName[destinationName.Length] = '\0';
+                    info->Size = renameInfoSize;
+
+                    return (ulong)file->SetInfo(file, (EFI_GUID*)EFI_FILE_INFO_ID,
+                        renameInfoSize, infoBuffer) == EFI_SUCCESS;
+                }
             }
             finally
             {

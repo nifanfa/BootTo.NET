@@ -52,7 +52,7 @@ partial class Program
             {
                 EFI_GRAPHICS_OUTPUT_MODE_INFORMATION* modeinfo;
                 gop->QueryMode(gop, u, &sizeofMode, &modeinfo);
-                printf("GOP Mode %d: %dx%d\r\n"u8, u, modeinfo->HorizontalResolution, modeinfo->VerticalResolution);
+                printf("GOP Mode %d: %dx%d\n"u8, u, modeinfo->HorizontalResolution, modeinfo->VerticalResolution);
             }
             Console.Write("Please select mode: ");
             gop->SetMode(gop, Convert.ToUInt32(Console.ReadLine()));
@@ -108,7 +108,7 @@ partial class Program
         Console.WriteLine(@"|_______/  \______/  \______/    \___/  |__/ \______/|__/|__/  \__/|________/   |__/   ");
         Console.ForegroundColor = ConsoleColor.Gray;
 
-        printf("GC.Collect freed %d unreferenced objects!\r\n"u8, GC.Collect());
+        printf("GC.Collect freed %d unreferenced objects!\n"u8, GC.Collect());
 
 #if true
         Console.WriteLine("Press any key to continue...");
@@ -234,7 +234,7 @@ partial class Program
             Console.Write("Content of Test.txt is: ");
             unsafe
             {
-                printf("%s\r\n"u8, buffer);
+                printf("%s\n"u8, buffer);
             }
         }
     }
@@ -253,7 +253,7 @@ partial class Program
             await socket.ReceiveAsync(buffer);
             unsafe
             {
-                printf("Buffer received: %s\r\n"u8, buffer);
+                printf("Buffer received: %s\n"u8, buffer);
             }
             socket.Close();
         }
@@ -274,7 +274,7 @@ partial class Program
             await socket.ReceiveAsync(buffer);
             unsafe
             {
-                printf("Buffer received: %s\r\n"u8, buffer);
+                printf("Buffer received: %s\n"u8, buffer);
             }
             socket.Close();
         }
@@ -296,6 +296,25 @@ partial class Program
         }
     }
 
+    public static void PrintFrame()
+    {
+        Console.Clear();
+        int height = Console.BufferHeight - 2;
+        int width = Console.BufferWidth - 1;
+        int h = 0;
+        for (; h <= height; h++)
+        {
+            for (int i = 0; i <= width; i++)
+            {
+                if (h % height == 0 || i % width == 0)
+                    Console.Write('#');
+                else Console.Write(' ');
+            }
+            Console.WriteLine();
+        }
+        Console.Write(Convert.ToBoolean(IsTcg()) ? "Slow QEMU TCG detected. Enable Windows Hypervisor Platform." : string.Empty);
+    }
+
     static void Resize(uint[] dst, long dstWidth, uint[] src, long srcWidth)
     {
         int srcHeight = (int)(src.Length / srcWidth);
@@ -314,25 +333,6 @@ partial class Program
                 dst[destinationRow + x] = src[sourceRow + srcX];
             }
         }
-    }
-
-    public static void PrintFrame()
-    {
-        Console.Clear();
-        int height = Console.BufferHeight - 2;
-        int width = Console.BufferWidth - 1;
-        int h = 0;
-        for (; h <= height; h++)
-        {
-            for (int i = 0; i <= width; i++)
-            {
-                if (h % height == 0 || i % width == 0)
-                    Console.Write('#');
-                else Console.Write(' ');
-            }
-            Console.WriteLine();
-        }
-        Console.Write(Convert.ToBoolean(IsTcg()) ? "Slow QEMU TCG detected. Enable Windows Hypervisor Platform." : string.Empty);
     }
 
     public unsafe static ulong GetAvailableMemory()

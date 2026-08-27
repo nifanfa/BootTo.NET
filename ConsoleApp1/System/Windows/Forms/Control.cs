@@ -2,7 +2,7 @@ using System.Drawing;
 
 namespace System.Windows.Forms
 {
-    [System.Flags]
+    [Flags]
     public enum MouseButtons
     {
         None = 0,
@@ -70,7 +70,7 @@ namespace System.Windows.Forms
             if (!TryGetPointer())
                 return;
 
-            global::EFI_SIMPLE_POINTER_STATE state;
+            EFI_SIMPLE_POINTER_STATE state;
             while ((ulong)s_pointer->GetState(s_pointer, &state) == EFI_SUCCESS)
             {
                 int deltaX = NormalizePointerMovement(state.RelativeMovementX, ref s_remainderX);
@@ -95,7 +95,7 @@ namespace System.Windows.Forms
             if (gBS == null)
                 return false;
 
-            global::EFI_SIMPLE_POINTER_PROTOCOL* pointer = null;
+            EFI_SIMPLE_POINTER_PROTOCOL* pointer = null;
             EFI_GUID protocol = EFI_SIMPLE_POINTER_PROTOCOL_GUID;
             EFI_STATUS status = gBS->LocateProtocol((EFI_GUID*)protocol, null, (void**)&pointer);
             if ((ulong)status != EFI_SUCCESS || pointer == null || pointer->GetState == null)
@@ -107,7 +107,7 @@ namespace System.Windows.Forms
             return true;
         }
 
-        private static MouseButtons GetButtons(global::EFI_SIMPLE_POINTER_STATE state)
+        private static MouseButtons GetButtons(EFI_SIMPLE_POINTER_STATE state)
         {
             MouseButtons buttons = MouseButtons.None;
             if (state.LeftButton)

@@ -1,4 +1,10 @@
-﻿using System.Runtime.InteropServices;
+﻿using System;
+using System.Drawing;
+using System.IO;
+using System.Media;
+using System.Runtime;
+using System.Runtime.InteropServices;
+using System.Windows.Forms;
 
 internal static unsafe class doomgeneric
 {
@@ -18,17 +24,17 @@ internal static unsafe class doomgeneric
     private const int DoomMouseTurnMultiplier = 32;
     private const int MaximumOpenFiles = 32;
 
-    private static readonly System.IO.FileStream[] OpenFiles = new System.IO.FileStream[MaximumOpenFiles];
-    private static readonly System.Media.SoundPlayer SoundOutput = new System.Media.SoundPlayer(2, DoomAudioRate);
+    private static readonly FileStream[] OpenFiles = new FileStream[MaximumOpenFiles];
+    private static readonly SoundPlayer SoundOutput = new SoundPlayer(2, DoomAudioRate);
     private static readonly byte[] AudioBuffer = new byte[DoomAudioFrames * 2 * sizeof(short)];
-    private static System.Drawing.Bitmap s_screen;
-    private static System.Drawing.Graphics s_graphics;
+    private static Bitmap s_screen;
+    private static Graphics s_graphics;
     private static uint s_ticks;
     private static uint s_tickMillisecondRemainder;
 
     public static void Run()
     {
-        s_screen = new System.Drawing.Bitmap(DoomWidth, DoomHeight);
+        s_screen = new Bitmap(DoomWidth, DoomHeight);
         s_graphics = CreateGraphics();
 
         byte[] program = "doomgeneric\0"u8;
@@ -49,34 +55,34 @@ internal static unsafe class doomgeneric
         Program.PrintFrame();
         while (true)
         {
-            System.Windows.Forms.Control.PumpMouseState();
+            Control.PumpMouseState();
             doomgeneric_Tick();
             WaitForNextTick();
         }
     }
 
-    [System.Runtime.RuntimeExport("malloc")]
+    [RuntimeExport("malloc")]
     public static nint Malloc(ulong size) => (nint)GarbageCollector.AllocateNative(size == 0 ? 1UL : size);
 
-    [System.Runtime.RuntimeExport("free")]
+    [RuntimeExport("free")]
     public static void Free(nint pointer) => GarbageCollector.FreeNative((void*)pointer);
 
-    [System.Runtime.RuntimeExport("DG_PresentFrame")]
+    [RuntimeExport("DG_PresentFrame")]
     public static void PresentFrame(uint* pixels, int width, int height)
     {
         if (pixels == null || width != DoomWidth || height != DoomHeight || s_screen == null)
             return;
 
         for (int i = 0; i < DoomWidth * DoomHeight; i++)
-            s_screen.pixels[i] = System.Drawing.Color.FromArgb(pixels[i]);
+            s_screen.pixels[i] = Color.FromArgb(pixels[i]);
 
-        System.Drawing.Rectangle bounds = s_graphics.VisibleClipBounds;
+        Rectangle bounds = s_graphics.VisibleClipBounds;
         int x = (bounds.Width - DoomWidth) / 2;
         int y = (bounds.Height - DoomHeight) / 2;
         s_graphics.DrawImage(s_screen, x, y);
     }
 
-    [System.Runtime.RuntimeExport("DG_Sleep")]
+    [RuntimeExport("DG_Sleep")]
     public static void Sleep(uint milliseconds)
     {
         if (milliseconds != 0)
@@ -86,7 +92,7 @@ internal static unsafe class doomgeneric
         }
     }
 
-    [System.Runtime.RuntimeExport("DG_GetTicks")]
+    [RuntimeExport("DG_GetTicks")]
     public static uint GetTicks() => s_ticks;
 
     private static void WaitForNextTick()
@@ -97,7 +103,7 @@ internal static unsafe class doomgeneric
         Sleep(milliseconds);
     }
 
-    [System.Runtime.RuntimeExport("DG_AudioWrite")]
+    [RuntimeExport("DG_AudioWrite")]
     public static int AudioWrite(short* samples, int frameCount)
     {
         if (samples == null || frameCount <= 0 || frameCount > DoomAudioFrames)
@@ -117,15 +123,15 @@ internal static unsafe class doomgeneric
         return SoundOutput.Play(AudioBuffer, 0, byteCount) == byteCount ? frameCount : 0;
     }
 
-    [System.Runtime.RuntimeExport("DG_PollMouse")]
+    [RuntimeExport("DG_PollMouse")]
     public static int PollMouse(int* buttons, int* deltaX, int* deltaY)
     {
         if (buttons == null || deltaX == null || deltaY == null ||
-            !System.Windows.Forms.Control.TryReadMouseState(out int relativeX, out _, out System.Windows.Forms.MouseButtons state))
+            !Control.TryReadMouseState(out int relativeX, out _, out MouseButtons state))
             return 0;
 
         int doomButtons = 0;
-        if ((state & System.Windows.Forms.MouseButtons.Left) != 0)
+        if ((state & MouseButtons.Left) != 0)
             doomButtons |= 1;
         *buttons = doomButtons;
         *deltaX = ScaleMouseDelta(relativeX);
@@ -142,10 +148,10 @@ internal static unsafe class doomgeneric
         return scaled;
     }
 
-    [System.Runtime.RuntimeExport("DG_PollKey")]
+    [RuntimeExport("DG_PollKey")]
     public static int PollKey(int* pressed, byte* key)
     {
-        if (pressed == null || key == null || !System.Console.TryReadKeyEvent(out System.ConsoleKeyEvent keyEvent))
+        if (pressed == null || key == null || !Console.TryReadKeyEvent(out ConsoleKeyEvent keyEvent))
             return 0;
 
         *pressed = keyEvent.IsKeyDown ? 1 : 0;
@@ -153,10 +159,10 @@ internal static unsafe class doomgeneric
         return 1;
     }
 
-    [System.Runtime.RuntimeExport("DG_FileOpen")]
+    [RuntimeExport("DG_FileOpen")]
     public static int FileOpen(byte* path, byte* mode)
     {
-        string filePath = DecodeAscii(path);
+        string filePath = NormalizeFilePath(DecodeAscii(path));
         string openMode = DecodeAscii(mode);
         if (string.IsNullOrEmpty(filePath) || string.IsNullOrEmpty(openMode))
             return 0;
@@ -172,13 +178,15 @@ internal static unsafe class doomgeneric
             for (int i = 0; i < openMode.Length; i++)
                 readWrite |= openMode[i] == '+';
 
-            System.IO.FileMode fileMode = openMode[0] == 'r'
-                ? System.IO.FileMode.Open
-                : openMode[0] == 'a' ? System.IO.FileMode.Append : System.IO.FileMode.Create;
-            System.IO.FileAccess access = readWrite
-                ? System.IO.FileAccess.ReadWrite
-                : write ? System.IO.FileAccess.Write : System.IO.FileAccess.Read;
-            OpenFiles[slot] = new System.IO.FileStream(filePath, fileMode, access);
+            FileMode fileMode = openMode[0] == 'r'
+                ? FileMode.Open
+                : openMode[0] == 'a' ? FileMode.Append : FileMode.Create;
+            FileAccess access = readWrite
+                ? FileAccess.ReadWrite
+                : write ? FileAccess.Write : FileAccess.Read;
+            if (write)
+                EnsureParentDirectory(filePath);
+            OpenFiles[slot] = new FileStream(filePath, fileMode, access);
             return slot + 1;
         }
         catch
@@ -187,20 +195,27 @@ internal static unsafe class doomgeneric
         }
     }
 
-    [System.Runtime.RuntimeExport("DG_FileRead")]
+    [RuntimeExport("DG_FileRead")]
     public static int FileRead(int handle, byte* destination, int length)
     {
-        System.IO.FileStream stream = GetFile(handle);
+        FileStream stream = GetFile(handle);
         if (stream == null || destination == null || length < 0)
             return -1;
 
         try
         {
             byte[] buffer = new byte[length];
-            int read = stream.Read(buffer);
-            for (int i = 0; i < read; i++)
+            int totalRead = 0;
+            while (totalRead < length)
+            {
+                int read = stream.Read(buffer, totalRead, length - totalRead);
+                if (read <= 0)
+                    break;
+                totalRead += read;
+            }
+            for (int i = 0; i < totalRead; i++)
                 destination[i] = buffer[i];
-            return read;
+            return totalRead;
         }
         catch
         {
@@ -208,10 +223,10 @@ internal static unsafe class doomgeneric
         }
     }
 
-    [System.Runtime.RuntimeExport("DG_FileWrite")]
+    [RuntimeExport("DG_FileWrite")]
     public static int FileWrite(int handle, byte* source, int length)
     {
-        System.IO.FileStream stream = GetFile(handle);
+        FileStream stream = GetFile(handle);
         if (stream == null || source == null || length < 0)
             return -1;
 
@@ -220,7 +235,16 @@ internal static unsafe class doomgeneric
             byte[] buffer = new byte[length];
             for (int i = 0; i < length; i++)
                 buffer[i] = source[i];
-            return stream.Write(buffer);
+
+            int totalWritten = 0;
+            while (totalWritten < length)
+            {
+                int written = stream.Write(buffer, totalWritten, length - totalWritten);
+                if (written <= 0)
+                    break;
+                totalWritten += written;
+            }
+            return totalWritten;
         }
         catch
         {
@@ -228,16 +252,16 @@ internal static unsafe class doomgeneric
         }
     }
 
-    [System.Runtime.RuntimeExport("DG_FileSeek")]
+    [RuntimeExport("DG_FileSeek")]
     public static long FileSeek(int handle, long offset, int origin)
     {
-        System.IO.FileStream stream = GetFile(handle);
+        FileStream stream = GetFile(handle);
         if (stream == null)
             return -1;
 
         try
         {
-            return stream.Seek(offset, (System.IO.SeekOrigin)origin);
+            return stream.Seek(offset, (SeekOrigin)origin);
         }
         catch
         {
@@ -245,10 +269,10 @@ internal static unsafe class doomgeneric
         }
     }
 
-    [System.Runtime.RuntimeExport("DG_FileTell")]
+    [RuntimeExport("DG_FileTell")]
     public static long FileTell(int handle)
     {
-        System.IO.FileStream stream = GetFile(handle);
+        FileStream stream = GetFile(handle);
         if (stream == null)
             return -1;
 
@@ -262,7 +286,7 @@ internal static unsafe class doomgeneric
         }
     }
 
-    [System.Runtime.RuntimeExport("DG_FileClose")]
+    [RuntimeExport("DG_FileClose")]
     public static int FileClose(int handle)
     {
         int index = handle - 1;
@@ -271,6 +295,7 @@ internal static unsafe class doomgeneric
 
         try
         {
+            OpenFiles[index].Flush();
             OpenFiles[index].Close();
             OpenFiles[index] = null;
             return 0;
@@ -281,10 +306,10 @@ internal static unsafe class doomgeneric
         }
     }
 
-    [System.Runtime.RuntimeExport("DG_FileFlush")]
+    [RuntimeExport("DG_FileFlush")]
     public static int FileFlush(int handle)
     {
-        System.IO.FileStream stream = GetFile(handle);
+        FileStream stream = GetFile(handle);
         if (stream == null)
             return -1;
 
@@ -299,12 +324,14 @@ internal static unsafe class doomgeneric
         }
     }
 
-    [System.Runtime.RuntimeExport("DG_FileCreateDirectory")]
+    [RuntimeExport("DG_FileCreateDirectory")]
     public static int FileCreateDirectory(byte* path)
     {
         try
         {
-            System.IO.Directory.CreateDirectory(DecodeAscii(path));
+            string directory = NormalizeFilePath(DecodeAscii(path));
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
             return 0;
         }
         catch
@@ -313,12 +340,12 @@ internal static unsafe class doomgeneric
         }
     }
 
-    [System.Runtime.RuntimeExport("DG_FileRemove")]
+    [RuntimeExport("DG_FileRemove")]
     public static int FileRemove(byte* path)
     {
         try
         {
-            System.IO.File.Delete(DecodeAscii(path));
+            File.Delete(NormalizeFilePath(DecodeAscii(path)));
             return 0;
         }
         catch
@@ -327,14 +354,18 @@ internal static unsafe class doomgeneric
         }
     }
 
-    [System.Runtime.RuntimeExport("DG_FileRename")]
+    [RuntimeExport("DG_FileRename")]
     public static int FileRename(byte* oldPath, byte* newPath)
     {
         try
         {
-            byte[] contents = System.IO.File.ReadAllBytes(DecodeAscii(oldPath));
-            System.IO.File.WriteAllBytes(DecodeAscii(newPath), contents);
-            System.IO.File.Delete(DecodeAscii(oldPath));
+            string sourcePath = NormalizeFilePath(DecodeAscii(oldPath));
+            string destinationPath = NormalizeFilePath(DecodeAscii(newPath));
+            if (string.IsNullOrEmpty(sourcePath) || string.IsNullOrEmpty(destinationPath))
+                return -1;
+
+            EnsureParentDirectory(destinationPath);
+            File.Move(sourcePath, destinationPath);
             return 0;
         }
         catch
@@ -343,7 +374,7 @@ internal static unsafe class doomgeneric
         }
     }
 
-    private static System.IO.FileStream GetFile(int handle)
+    private static FileStream GetFile(int handle)
     {
         int index = handle - 1;
         return (uint)index < MaximumOpenFiles ? OpenFiles[index] : null;
@@ -372,5 +403,37 @@ internal static unsafe class doomgeneric
         for (int i = 0; i < length; i++)
             characters[i] = (char)value[i];
         return new string(characters);
+    }
+
+    private static string NormalizeFilePath(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+            return path;
+
+        int start = 0;
+        while (start + 1 < path.Length && path[start] == '.' &&
+               (path[start + 1] == '\\' || path[start + 1] == '/'))
+            start += 2;
+
+        int end = path.Length;
+        while (end > start && (path[end - 1] == '\\' || path[end - 1] == '/'))
+            end--;
+        if (end - start == 1 && path[start] == '.')
+            return string.Empty;
+
+        char[] normalized = new char[end - start];
+        for (int i = 0; i < normalized.Length; i++)
+        {
+            char value = path[start + i];
+            normalized[i] = value == '/' ? '\\' : value;
+        }
+        return new string(normalized);
+    }
+
+    private static void EnsureParentDirectory(string path)
+    {
+        string directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(directory))
+            Directory.CreateDirectory(directory);
     }
 }

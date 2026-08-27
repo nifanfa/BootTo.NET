@@ -28,12 +28,12 @@
 
 int key_right = KEY_RIGHTARROW;
 int key_left = KEY_LEFTARROW;
-int key_up = KEY_UPARROW;
-int key_down = KEY_DOWNARROW; 
-int key_strafeleft = KEY_STRAFE_L;
-int key_straferight = KEY_STRAFE_R;
+int key_up = 'w';
+int key_down = 's';
+int key_strafeleft = 'a';
+int key_straferight = 'd';
 int key_fire = KEY_FIRE;
-int key_use = KEY_USE;
+int key_use = 'e';
 int key_strafe = KEY_RALT;
 int key_speed = KEY_RSHIFT; 
 
