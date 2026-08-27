@@ -18,7 +18,7 @@ running the application.
 | `DnsDxe.efi` | Provides EFI DNS4 name resolution. BootTo.NET supplies `8.8.8.8` explicitly, so DnsDxe does not use its DHCP/`Ip4Config2` DNS-server discovery path. |
 | `HttpUtilitiesDxe.efi` | Provides shared HTTP message and header parsing and generation utilities. |
 | `TlsDxe.efi` | Provides UEFI TLS protocols and encrypted sessions. HTTPS certificate validation uses the `TlsCaCertificate` UEFI variable. This copy is built from the OpenCore UDK source with a fix for the OpenSSL empty `EX_CALLBACK` stack path. |
-| `HttpDxe.efi` | Provides the UEFI HTTP protocol and binds to the firmware TCP/IP and DNS stack, including TLS for HTTPS URLs. |
+| `HttpDxe.efi` | Provides the UEFI HTTP protocol and binds to the firmware TCP/IP and DNS stack, including TLS for HTTPS URLs.(WARNING: this is NOT original HttpDxe.efi. HttpDns4 method is edited!) |
 
 ## Other Drivers
 
