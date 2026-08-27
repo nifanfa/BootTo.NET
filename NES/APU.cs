@@ -1,6 +1,6 @@
 using System;
 
-namespace Playground.NES
+namespace NES
 {
     public sealed class APU
     {
@@ -32,7 +32,6 @@ namespace Playground.NES
         private int sampleAccumulator;
         private readonly byte[] pcmBuffer = new byte[4096];
         private int pcmBufferOffset;
-        private readonly System.Media.SoundPlayer soundPlayer;
 
         private double highPass90Input;
         private double highPass90Output;
@@ -45,6 +44,8 @@ namespace Playground.NES
         public int PeakSampleMagnitude { get; private set; }
         // Little-endian signed 16-bit mono PCM at PcmSampleRate.
         // The callback is invoked with complete PCM blocks, not individual samples.
+        public Action<byte[], int> PcmOutput { get; set; }
+
         public APU()
             : this(null)
         {
@@ -53,7 +54,6 @@ namespace Playground.NES
         public APU(Func<int, byte> memoryReader)
         {
             dmc = new DmcChannel(memoryReader);
-            soundPlayer = new System.Media.SoundPlayer(PcmChannels, PcmSampleRate);
         }
 
         public void WriteRegister(int address, byte data)
@@ -130,7 +130,9 @@ namespace Playground.NES
             if (pcmBufferOffset == 0)
                 return;
 
-            soundPlayer.Play(pcmBuffer, 0, pcmBufferOffset);
+            Action<byte[], int> output = PcmOutput;
+            if (output != null)
+                output(pcmBuffer, pcmBufferOffset);
             pcmBufferOffset = 0;
         }
 
@@ -243,7 +245,9 @@ namespace Playground.NES
             pcmBuffer[pcmBufferOffset++] = (byte)((LastSample >> 8) & 0xFF);
             if (pcmBufferOffset == pcmBuffer.Length)
             {
-                soundPlayer.Play(pcmBuffer, 0, pcmBufferOffset);
+                Action<byte[], int> output = PcmOutput;
+                if (output != null)
+                    output(pcmBuffer, pcmBuffer.Length);
                 pcmBufferOffset = 0;
             }
         }

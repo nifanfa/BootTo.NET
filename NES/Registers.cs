@@ -1,4 +1,6 @@
-namespace Playground.NES
+﻿using System;
+
+namespace NES
 {
     public class Registers
     {

@@ -17,37 +17,6 @@ namespace System.Drawing
 
         public Rectangle VisibleClipBounds => GetDisplayBounds();
 
-        public void DrawPoint(int x, int y, Color color)
-        {
-            EnsureOpen();
-            if (x < 0 || y < 0 ||
-                x >= VisibleClipBounds.Width ||
-                y >= VisibleClipBounds.Height)
-                return;
-
-            EFI_GRAPHICS_OUTPUT_BLT_PIXEL pixel = new EFI_GRAPHICS_OUTPUT_BLT_PIXEL
-            {
-                Blue = color.B,
-                Green = color.G,
-                Red = color.R,
-                Reserved = 0
-            };
-
-            EFI_STATUS status = _graphics->Blt(
-                _graphics,
-                &pixel,
-                EfiBltBufferToVideo,
-                0,
-                0,
-                (ulong)x,
-                (ulong)y,
-                1,
-                1,
-                0);
-            if ((ulong)status != EFI_SUCCESS)
-                throw new InvalidOperationException("The graphics protocol could not draw the pixel.");
-        }
-
         public void DrawImage(Image image, int x, int y)
         {
             EnsureOpen();

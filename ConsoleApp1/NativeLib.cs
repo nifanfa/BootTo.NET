@@ -55,12 +55,6 @@ internal unsafe class NativeLib
     [DllImport("*", EntryPoint = "vsnprintf_")]
     public static extern int snprintf(byte* buffer, int count, void* format, params VariableArgument[] va);
 
-    [DllImport("*")]
-    public static extern void* memcpy(void* dest, void* src, ulong n);
-
-    [DllImport("*")]
-    public static extern void* memset(void* ptr, int value, ulong num);
-
     [DllImport("*", EntryPoint = "vprintf_")]
     public static extern int printf(void* format, params VariableArgument[] va);
 

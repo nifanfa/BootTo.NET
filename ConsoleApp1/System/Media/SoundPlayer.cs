@@ -1,3 +1,4 @@
+using Internal.Runtime.CompilerServices;
 using System.IO;
 using System.Runtime.InteropServices;
 
@@ -287,6 +288,11 @@ namespace System.Media
         private const ulong PlaybackDelay = 0;
         private static sbyte s_gain = DefaultGain;
         private static bool s_failed;
+        private static ulong s_remainingBytes;
+
+        // Approximate amount of converted PCM accepted by AudioDxe but not
+        // completed yet. This is transfer-level accounting, not a DMA cursor.
+        public ulong RemainingBytes => s_remainingBytes;
 
         private static bool IsAvailable =>
             s_audioIo != null && (void*)s_playbackEvent != null && !s_failed;
@@ -476,7 +482,7 @@ namespace System.Media
                 return 0;
 
             fixed (byte* source = output)
-                memcpy(rawBuffer, source, (ulong)output.Length);
+                Unsafe.CopyBlock(rawBuffer, source, (ulong)output.Length);
 
             EFI_STATUS status = PlayBuffer(
                 rawBuffer,
@@ -514,7 +520,7 @@ namespace System.Media
                 return 0;
 
             fixed (byte* source = output)
-                memcpy(rawBuffer, source, (ulong)output.Length);
+                Unsafe.CopyBlock(rawBuffer, source, (ulong)output.Length);
 
             EFI_TPL oldTpl = gBS->RaiseTPL(TPL_NOTIFY);
             EFI_STATUS status = s_audioIo->SetupPlayback(
@@ -527,13 +533,14 @@ namespace System.Media
                 PlaybackDelay);
             if ((ulong)status == EFI_SUCCESS)
             {
+                s_remainingBytes += (ulong)output.Length;
                 status = s_audioIo->StartPlaybackAsync(
                     s_audioIo,
                     rawBuffer,
                     (ulong)output.Length,
                     0,
-                    null,
-                    null);
+                    &StreamingPlaybackDone,
+                    (void*)(ulong)output.Length);
             }
             gBS->RestoreTPL(oldTpl);
 
@@ -543,6 +550,10 @@ namespace System.Media
             gBS->FreePool(rawBuffer);
             if ((ulong)status != EFI_SUCCESS)
             {
+                if (s_remainingBytes >= (ulong)output.Length)
+                    s_remainingBytes -= (ulong)output.Length;
+                else
+                    s_remainingBytes = 0;
                 s_failed = true;
                 return 0;
             }
@@ -718,6 +729,9 @@ namespace System.Media
                 s_currentBuffer = null;
             }
 
+            // StopPlayback does not invoke queued transfer callbacks.
+            s_remainingBytes = 0;
+
             if (checkEvent)
                 gBS->CheckEvent(s_playbackEvent);
             gBS->RestoreTPL(oldTpl);
@@ -741,6 +755,16 @@ namespace System.Media
                     s_currentBuffer = null;
             }
             gBS->SignalEvent(s_playbackEvent);
+        }
+
+        [UnmanagedCallersOnly]
+        private static void StreamingPlaybackDone(EFI_AUDIO_IO_PROTOCOL* audioIo, void* context)
+        {
+            ulong completed = (ulong)context;
+            if (completed >= s_remainingBytes)
+                s_remainingBytes = 0;
+            else
+                s_remainingBytes -= completed;
         }
 
         private static ulong GetConnectedSpeakerOutputMask(

@@ -3702,7 +3702,11 @@ namespace Internal.Runtime
 
             [RuntimeImport("*", "memcpy")]
             [MethodImpl(MethodImplOptions.InternalCall)]
-            public unsafe static extern void CopyBlock(void* destination, void* source, ulong byteCount);
+            public static extern void CopyBlock(void* destination, void* source, ulong byteCount);
+
+            [RuntimeImport("*", "memset")]
+            [MethodImpl(MethodImplOptions.InternalCall)]
+            public static extern void InitBlock(void* startAddress, int value, ulong byteCount);
         }
     }
 

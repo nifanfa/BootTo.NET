@@ -1,6 +1,6 @@
-using System;
+﻿using System;
 
-namespace Playground.NES
+namespace NES
 {
     public class CPU
     {

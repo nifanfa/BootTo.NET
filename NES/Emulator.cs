@@ -1,9 +1,11 @@
 ﻿using System;
 using System.IO;
+using System.Media;
+using System.Threading;
 
-namespace Playground.NES
+namespace NES
 {
-    public class Emulator
+    public partial class Emulator
     {
         MemoryStream fsOpenRom;
         Registers registers;
@@ -11,7 +13,8 @@ namespace Playground.NES
         Mappers mappers;
         CPU cpu;
         APU apu;
-        public GameRender gameRender;
+        SoundPlayer soundPlayer;
+        GameRender gameRender;
         Input input;
         PPU ppu;
 
@@ -29,12 +32,24 @@ namespace Playground.NES
         public int VBlankTime = 20 * 341 * 5;
         public byte MapperNumber;
         public bool rendering = false;
+        private const int AudioLowWatermarkBytes = APU.PcmSampleRate * APU.PcmBytesPerSample / 10;
+        private const int AudioHighWatermarkBytes = APU.PcmSampleRate * APU.PcmBytesPerSample / 5;
+        private const int AudioMaximumBufferedBytes = APU.PcmSampleRate * APU.PcmBytesPerSample / 4;
+        private bool skipVideoFrames;
         #endregion
 
         public void runGame()
         {
             if (bolRunGame && !cpu.badOpCode)
             {
+                // The APU buffer is the real-time clock. Keep roughly a
+                // quarter second of PCM queued, not seconds of delayed audio.
+                if (soundPlayer.RemainingBytes >= AudioMaximumBufferedBytes)
+                {
+                    Thread.Sleep(1);
+                    return;
+                }
+
                 if (cpu.intTotalCpuCycles < intMaxCPUCycles)
                 {
                     int cpuCyclesBefore = cpu.intTotalCpuCycles;
@@ -143,6 +158,8 @@ namespace Playground.NES
             mappers = new Mappers();
             memory = new MemoryMap(registers, input, this, mappers);
             apu = new APU(memory.ReadPRG);
+            apu.PcmOutput = PcmOutput;
+            soundPlayer = new SoundPlayer(1, 44100);
             memory.AttachAPU(apu);
             ppu = new PPU(memory, this);
             cpu = new CPU(memory, input, ppu, registers);
@@ -151,6 +168,11 @@ namespace Playground.NES
 
             bolStartFrame = true;
             bolReset = true;
+        }
+
+        private void PcmOutput(byte[] buffer, int count)
+        {
+            soundPlayer.Play(buffer, 0, count);
         }
 
         #region Keyboard Input

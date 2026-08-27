@@ -1,37 +1,51 @@
-﻿using System.Drawing;
+﻿using Internal.Runtime.CompilerServices;
+using System;
+using System.Drawing;
 
-namespace Playground.NES
+namespace NES
 {
     public class GameRender
     {
+        Emulator NES;
+        Bitmap textureScreenBuffer = new Bitmap(256, 240);
         Graphics graphics = CreateGraphics();
-        Bitmap bitmap = new Bitmap(256, 240);
 
-        public unsafe void WriteBitmap(byte[] byteToWrite, Color XColor)
+        public void WriteBitmap(byte[] byteToWrite, Color XColor)
         {
-            lock (this)
+            if (byteToWrite == null)
+                throw new ArgumentNullException(nameof(byteToWrite));
+            if ((byteToWrite.Length & 3) != 0)
+                throw new ArgumentException("Bitmap data must contain complete 4-byte pixels.");
+
+            int pixelCount = byteToWrite.Length / 4;
+            if (pixelCount > textureScreenBuffer.Width * textureScreenBuffer.Height)
+                throw new ArgumentException("Bitmap data is larger than the target bitmap.");
+
+            unsafe
             {
-                int w = 0;
-                int h = 0;
-
-                int baseX = (int)((graphics.VisibleClipBounds.Width / 2) - (bitmap.Width / 2));
-                int baseY = (int)((graphics.VisibleClipBounds.Height / 2) - (bitmap.Height / 2));
-
-                for (int i = 0; i < byteToWrite.Length; i += 4)
+                fixed (byte* src = byteToWrite)
                 {
-                    Color color = Color.FromArgb(byteToWrite[i + 3], byteToWrite[i + 2], byteToWrite[i + 1], byteToWrite[i + 0]);
-                    bitmap.SetPixel(w, h, color.A != 0 ? color : XColor);
-                    //
-                    w++;
-                    if (w == bitmap.Width)
+                    fixed (Color* dst = textureScreenBuffer.pixels)
                     {
-                        w = 0;
-                        h++;
+                        Unsafe.CopyBlock(dst, src, (ulong)byteToWrite.Length);
+
+                        // Color is a packed 32-bit ARGB value. Avoid the
+                        // per-pixel SetPixel call and coordinate arithmetic.
+                        uint* pixels = (uint*)dst;
+                        uint replacement = XColor.ARGB;
+                        for (int pixel = 0; pixel < pixelCount; pixel++)
+                        {
+                            if ((pixels[pixel] & 0xFF000000U) == 0)
+                                pixels[pixel] = replacement;
+                        }
                     }
                 }
-
-                graphics.DrawImage(bitmap, baseX, baseY);
             }
+
+            Rectangle bounds = graphics.VisibleClipBounds;
+            int baseX = (bounds.Width / 2) - (textureScreenBuffer.Width / 2);
+            int baseY = (bounds.Height / 2) - (textureScreenBuffer.Height / 2);
+            graphics.DrawImage(textureScreenBuffer, baseX, baseY);
         }
     }
 }

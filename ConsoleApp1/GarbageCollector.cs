@@ -1,4 +1,5 @@
 using Internal.Runtime;
+using Internal.Runtime.CompilerServices;
 using System;
 using System.Runtime.InteropServices;
 
@@ -114,7 +115,7 @@ internal static unsafe class GarbageCollector
 
         // Managed objects are zero-initialized by the runtime. Keep this at
         // the managed layer so AllocateNative remains a raw EFI allocation.
-        memset(allocation, 0, allocationSize);
+        Unsafe.InitBlock(allocation, 0, allocationSize);
 
         AllocationHeader* header = (AllocationHeader*)allocation;
         header->Next = s_allocations;
