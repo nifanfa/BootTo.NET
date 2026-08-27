@@ -7,9 +7,13 @@ namespace System.Media
     {
         private const int PcmFormat = 1;
         private const int BitsPerSample = 16;
+        private const int OutputSampleRate = 44100;
+        private const int OutputChannels = 2;
 
         private string _soundLocation = string.Empty;
         private Stream _stream;
+        private readonly int _pcmChannels;
+        private readonly int _pcmSampleRate;
 
         private struct WavFormat
         {
@@ -31,6 +35,17 @@ namespace System.Media
         public SoundPlayer(Stream stream)
         {
             Stream = stream;
+        }
+
+        public SoundPlayer(int channels, int sampleRate)
+        {
+            if (channels < 1 || channels > 2)
+                throw new ArgumentException("PCM channels must be one or two.");
+            if (sampleRate <= 0)
+                throw new ArgumentException("PCM sample rate must be positive.");
+
+            _pcmChannels = channels;
+            _pcmSampleRate = sampleRate;
         }
 
         public string SoundLocation
@@ -79,8 +94,7 @@ namespace System.Media
                 if (!TryParse(input, out format))
                     throw new InvalidOperationException("The sound data is not a supported PCM WAV file.");
 
-                Initialize(format.SampleRate);
-                if (!IsAvailable)
+                if (!EnsurePcmAudio(OutputSampleRate))
                     throw new InvalidOperationException("No UEFI audio output is available.");
 
                 byte[] buffer = new byte[format.DataLength];
@@ -98,6 +112,22 @@ namespace System.Media
                 if (ownsStream)
                     input.Close();
             }
+        }
+
+        // Appends signed 16-bit PCM without waiting for playback. AudioDxe
+        // owns the streaming cache and decides when its DMA stream starts.
+        public int Play(byte[] buffer, int offset, int count)
+        {
+            if (_pcmChannels == 0)
+                throw new InvalidOperationException("This SoundPlayer was not configured for PCM playback.");
+            if (buffer == null || offset < 0 || count <= 0 || offset > buffer.Length - count)
+                return 0;
+
+            int frameBytes = _pcmChannels * 2;
+            if (count % frameBytes != 0)
+                return 0;
+
+            return AppendPcm(buffer, offset, count, _pcmChannels, _pcmSampleRate);
         }
 
         private static int ReadFully(Stream stream, byte[] buffer, int count)
@@ -313,7 +343,17 @@ namespace System.Media
             s_outputFrequency = initialFrequency;
             s_outputFrequencies = outputFrequencies;
             s_failed = false;
-            Console.WriteLine("Audio output mask: " + s_outputIndexMask.ToString());
+        }
+
+        private static bool EnsurePcmAudio(int sampleRate)
+        {
+            if (!TryGetFrequency(sampleRate, out uint frequency))
+                return false;
+
+            if (s_audioIo == null || s_outputFrequency != frequency)
+                Initialize(sampleRate);
+
+            return IsAvailable;
         }
 
         private static EFI_STATUS LocateSpeakerAudioIo(
@@ -418,49 +458,155 @@ namespace System.Media
             int channels,
             int sampleRate)
         {
-            if (!IsAvailable || buffer == null || offset < 0 || count <= 0 ||
-                offset > buffer.Length - count || channels <= 0 || channels > 16 ||
-                !TryGetFrequency(sampleRate, out uint frequency))
+            if (buffer == null || offset < 0 || count <= 0 ||
+                offset > buffer.Length - count || channels <= 0 || channels > 2 ||
+                sampleRate <= 0)
                 return 0;
 
             int frameBytes = channels * 2;
             if (count % frameBytes != 0)
                 return 0;
 
-            uint outputFrequencies;
-            ulong outputMask;
-            if (frequency == s_outputFrequency)
-            {
-                outputMask = s_outputIndexMask;
-                outputFrequencies = s_outputFrequencies;
-            }
-            else
-            {
-                outputMask = GetConnectedSpeakerOutputMask(
-                    s_audioIo,
-                    AudioIoBits16,
-                    frequency,
-                    out outputFrequencies);
-            }
-            if (outputMask == 0)
+            byte[] output = ConvertToOutputPcm(buffer, offset, count, channels, sampleRate);
+            if (output == null || !EnsurePcmAudio(OutputSampleRate))
                 return 0;
 
-            void* rawBuffer = GarbageCollector.AllocateNative((ulong)count);
+            void* rawBuffer = GarbageCollector.AllocateNative((ulong)output.Length);
             if (rawBuffer == null)
                 return 0;
 
-            fixed (byte* source = buffer)
-                memcpy(rawBuffer, source + offset, (ulong)count);
+            fixed (byte* source = output)
+                memcpy(rawBuffer, source, (ulong)output.Length);
 
             EFI_STATUS status = PlayBuffer(
                 rawBuffer,
-                (ulong)count,
-                outputMask,
-                outputFrequencies,
-                frequency,
+                (ulong)output.Length,
+                s_outputIndexMask,
+                s_outputFrequencies,
+                s_outputFrequency,
                 AudioIoBits16,
-                (byte)channels);
+                OutputChannels);
             return (ulong)status == EFI_SUCCESS ? count : 0;
+        }
+
+        private static int AppendPcm(
+            byte[] buffer,
+            int offset,
+            int count,
+            int channels,
+            int sampleRate)
+        {
+            if (buffer == null || offset < 0 || count <= 0 ||
+                offset > buffer.Length - count || channels <= 0 || channels > 2 ||
+                sampleRate <= 0)
+                return 0;
+
+            int frameBytes = channels * 2;
+            if (count % frameBytes != 0)
+                return 0;
+
+            byte[] output = ConvertToOutputPcm(buffer, offset, count, channels, sampleRate);
+            if (output == null || !EnsurePcmAudio(OutputSampleRate))
+                return 0;
+
+            void* rawBuffer = GarbageCollector.AllocateNative((ulong)output.Length);
+            if (rawBuffer == null)
+                return 0;
+
+            fixed (byte* source = output)
+                memcpy(rawBuffer, source, (ulong)output.Length);
+
+            EFI_TPL oldTpl = gBS->RaiseTPL(TPL_NOTIFY);
+            EFI_STATUS status = s_audioIo->SetupPlayback(
+                s_audioIo,
+                s_outputIndexMask,
+                s_gain,
+                s_outputFrequency,
+                AudioIoBits16,
+                OutputChannels,
+                PlaybackDelay);
+            if ((ulong)status == EFI_SUCCESS)
+            {
+                status = s_audioIo->StartPlaybackAsync(
+                    s_audioIo,
+                    rawBuffer,
+                    (ulong)output.Length,
+                    0,
+                    null,
+                    null);
+            }
+            gBS->RestoreTPL(oldTpl);
+
+            // AudioDxe copies queued input before StartPlaybackAsync returns.
+            // The streaming path therefore owns no caller buffer after this
+            // point and needs no managed completion callback.
+            gBS->FreePool(rawBuffer);
+            if ((ulong)status != EFI_SUCCESS)
+            {
+                s_failed = true;
+                return 0;
+            }
+
+            return count;
+        }
+
+        // AudioDxe is fed a single hardware-safe format. This keeps stream
+        // setup independent of the producer's source layout and sample rate.
+        private static byte[] ConvertToOutputPcm(
+            byte[] input,
+            int offset,
+            int count,
+            int inputChannels,
+            int inputSampleRate)
+        {
+            int inputFrames = count / (inputChannels * 2);
+            if (inputFrames == 0)
+                return null;
+
+            long outputFramesLong = ((long)inputFrames * OutputSampleRate + inputSampleRate - 1) / inputSampleRate;
+            if (outputFramesLong <= 0 || outputFramesLong > int.MaxValue / (OutputChannels * 2))
+                return null;
+
+            int outputFrames = (int)outputFramesLong;
+            byte[] output = new byte[outputFrames * OutputChannels * 2];
+            for (int outputFrame = 0; outputFrame < outputFrames; outputFrame++)
+            {
+                long sourcePosition = (long)outputFrame * inputSampleRate;
+                int sourceFrame = (int)(sourcePosition / OutputSampleRate);
+                int fraction = (int)(sourcePosition % OutputSampleRate);
+                if (sourceFrame >= inputFrames)
+                    sourceFrame = inputFrames - 1;
+
+                int nextFrame = sourceFrame + 1 < inputFrames ? sourceFrame + 1 : sourceFrame;
+                short left = InterpolateSample(input, offset, inputChannels, sourceFrame, nextFrame, 0, fraction);
+                short right = inputChannels == 1
+                    ? left
+                    : InterpolateSample(input, offset, inputChannels, sourceFrame, nextFrame, 1, fraction);
+
+                int outputOffset = outputFrame * 4;
+                output[outputOffset] = (byte)left;
+                output[outputOffset + 1] = (byte)(left >> 8);
+                output[outputOffset + 2] = (byte)right;
+                output[outputOffset + 3] = (byte)(right >> 8);
+            }
+
+            return output;
+        }
+
+        private static short InterpolateSample(
+            byte[] input,
+            int offset,
+            int channels,
+            int sourceFrame,
+            int nextFrame,
+            int channel,
+            int fraction)
+        {
+            int sourceOffset = offset + (sourceFrame * channels + channel) * 2;
+            int nextOffset = offset + (nextFrame * channels + channel) * 2;
+            int source = (short)(input[sourceOffset] | (input[sourceOffset + 1] << 8));
+            int next = (short)(input[nextOffset] | (input[nextOffset + 1] << 8));
+            return (short)(source + ((next - source) * fraction + OutputSampleRate / 2) / OutputSampleRate);
         }
 
         private static bool CompletePlayback()
@@ -529,7 +675,7 @@ namespace System.Media
                     rawBufferSize,
                     0,
                     &PlaybackDone,
-                    null);
+                    rawBuffer);
                 if ((ulong)status != EFI_SUCCESS)
                 {
                     s_currentBuffer = null;
@@ -588,10 +734,11 @@ namespace System.Media
         [UnmanagedCallersOnly]
         private static void PlaybackDone(EFI_AUDIO_IO_PROTOCOL* audioIo, void* context)
         {
-            if (s_currentBuffer != null)
+            if (context != null)
             {
-                gBS->FreePool(s_currentBuffer);
-                s_currentBuffer = null;
+                gBS->FreePool(context);
+                if (s_currentBuffer == context)
+                    s_currentBuffer = null;
             }
             gBS->SignalEvent(s_playbackEvent);
         }

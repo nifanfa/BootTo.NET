@@ -18,16 +18,16 @@ partial class Program
 
     static readonly List<string> DxeDrivers = new()
     {
-        @"\EFI\Drivers\RngDxe.efi",
-        @"\EFI\Drivers\Hash2DxeCrypto.efi",
-        @"\EFI\Drivers\DpcDxe.efi",
-        @"\EFI\Drivers\DnsDxe.efi",
-        @"\EFI\Drivers\HttpUtilitiesDxe.efi",
-        @"\EFI\Drivers\TlsDxe.efi",
-        @"\EFI\Drivers\HttpDxe.efi",
-        @"\EFI\Drivers\AudioDxe.efi",
-        @"\EFI\Drivers\XhciDxe.efi",
-        @"\EFI\Drivers\UsbMouseDxe.efi"
+        @"\EFI\Drivers\Original\RngDxe.efi",
+        @"\EFI\Drivers\Original\Hash2DxeCrypto.efi",
+        @"\EFI\Drivers\Original\DpcDxe.efi",
+        @"\EFI\Drivers\Original\DnsDxe.efi",
+        @"\EFI\Drivers\Original\HttpUtilitiesDxe.efi",
+        @"\EFI\Drivers\Modified\TlsDxe.efi",
+        @"\EFI\Drivers\Modified\HttpDxe.efi",
+        @"\EFI\Drivers\Modified\AudioDxe.efi",
+        @"\EFI\Drivers\Original\XhciDxe.efi",
+        @"\EFI\Drivers\Original\UsbMouseDxe.efi"
     };
 
     [RuntimeExport("EfiMain")]

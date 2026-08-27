@@ -32,6 +32,7 @@ namespace Playground.NES
         private int sampleAccumulator;
         private readonly byte[] pcmBuffer = new byte[4096];
         private int pcmBufferOffset;
+        private readonly System.Media.SoundPlayer soundPlayer;
 
         private double highPass90Input;
         private double highPass90Output;
@@ -52,6 +53,7 @@ namespace Playground.NES
         public APU(Func<int, byte> memoryReader)
         {
             dmc = new DmcChannel(memoryReader);
+            soundPlayer = new System.Media.SoundPlayer(PcmChannels, PcmSampleRate);
         }
 
         public void WriteRegister(int address, byte data)
@@ -128,7 +130,7 @@ namespace Playground.NES
             if (pcmBufferOffset == 0)
                 return;
 
-            // TO-DO
+            soundPlayer.Play(pcmBuffer, 0, pcmBufferOffset);
             pcmBufferOffset = 0;
         }
 
@@ -241,7 +243,7 @@ namespace Playground.NES
             pcmBuffer[pcmBufferOffset++] = (byte)((LastSample >> 8) & 0xFF);
             if (pcmBufferOffset == pcmBuffer.Length)
             {
-                // TO-DO
+                soundPlayer.Play(pcmBuffer, 0, pcmBufferOffset);
                 pcmBufferOffset = 0;
             }
         }
