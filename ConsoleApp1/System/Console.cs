@@ -689,6 +689,14 @@ namespace System
             return DequeueUsbKey(out keyEvent);
         }
 
+        internal static bool TryReadKeyEvent(out ConsoleKeyEvent keyEvent)
+        {
+            if (!s_usbStarted)
+                TryStartUsbKeyboard();
+
+            return DequeueUsbKey(out keyEvent);
+        }
+
         private static bool StartUsbKeyboard()
         {
             if (s_usbStarted)
@@ -820,6 +828,8 @@ namespace System
                 return;
 
             byte modifiers = report[0];
+            ProcessModifierTransition(modifiers, s_usbPreviousModifiers, 0x01, 0xE0);
+            ProcessModifierTransition(modifiers, s_usbPreviousModifiers, 0x02, 0xE1);
             for (int i = 0; i < s_usbPreviousKeys.Length; i++)
             {
                 byte usage = s_usbPreviousKeys[i];
@@ -846,6 +856,14 @@ namespace System
                 s_usbPreviousKeys[i] = report[2 + i];
 
             s_usbPreviousModifiers = modifiers;
+        }
+
+        private static void ProcessModifierTransition(byte current, byte previous, byte mask, byte usage)
+        {
+            bool wasPressed = (previous & mask) != 0;
+            bool isPressed = (current & mask) != 0;
+            if (wasPressed != isPressed)
+                EnqueueUsbKey(new ConsoleKeyEvent(CreateKeyInfo(usage, current), isPressed));
         }
 
         private static bool ContainsUsage(byte* values, int length, byte usage)
@@ -961,6 +979,8 @@ namespace System
                 case 0x50: return ConsoleKey.LeftArrow;
                 case 0x51: return ConsoleKey.DownArrow;
                 case 0x52: return ConsoleKey.UpArrow;
+                case 0xE0: return ConsoleKey.LeftControl;
+                case 0xE1: return ConsoleKey.LeftShift;
                 default: return (ConsoleKey)0;
             }
         }

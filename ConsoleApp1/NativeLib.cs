@@ -58,10 +58,16 @@ internal unsafe class NativeLib
     [DllImport("*", EntryPoint = "vprintf_")]
     public static extern int printf(void* format, params VariableArgument[] va);
 
+    static char lastCharacter;
+
     [RuntimeExport("_putchar")]
     public static void _putchar(char character)
     {
-        Console.Write(character);
+        if (character == '\n' && lastCharacter != '\r')
+        {
+            Console.Write('\r');
+        }
+        Console.Write(lastCharacter = character);
     }
 }
 

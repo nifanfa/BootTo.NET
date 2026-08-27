@@ -64,6 +64,8 @@ namespace System
         RightWindows = 92,
         Applications = 93,
         Sleep = 95,
+        LeftShift = 160,
+        LeftControl = 162,
         NumPad0 = 96,
         NumPad1 = 97,
         NumPad2 = 98,

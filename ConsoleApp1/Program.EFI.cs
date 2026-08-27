@@ -123,6 +123,10 @@ partial class Program
 #endif
 
 #if true
+        doomgeneric.Run();
+#endif
+
+#if false
         Console.WriteLine("+++++++++++++++++++++++++++");
         string[] files = Directory.GetFiles(@"\");
         for (int i = 0; i < files.Length; i++)
@@ -182,24 +186,9 @@ partial class Program
     {
         Emulator nes = new Emulator();
 
-        public unsafe NesTest(string rom)
+        public NesTest(string rom)
         {
-            Console.Clear();
-            int height = Console.BufferHeight - 2;
-            int width = Console.BufferWidth - 1;
-            int h = 0;
-            for (; h <= height; h++)
-            {
-                for (int i = 0; i <= width; i++)
-                {
-                    if (h % height == 0 || i % width == 0)
-                        Console.Write('#');
-                    else Console.Write(' ');
-                }
-                Console.WriteLine();
-            }
-            Console.Write(Convert.ToBoolean(IsTcg()) ? "Slow QEMU TCG detected. Enable Windows Hypervisor Platform." : string.Empty);
-
+            PrintFrame();
             nes.openROM(rom);
         }
 
@@ -325,6 +314,25 @@ partial class Program
                 dst[destinationRow + x] = src[sourceRow + srcX];
             }
         }
+    }
+
+    public static void PrintFrame()
+    {
+        Console.Clear();
+        int height = Console.BufferHeight - 2;
+        int width = Console.BufferWidth - 1;
+        int h = 0;
+        for (; h <= height; h++)
+        {
+            for (int i = 0; i <= width; i++)
+            {
+                if (h % height == 0 || i % width == 0)
+                    Console.Write('#');
+                else Console.Write(' ');
+            }
+            Console.WriteLine();
+        }
+        Console.Write(Convert.ToBoolean(IsTcg()) ? "Slow QEMU TCG detected. Enable Windows Hypervisor Platform." : string.Empty);
     }
 
     public unsafe static ulong GetAvailableMemory()
