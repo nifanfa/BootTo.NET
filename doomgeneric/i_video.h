@@ -21,11 +21,16 @@
 #define __I_VIDEO__
 
 #include "doomtype.h"
+#include "doomgeneric.h"
 
-// Screen width and height.
+// WAD graphics and UI coordinates remain at Doom's original resolution.
+// The renderer itself uses the full doomgeneric framebuffer resolution.
 
-#define SCREENWIDTH  320
-#define SCREENHEIGHT 200
+#define ORIGWIDTH   320
+#define ORIGHEIGHT  200
+
+#define SCREENWIDTH  DOOMGENERIC_RESX
+#define SCREENHEIGHT DOOMGENERIC_RESY
 
 // Screen width used for "squash" scale functions
 

@@ -254,7 +254,7 @@
 #define ST_OUTHEIGHT		1
 
 #define ST_MAPTITLEX \
-    (SCREENWIDTH - ST_MAPWIDTH * ST_CHATFONTWIDTH)
+    (ORIGWIDTH - ST_MAPWIDTH * ST_CHATFONTWIDTH)
 
 #define ST_MAPTITLEY		0
 #define ST_MAPHEIGHT		1
@@ -1411,6 +1411,7 @@ void ST_Stop (void)
 void ST_Init (void)
 {
     ST_loadData();
-    st_backing_screen = (byte *) Z_Malloc(ST_WIDTH * ST_HEIGHT, PU_STATIC, 0);
+    st_backing_screen = (byte *) Z_Malloc(SCREENWIDTH * (SCREENHEIGHT * ST_HEIGHT / ORIGHEIGHT),
+                                          PU_STATIC, 0);
 }
 

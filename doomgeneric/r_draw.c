@@ -38,11 +38,11 @@
 
 
 // ?
-#define MAXWIDTH			1120
-#define MAXHEIGHT			832
+#define MAXWIDTH			(SCREENWIDTH + 1)
+#define MAXHEIGHT			(SCREENHEIGHT + 1)
 
 // status bar height at bottom of screen
-#define SBARHEIGHT		32
+#define SBARHEIGHT		((SCREENHEIGHT * 32) / ORIGHEIGHT)
 
 //
 // All drawing to the view buffer is accomplished in this file.
@@ -58,6 +58,7 @@ byte*		viewimage;
 int		viewwidth;
 int		scaledviewwidth;
 int		viewheight;
+int		scaledviewheight;
 int		viewwindowx;
 int		viewwindowy; 
 byte*		ylookup[MAXHEIGHT]; 
@@ -221,7 +222,7 @@ void R_DrawColumnLow (void)
 	return; 
 				 
 #ifdef RANGECHECK 
-    if ((unsigned)dc_x >= SCREENWIDTH
+    if ((unsigned)(dc_x << 1) >= SCREENWIDTH
 	|| dc_yl < 0
 	|| dc_yh >= SCREENHEIGHT)
     {
@@ -230,7 +231,7 @@ void R_DrawColumnLow (void)
     }
     //	dccount++; 
 #endif 
-    // Blocky mode, need to multiply by 2.
+	// Blocky mode, need to multiply by 2.
     x = dc_x << 1;
     
     dest = ylookup[dc_yl] + columnofs[x];
@@ -876,36 +877,38 @@ void R_FillBackScreen (void)
 
     patch = W_CacheLumpName(DEH_String("brdr_t"),PU_CACHE);
 
-    for (x=0 ; x<scaledviewwidth ; x+=8)
-	V_DrawPatch(viewwindowx+x, viewwindowy-8, patch);
+    for (x=0 ; x<V_UnscaleX(scaledviewwidth) ; x+=8)
+	V_DrawPatch(V_UnscaleX(viewwindowx)+x, V_UnscaleY(viewwindowy)-8, patch);
     patch = W_CacheLumpName(DEH_String("brdr_b"),PU_CACHE);
 
-    for (x=0 ; x<scaledviewwidth ; x+=8)
-	V_DrawPatch(viewwindowx+x, viewwindowy+viewheight, patch);
+    for (x=0 ; x<V_UnscaleX(scaledviewwidth) ; x+=8)
+	V_DrawPatch(V_UnscaleX(viewwindowx)+x,
+                    V_UnscaleY(viewwindowy)+V_UnscaleY(scaledviewheight), patch);
     patch = W_CacheLumpName(DEH_String("brdr_l"),PU_CACHE);
 
-    for (y=0 ; y<viewheight ; y+=8)
-	V_DrawPatch(viewwindowx-8, viewwindowy+y, patch);
+    for (y=0 ; y<V_UnscaleY(scaledviewheight) ; y+=8)
+	V_DrawPatch(V_UnscaleX(viewwindowx)-8, V_UnscaleY(viewwindowy)+y, patch);
     patch = W_CacheLumpName(DEH_String("brdr_r"),PU_CACHE);
 
-    for (y=0 ; y<viewheight ; y+=8)
-	V_DrawPatch(viewwindowx+scaledviewwidth, viewwindowy+y, patch);
+    for (y=0 ; y<V_UnscaleY(scaledviewheight) ; y+=8)
+	V_DrawPatch(V_UnscaleX(viewwindowx)+V_UnscaleX(scaledviewwidth),
+                    V_UnscaleY(viewwindowy)+y, patch);
 
     // Draw beveled edge. 
-    V_DrawPatch(viewwindowx-8,
-                viewwindowy-8,
+    V_DrawPatch(V_UnscaleX(viewwindowx)-8,
+                V_UnscaleY(viewwindowy)-8,
                 W_CacheLumpName(DEH_String("brdr_tl"),PU_CACHE));
     
-    V_DrawPatch(viewwindowx+scaledviewwidth,
-                viewwindowy-8,
+    V_DrawPatch(V_UnscaleX(viewwindowx)+V_UnscaleX(scaledviewwidth),
+                V_UnscaleY(viewwindowy)-8,
                 W_CacheLumpName(DEH_String("brdr_tr"),PU_CACHE));
     
-    V_DrawPatch(viewwindowx-8,
-                viewwindowy+viewheight,
+    V_DrawPatch(V_UnscaleX(viewwindowx)-8,
+                V_UnscaleY(viewwindowy)+V_UnscaleY(scaledviewheight),
                 W_CacheLumpName(DEH_String("brdr_bl"),PU_CACHE));
     
-    V_DrawPatch(viewwindowx+scaledviewwidth,
-                viewwindowy+viewheight,
+    V_DrawPatch(V_UnscaleX(viewwindowx)+V_UnscaleX(scaledviewwidth),
+                V_UnscaleY(viewwindowy)+V_UnscaleY(scaledviewheight),
                 W_CacheLumpName(DEH_String("brdr_br"),PU_CACHE));
 
     V_RestoreBuffer();
