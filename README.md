@@ -28,6 +28,12 @@ QEMU mounts the bundled UEFI variable template through a temporary snapshot. Var
   <img alt="image" src="https://github.com/user-attachments/assets/ab65cd9b-521a-4177-af3e-3ef58b57ca76" />
 </p>
 
+# Quake generic (True 3D)
+> **Key Mapping:** `W` / `S` -> Move Forward / Backward | `A` / `D` -> Strafe Left / Right | `Space` -> Jump / Swim Up | `Left Shift` -> Sprint | `Mouse Left Click` -> Attack | `Mouse Movement` -> Look / Camera | `Esc` -> Menu / Back | `Enter` -> Confirm | `1–8` -> Switch Weapon | `` ` `` / `~` -> Toggle Console
+<p align="center">
+  <img alt="QQ_1787901663795" src="https://github.com/user-attachments/assets/a4b9f0c2-99da-469f-bd60-3342b0a4359d" />
+</p>
+
 # DOOM generic
 > **Key Mapping:** `W` `S` `A` `D` -> Movement | `Mouse Movement` -> Look / Camera | `Mouse Left Click` -> Fire | `E` -> Use / Open Door | `Left Shift` -> Sprint | `Enter` -> Confirm | `Esc` -> Menu / Back
 <p align="center">
