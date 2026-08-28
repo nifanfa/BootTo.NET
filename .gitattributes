@@ -65,3 +65,6 @@
 # Exclude C from language statistics
 *.c linguist-vendored
 *.h linguist-vendored
+
+# Quake game saves
+*.sav   binary
