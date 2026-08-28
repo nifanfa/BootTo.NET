@@ -25,7 +25,7 @@ QEMU mounts the bundled UEFI variable template through a temporary snapshot. Var
 
 # Tested and working on real hardware
 <p align="center">
-  <img alt="image" src="https://github.com/user-attachments/assets/2e3c3f70-965b-4dfc-b75f-e52e832f4c99" />
+  <img alt="image" src="https://github.com/user-attachments/assets/ab65cd9b-521a-4177-af3e-3ef58b57ca76" />
 </p>
 
 # DOOM generic
