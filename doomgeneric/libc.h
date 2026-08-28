@@ -41,16 +41,16 @@ extern void *malloc(size_t size);
 extern void free(void *ptr);
 extern void *memcpy(void *dest, const void *src, size_t count);
 extern void *memset(void *dest, int value, size_t count);
-extern int DG_FileOpen(const char *path, const char *mode);
-extern int DG_FileRead(int handle, void *buffer, int length);
-extern int DG_FileWrite(int handle, const void *buffer, int length);
-extern long DG_FileSeek(int handle, long offset, int origin);
-extern long DG_FileTell(int handle);
-extern int DG_FileClose(int handle);
-extern int DG_FileFlush(int handle);
-extern int DG_FileCreateDirectory(const char *path);
-extern int DG_FileRemove(const char *path);
-extern int DG_FileRename(const char *old_path, const char *new_path);
+extern int BTDN_FileOpen(const char *path, const char *mode);
+extern int BTDN_FileRead(int handle, void *buffer, int length);
+extern int BTDN_FileWrite(int handle, const void *buffer, int length);
+extern int BTDN_FileSeek(int handle, int offset, int origin);
+extern int BTDN_FileTell(int handle);
+extern int BTDN_FileClose(int handle);
+extern int BTDN_FileFlush(int handle);
+extern int BTDN_FileCreateDirectory(const char *path);
+extern int BTDN_FileRemove(const char *path);
+extern int BTDN_FileRename(const char *old_path, const char *new_path);
 
 static void *memmove(void *dest, const void *src, size_t count)
 {
@@ -386,7 +386,7 @@ static void *realloc(void *memory, size_t size)
 
 static FILE *fopen(const char *path, const char *mode)
 {
-    int handle = DG_FileOpen(path, mode);
+    int handle = BTDN_FileOpen(path, mode);
     FILE *file;
 
     if (handle <= 0)
@@ -394,7 +394,7 @@ static FILE *fopen(const char *path, const char *mode)
     file = (FILE *) malloc(sizeof(*file));
     if (file == NULL)
     {
-        DG_FileClose(handle);
+        BTDN_FileClose(handle);
         return NULL;
     }
     file->handle = handle;
@@ -406,7 +406,7 @@ static int fclose(FILE *file)
     int result;
     if (file == NULL || file == stdout || file == stderr)
         return EOF;
-    result = DG_FileClose(file->handle);
+    result = BTDN_FileClose(file->handle);
     free(file);
     return result;
 }
@@ -420,7 +420,7 @@ static size_t fread(void *buffer, size_t size, size_t count, FILE *file)
     requested = size * count;
     if (requested > INT_MAX)
         requested = INT_MAX;
-    bytes = DG_FileRead(file->handle, buffer, (int) requested);
+    bytes = BTDN_FileRead(file->handle, buffer, (int) requested);
     return bytes <= 0 ? 0 : (size_t) bytes / size;
 }
 
@@ -433,24 +433,24 @@ static size_t fwrite(const void *buffer, size_t size, size_t count, FILE *file)
     requested = size * count;
     if (requested > INT_MAX)
         requested = INT_MAX;
-    bytes = DG_FileWrite(file->handle, buffer, (int) requested);
+    bytes = BTDN_FileWrite(file->handle, buffer, (int) requested);
     return bytes <= 0 ? 0 : (size_t) bytes / size;
 }
 
 static int fseek(FILE *file, long offset, int origin)
 {
-    return file == NULL || DG_FileSeek(file->handle, offset, origin) < 0 ? -1 : 0;
+    return file == NULL || BTDN_FileSeek(file->handle, offset, origin) < 0 ? -1 : 0;
 }
 
 static long ftell(FILE *file)
 {
-    return file == NULL ? -1 : DG_FileTell(file->handle);
+    return file == NULL ? -1 : BTDN_FileTell(file->handle);
 }
 
 static int fflush(FILE *file)
 {
     return file == stdout || file == stderr ? 0 :
-        (file == NULL ? EOF : DG_FileFlush(file->handle));
+        (file == NULL ? EOF : BTDN_FileFlush(file->handle));
 }
 
 static int putchar(int character)
@@ -490,7 +490,7 @@ static char *fgets(char *buffer, int count, FILE *file)
         return NULL;
     while (index < count - 1)
     {
-        if (DG_FileRead(file->handle, buffer + index, 1) != 1)
+        if (BTDN_FileRead(file->handle, buffer + index, 1) != 1)
             break;
         if (buffer[index++] == '\n')
             break;
@@ -540,17 +540,17 @@ static int sscanf(const char *text, const char *format, ...)
 
 static int mkdir(const char *path)
 {
-    return DG_FileCreateDirectory(path);
+    return BTDN_FileCreateDirectory(path);
 }
 
 static int remove(const char *path)
 {
-    return DG_FileRemove(path);
+    return BTDN_FileRemove(path);
 }
 
 static int rename(const char *old_path, const char *new_path)
 {
-    return DG_FileRename(old_path, new_path);
+    return BTDN_FileRename(old_path, new_path);
 }
 
 static char *getenv(const char *name)

@@ -1,0 +1,374 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="源文件">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="头文件">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="资源文件">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="zone.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="world.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wad.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="view.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="vid.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="sys.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="spritegn.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="sound.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="server.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="screen.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="sbar.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="render.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="r_shared.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="r_local.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="quakekeys.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="quakegeneric.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="quakedef.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="protocol.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="progs.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="progdefs.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="pr_comp.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="net_vcr.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="net_loop.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="net.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="modelgen.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="model.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="menu.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="mathlib.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="keys.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="libc.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="input.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="draw.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="d_local.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="d_ifacea.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="d_iface.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="cvar.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="crc.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="console.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="common.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="cmd.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="client.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="cdaudio.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="bspfile.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="anorms.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="adivtab.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="zone.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="world.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wad.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="view.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="vid_null.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="sys_btdn.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="sv_user.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="sv_phys.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="sv_move.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="sv_main.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="snd_btdn.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="snd_dma.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="snd_mem.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="snd_mix.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="screen.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="sbar.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="r_vars.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="r_surf.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="r_sprite.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="r_sky.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="r_misc.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="r_part.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="r_main.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="r_efrag.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="r_light.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="r_edge.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="r_draw.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="r_bsp.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="r_alias.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="r_aclip.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="quakegeneric_btdn.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="pr_exec.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="pr_edict.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="pr_cmds.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="nonintel.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="net_vcr.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="net_none.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="net_main.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="net_loop.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="model.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="menu.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="mathlib.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="keys.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="in_null.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="host_cmd.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="host.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="draw.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="d_zpoint.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="d_vars.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="d_surf.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="d_sprite.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="d_sky.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="d_scan.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="d_polyse.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="d_part.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="d_modech.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="d_init.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="d_edge.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="d_fill.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="cvar.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="crc.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="console.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="common.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="cmd.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="cl_tent.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="cl_parse.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="cl_main.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="cl_input.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="cl_demo.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="chase.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="cd_null.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <MASM Include="setjmp_btdn.asm">
+      <Filter>源文件</Filter>
+    </MASM>
+  </ItemGroup>
+</Project>

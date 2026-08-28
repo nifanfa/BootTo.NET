@@ -53,6 +53,7 @@
   <ItemGroup>
     <NativeLibrary Include="..\x64\Debug\NativeLib.lib" />
     <NativeLibrary Include="..\x64\Debug\doomgeneric.lib" />
+    <NativeLibrary Include="..\x64\Debug\quakegeneric.lib" />
   </ItemGroup>
 
   <Target Name="CopyEFI" AfterTargets="Publish">
