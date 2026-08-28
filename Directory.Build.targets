@@ -1,0 +1,43 @@
+<Project>
+
+  <Import Project="Qemu.targets" />
+
+  <!-- See https://aka.ms/dotnet/msbuild/customize for more details on customizing your build -->
+  <PropertyGroup Condition="'$(BuildingInsideVisualStudio)' == 'true'">
+    <StartAction>Program</StartAction>
+    <StartProgram>dotnet</StartProgram>
+	<StartArguments>publish --tl:off -r win-x64 $(AssemblyName)</StartArguments>
+    <StartWorkingDirectory>$(MSBuildThisFileDirectory)</StartWorkingDirectory>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <EmitLegacyAssetsFileItems>true</EmitLegacyAssetsFileItems>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <NoStdLib>true</NoStdLib>
+    <NoConfig>true</NoConfig>
+    <RuntimeMetadataVersion>v4.0.30319</RuntimeMetadataVersion>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <IlcSystemModule>$(AssemblyName)</IlcSystemModule>
+    <EntryPointSymbol>EfiMain</EntryPointSymbol>
+    <LinkerSubsystem>EFI_APPLICATION</LinkerSubsystem>
+  </PropertyGroup>
+
+  <!--Warning: This package is modified(/packages). Using official one may cause it fail to compile!-->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.DotNet.ILCompiler" Version="7.0.0-alpha.1.22074.1" />
+  </ItemGroup>
+
+  <!--CustomizeReferences-->
+  <Target Name="CustomizeReferences" BeforeTargets="BeforeCompile" AfterTargets="FindReferenceAssembliesForReferences">
+    <ItemGroup>
+      <ReferencePathWithRefAssemblies Remove="@(ReferencePathWithRefAssemblies)" Condition="%(Filename) != 'Corlib'" />
+      <ReferencePath Remove="@(ReferencePath)" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="PrepareForILLink">
+  </Target>
+
+</Project>

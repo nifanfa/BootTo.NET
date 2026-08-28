@@ -2,8 +2,6 @@
 using Internal.Runtime.CompilerHelpers;
 using Internal.Runtime.CompilerServices;
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Runtime;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;

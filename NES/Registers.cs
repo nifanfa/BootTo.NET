@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace NES
+﻿namespace NES
 {
     public class Registers
     {

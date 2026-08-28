@@ -3,97 +3,18 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <EmitLegacyAssetsFileItems>true</EmitLegacyAssetsFileItems>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
-    <NoStdLib>true</NoStdLib>
-    <NoConfig>true</NoConfig>
-    <RuntimeMetadataVersion>v4.0.30319</RuntimeMetadataVersion>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
-
-    <IlcSystemModule>ConsoleApp1</IlcSystemModule>
-    <EntryPointSymbol>EfiMain</EntryPointSymbol>
-
-    <LinkerSubsystem>EFI_APPLICATION</LinkerSubsystem>
-
-    <QemuDirectory Condition="'$(QemuDirectory)' == ''">$(MSBuildProjectDirectory)\..\qemu</QemuDirectory>
-    <QemuExecutable>$(QemuDirectory)\qemu-system-x86_64.exe</QemuExecutable>
-    <QemuImgExecutable>$(QemuDirectory)\qemu-img.exe</QemuImgExecutable>
-    <SevenZipExecutable>$(QemuDirectory)\7z.exe</SevenZipExecutable>
-    <QemuFirmwareDirectory>$(QemuDirectory)\firmware</QemuFirmwareDirectory>
-    <QemuFirmware>$(QemuFirmwareDirectory)\edk2-x86_64-code.fd</QemuFirmware>
-    <QemuVariablesTemplate>$(QemuFirmwareDirectory)\edk2-i386-vars.fd</QemuVariablesTemplate>
-    <QemuDriveDirectory>$(MSBuildProjectDirectory)\..\Drive</QemuDriveDirectory>
-    <QemuDiskImage>$(MSBuildProjectDirectory)\..\Drive.img</QemuDiskImage>
     <RootNamespace />
   </PropertyGroup>
-
-  <!--Warning: This package is modified(/packages). Using official one may cause it fail to compile!-->
-  <ItemGroup>
-    <PackageReference Include="Microsoft.DotNet.ILCompiler" Version="7.0.0-alpha.1.22074.1" />
-  </ItemGroup>
 
   <Import Project="..\uefi-cs\uefi-cs.projitems" Label="Shared" />
 
   <Import Project="..\NES\NES.projitems" Label="Shared" />
-
-  <!--CustomizeReferences-->
-  <Target Name="CustomizeReferences" BeforeTargets="BeforeCompile" AfterTargets="FindReferenceAssembliesForReferences">
-    <ItemGroup>
-      <ReferencePathWithRefAssemblies Remove="@(ReferencePathWithRefAssemblies)" Condition="%(Filename) != 'Corlib'" />
-      <ReferencePath Remove="@(ReferencePath)" />
-    </ItemGroup>
-  </Target>
-
-  <Target Name="PrepareForILLink">
-  </Target>
   
   <ItemGroup>
     <NativeLibrary Include="..\x64\Debug\NativeLib.lib" />
     <NativeLibrary Include="..\x64\Debug\doomgeneric.lib" />
     <NativeLibrary Include="..\x64\Debug\quakegeneric.lib" />
   </ItemGroup>
-
-  <Target Name="CopyEFI" AfterTargets="Publish">
-    <Copy SourceFiles="$(MSBuildProjectDirectory)\$(NativeOutputPath)$(TargetName)$(NativeBinaryExt)" DestinationFiles="$(QemuDriveDirectory)\EFI\BOOT\BOOTX64.efi" />
-  </Target>
-
-  <Target Name="CreateQemuDiskImage" AfterTargets="CopyEFI">
-    <Error Text="Bundled qemu-img was not found at $(QemuImgExecutable)." Condition="!Exists('$(QemuImgExecutable)')" />
-    <Delete Files="$(QemuDiskImage)" Condition="Exists('$(QemuDiskImage)')" />
-    <Exec Command="&quot;$(QemuImgExecutable)&quot; convert -f raw -O raw &quot;fat:$(QemuDriveDirectory)&quot; &quot;$(QemuDiskImage)&quot;" />
-  </Target>
-
-  <Target Name="DetectQemuAcceleration">
-    <Error Text="Bundled QEMU was not found at $(QemuExecutable)." Condition="!Exists('$(QemuExecutable)')" />
-    <Exec Command="&quot;$(QemuExecutable)&quot; -accel help" ConsoleToMsBuild="true" StandardOutputImportance="Low" IgnoreExitCode="true">
-      <Output TaskParameter="ConsoleOutput" PropertyName="_QemuAcceleratorOutput" />
-    </Exec>
-    <Exec Command="powershell.exe -NoProfile -NonInteractive -Command &quot;$hypervisor = (Get-CimInstance Win32_ComputerSystem).HypervisorPresent; if ($hypervisor -eq $true) { exit 0 }; exit 1&quot;" IgnoreExitCode="true">
-      <Output TaskParameter="ExitCode" PropertyName="_WindowsHypervisorExitCode" />
-    </Exec>
-    <PropertyGroup>
-      <QemuAcceleration Condition="$([System.String]::Copy('$(_QemuAcceleratorOutput)').ToLowerInvariant().Contains('whpx')) and '$(_WindowsHypervisorExitCode)' == '0'">whpx</QemuAcceleration>
-      <QemuAcceleration Condition="'$(QemuAcceleration)' == ''">tcg</QemuAcceleration>
-      <QemuAccelerationArgument Condition="'$(QemuAcceleration)' == 'whpx'">whpx,kernel-irqchip=off</QemuAccelerationArgument>
-      <QemuAccelerationArgument Condition="'$(QemuAccelerationArgument)' == ''">$(QemuAcceleration)</QemuAccelerationArgument>
-    </PropertyGroup>
-    <Message Text="QEMU acceleration: $(QemuAcceleration)" Importance="High" />
-  </Target>
-
-  <Target Name="RunQemu" DependsOnTargets="DetectQemuAcceleration;CreateQemuDiskImage" AfterTargets="CopyEFI" Condition="'$(RunQemu)' != 'false'">
-    <PropertyGroup>
-      <QemuArguments>-L "$(QemuFirmwareDirectory)" -name BootTo.NET -accel $(QemuAccelerationArgument) -cpu IvyBridge -machine q35,i8042=off -smp 2 -m 1024M -display sdl -audiodev dsound,id=audio0 -chardev console,id=com1 -serial chardev:com1 -vga std -device ich9-intel-hda,id=hda -device hda-output,bus=hda.0,audiodev=audio0 -device qemu-xhci,id=xhci -device usb-kbd,bus=xhci.0 -device usb-mouse,bus=xhci.0 -object rng-builtin,id=rng0 -device virtio-rng-pci,rng=rng0 -drive "if=pflash,format=raw,unit=0,readonly=on,file=$(QemuFirmware)" -drive "if=pflash,format=raw,unit=1,snapshot=on,file=$(QemuVariablesTemplate)" -drive "file=$(QemuDiskImage),format=raw,media=disk" -boot order=c,menu=on -netdev user,id=net0 -device e1000,netdev=net0,romfile=efi-e1000.rom -no-reboot</QemuArguments>
-    </PropertyGroup>
-    <Error Text="Bundled x64 UEFI firmware was not found at $(QemuFirmware)." Condition="!Exists('$(QemuFirmware)')" />
-    <Error Text="Bundled x86 UEFI variables template was not found at $(QemuVariablesTemplate)." Condition="!Exists('$(QemuVariablesTemplate)')" />
-    <Exec Command="&quot;$(QemuExecutable)&quot; $(QemuArguments)" />
-  </Target>
-
-  <Target Name="SyncQemuDiskImage" AfterTargets="RunQemu" Condition="'$(RunQemu)' != 'false' and Exists('$(QemuDiskImage)')">
-    <Exec Command="&quot;$(SevenZipExecutable)&quot; x &quot;$(QemuDiskImage)&quot; -o&quot;$(QemuDriveDirectory)&quot; -aoa -y &quot;-x!QEMU VVF.AT&quot;" />
-  </Target>
 
 </Project>

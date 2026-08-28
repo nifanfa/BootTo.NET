@@ -2,9 +2,9 @@
 
 ## Debugging
 1. **Open Project**: Open the `BootTo.NET.sln` solution in Visual Studio.
-2. **Launch**: Select **QEMU** from the launch profile dropdown, or simply press **F5**.
+2. **Launch**: Run `ConsoleApp1`, or simply press **F5**. The MSBuild targets will handle the rest.
 <p align="center">
-  <img alt="QQ_1787146565287" src="https://github.com/user-attachments/assets/671fb673-dab9-4685-a80b-f43171ff109e" />
+  <img alt="QQ_1787932865567" src="https://github.com/user-attachments/assets/aedd8930-933e-41c8-90c0-48376e5329e0" />
 </p>
 
 ## Synopsis
