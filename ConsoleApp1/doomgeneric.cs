@@ -18,8 +18,6 @@ internal static unsafe class doomgeneric
     private const int DoomAudioRate = 11025;
     private const int DoomAudioFrames = 315;
     private const uint DoomTickRate = 35;
-    private const ulong DoomAudioOutputBytesPerBlock = DoomAudioFrames * 4UL * 2UL * sizeof(short);
-    private const ulong MaximumQueuedAudioBytes = DoomAudioOutputBytesPerBlock * 3;
     private const int DoomMouseTurnMultiplier = 32;
     private static readonly SoundPlayer SoundOutput = new SoundPlayer(2, DoomAudioRate);
     private static readonly byte[] AudioBuffer = new byte[DoomAudioFrames * 2 * sizeof(short)];
@@ -104,9 +102,6 @@ internal static unsafe class doomgeneric
     {
         if (samples == null || frameCount <= 0 || frameCount > DoomAudioFrames)
             return 0;
-
-        if (SoundOutput.RemainingBytes > MaximumQueuedAudioBytes - DoomAudioOutputBytesPerBlock)
-            return frameCount;
 
         for (int i = 0; i < frameCount * 2; i++)
         {

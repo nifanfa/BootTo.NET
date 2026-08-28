@@ -21,8 +21,6 @@ internal static unsafe class quakegeneric
     private const int QuakeAudioRate = 11025;
     private const int QuakeAudioChannels = 2;
     private const int QuakeAudioSubmitFrames = 2048;
-    private const ulong QuakeOutputBytesPerSourceFrame = 16;
-    private const ulong MaximumQueuedAudioBytes = 44100UL * 2UL * sizeof(short) / 4UL;
     private static readonly SoundPlayer SoundOutput = new SoundPlayer(QuakeAudioChannels, QuakeAudioRate);
     private static readonly byte[] AudioBuffer = new byte[
         QuakeAudioSubmitFrames * QuakeAudioChannels * sizeof(short)];
@@ -122,11 +120,6 @@ internal static unsafe class quakegeneric
     public static int AudioWrite(short* samples, int frameCount)
     {
         if (samples == null || frameCount <= 0 || frameCount > QuakeAudioSubmitFrames)
-            return 0;
-
-        ulong outputByteCount = (ulong)frameCount * QuakeOutputBytesPerSourceFrame;
-        if (outputByteCount > MaximumQueuedAudioBytes ||
-            SoundOutput.RemainingBytes > MaximumQueuedAudioBytes - outputByteCount)
             return 0;
 
         int sampleCount = frameCount * QuakeAudioChannels;

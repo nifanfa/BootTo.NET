@@ -10,6 +10,8 @@ namespace System.Media
         private const int BitsPerSample = 16;
         private const int OutputSampleRate = 44100;
         private const int OutputChannels = 2;
+        private const ulong MinimumStreamingBufferBytes =
+            OutputSampleRate * OutputChannels * 2UL / 4UL;
 
         private string _soundLocation = string.Empty;
         private Stream _stream;
@@ -115,8 +117,8 @@ namespace System.Media
             }
         }
 
-        // Appends signed 16-bit PCM without waiting for playback. AudioDxe
-        // owns the streaming cache and decides when its DMA stream starts.
+        // Appends signed 16-bit PCM. AudioDxe owns the streaming cache; this
+        // call applies backpressure when producers outrun playback.
         public int Play(byte[] buffer, int offset, int count)
         {
             if (_pcmChannels == 0)
@@ -289,10 +291,6 @@ namespace System.Media
         private static sbyte s_gain = DefaultGain;
         private static bool s_failed;
         private static ulong s_remainingBytes;
-
-        // Approximate amount of converted PCM accepted by AudioDxe but not
-        // completed yet. This is transfer-level accounting, not a DMA cursor.
-        public ulong RemainingBytes => s_remainingBytes;
 
         private static bool IsAvailable =>
             s_audioIo != null && (void*)s_playbackEvent != null && !s_failed;
@@ -515,12 +513,19 @@ namespace System.Media
             if (output == null || !EnsurePcmAudio(OutputSampleRate))
                 return 0;
 
-            void* rawBuffer = GarbageCollector.AllocateNative((ulong)output.Length);
-            if (rawBuffer == null)
+            ulong outputLength = (ulong)output.Length;
+            if (!ReserveStreamingCapacity(outputLength))
                 return 0;
 
+            void* rawBuffer = GarbageCollector.AllocateNative(outputLength);
+            if (rawBuffer == null)
+            {
+                ReleaseStreamingCapacity(outputLength);
+                return 0;
+            }
+
             fixed (byte* source = output)
-                Unsafe.CopyBlock(rawBuffer, source, (ulong)output.Length);
+                Unsafe.CopyBlock(rawBuffer, source, outputLength);
 
             EFI_TPL oldTpl = gBS->RaiseTPL(TPL_NOTIFY);
             EFI_STATUS status = s_audioIo->SetupPlayback(
@@ -533,14 +538,13 @@ namespace System.Media
                 PlaybackDelay);
             if ((ulong)status == EFI_SUCCESS)
             {
-                s_remainingBytes += (ulong)output.Length;
                 status = s_audioIo->StartPlaybackAsync(
                     s_audioIo,
                     rawBuffer,
-                    (ulong)output.Length,
+                    outputLength,
                     0,
                     &StreamingPlaybackDone,
-                    (void*)(ulong)output.Length);
+                    (void*)outputLength);
             }
             gBS->RestoreTPL(oldTpl);
 
@@ -550,15 +554,50 @@ namespace System.Media
             gBS->FreePool(rawBuffer);
             if ((ulong)status != EFI_SUCCESS)
             {
-                if (s_remainingBytes >= (ulong)output.Length)
-                    s_remainingBytes -= (ulong)output.Length;
-                else
-                    s_remainingBytes = 0;
+                ReleaseStreamingCapacity(outputLength);
                 s_failed = true;
                 return 0;
             }
 
             return count;
+        }
+
+        private static bool ReserveStreamingCapacity(ulong byteCount)
+        {
+            if (byteCount == 0)
+                return false;
+
+            // Keep the next block queued while the current block is playing.
+            // Large producer blocks otherwise leave a gap at every completion.
+            ulong bufferLimit = byteCount * 2;
+            if (bufferLimit < MinimumStreamingBufferBytes)
+                bufferLimit = MinimumStreamingBufferBytes;
+
+            while (IsAvailable)
+            {
+                EFI_TPL oldTpl = gBS->RaiseTPL(TPL_NOTIFY);
+                bool hasCapacity = s_remainingBytes <= bufferLimit - byteCount;
+                if (hasCapacity)
+                    s_remainingBytes += byteCount;
+                gBS->RestoreTPL(oldTpl);
+
+                if (hasCapacity)
+                    return true;
+
+                gBS->Stall(1000);
+            }
+
+            return false;
+        }
+
+        private static void ReleaseStreamingCapacity(ulong byteCount)
+        {
+            EFI_TPL oldTpl = gBS->RaiseTPL(TPL_NOTIFY);
+            if (byteCount >= s_remainingBytes)
+                s_remainingBytes = 0;
+            else
+                s_remainingBytes -= byteCount;
+            gBS->RestoreTPL(oldTpl);
         }
 
         // AudioDxe is fed a single hardware-safe format. This keeps stream

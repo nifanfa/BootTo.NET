@@ -1,7 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.Media;
-using System.Threading;
 
 namespace NES
 {
@@ -32,24 +31,12 @@ namespace NES
         public int VBlankTime = 20 * 341 * 5;
         public byte MapperNumber;
         public bool rendering = false;
-        private const int AudioLowWatermarkBytes = APU.PcmSampleRate * APU.PcmBytesPerSample / 10;
-        private const int AudioHighWatermarkBytes = APU.PcmSampleRate * APU.PcmBytesPerSample / 5;
-        private const int AudioMaximumBufferedBytes = APU.PcmSampleRate * APU.PcmBytesPerSample / 4;
-        private bool skipVideoFrames;
         #endregion
 
         public void runGame()
         {
             if (bolRunGame && !cpu.badOpCode)
             {
-                // The APU buffer is the real-time clock. Keep roughly a
-                // quarter second of PCM queued, not seconds of delayed audio.
-                if (soundPlayer.RemainingBytes >= AudioMaximumBufferedBytes)
-                {
-                    Thread.Sleep(1);
-                    return;
-                }
-
                 if (cpu.intTotalCpuCycles < intMaxCPUCycles)
                 {
                     int cpuCyclesBefore = cpu.intTotalCpuCycles;
