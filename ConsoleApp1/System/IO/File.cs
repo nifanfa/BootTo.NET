@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text;
 namespace System.IO
 {
     public static unsafe class File
@@ -40,8 +41,194 @@ namespace System.IO
 
         public static void Delete(string path) => TryDelete(path);
 
+        public static FileStream Open(string path, FileMode mode)
+            => new FileStream(path, mode);
+
+        public static FileStream Open(string path, FileMode mode, FileAccess access)
+            => new FileStream(path, mode, access);
+
+        public static FileStream Open(string path, FileMode mode, FileAccess access, FileShare share)
+            => new FileStream(path, mode, access, share);
+
+        public static FileStream Open(string path, FileMode mode, FileAccess access, FileShare share, int bufferSize)
+            => Open(path, mode, access, share);
+
+        public static FileStream Open(string path, FileMode mode, FileAccess access, FileShare share,
+            int bufferSize, FileOptions options)
+            => Open(path, mode, access, share);
+
+        public static FileStream OpenRead(string path)
+            => new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+        public static FileStream OpenWrite(string path)
+            => new FileStream(path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None);
+
+        public static FileStream Create(string path)
+            => new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
+
+        public static string ReadAllText(string path)
+            => ReadAllText(path, Encoding.UTF8);
+
+        public static string ReadAllText(string path, Encoding encoding)
+        {
+            if (encoding == null)
+                throw new ArgumentNullException("The encoding cannot be null.");
+            string result = encoding.GetString(ReadAllBytes(path));
+            return result.Length > 0 && result[0] == '\uFEFF'
+                ? result.Substring(1)
+                : result;
+        }
+
+        public static void WriteAllText(string path, string contents)
+            => WriteAllText(path, contents, Encoding.UTF8);
+
+        public static void WriteAllText(string path, string contents, Encoding encoding)
+        {
+            if (encoding == null)
+                throw new ArgumentNullException("The encoding cannot be null.");
+            WriteAllBytes(path, encoding.GetBytes(contents ?? string.Empty));
+        }
+
+        public static void AppendAllText(string path, string contents)
+            => AppendAllText(path, contents, Encoding.UTF8);
+
+        public static void AppendAllText(string path, string contents, Encoding encoding)
+        {
+            if (encoding == null)
+                throw new ArgumentNullException("The encoding cannot be null.");
+            FileStream stream = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.Read);
+            try
+            {
+                byte[] data = encoding.GetBytes(contents ?? string.Empty);
+                stream.Write(data, 0, data.Length);
+                stream.Flush();
+            }
+            finally
+            {
+                stream.Close();
+            }
+        }
+
+        public static string[] ReadAllLines(string path)
+            => ReadAllLines(path, Encoding.UTF8);
+
+        public static string[] ReadAllLines(string path, Encoding encoding)
+        {
+            string text = ReadAllText(path, encoding);
+            List<string> lines = new List<string>();
+            int start = 0;
+            for (int i = 0; i < text.Length; i++)
+            {
+                if (text[i] != '\r' && text[i] != '\n')
+                    continue;
+
+                lines.Add(text.Substring(start, i - start));
+                if (text[i] == '\r' && i + 1 < text.Length && text[i + 1] == '\n')
+                    i++;
+                start = i + 1;
+            }
+            if (start < text.Length)
+                lines.Add(text.Substring(start));
+            return lines.ToArray();
+        }
+
+        public static void WriteAllLines(string path, string[] contents)
+            => WriteAllLines(path, contents, Encoding.UTF8);
+
+        public static void WriteAllLines(string path, IEnumerable<string> contents)
+            => WriteAllLines(path, contents, Encoding.UTF8);
+
+        public static void WriteAllLines(string path, string[] contents, Encoding encoding)
+            => WriteAllLines(path, (IEnumerable<string>)contents, encoding);
+
+        public static void WriteAllLines(string path, IEnumerable<string> contents, Encoding encoding)
+        {
+            if (contents == null)
+                throw new ArgumentNullException("The line collection cannot be null.");
+            if (encoding == null)
+                throw new ArgumentNullException("The encoding cannot be null.");
+
+            Text.StringBuilder text = new Text.StringBuilder();
+            int index = 0;
+            foreach (string line in contents)
+            {
+                if (index++ != 0)
+                    text.Append("\r\n");
+                text.Append(line ?? string.Empty);
+            }
+            WriteAllText(path, text.ToString(), encoding);
+        }
+
+        public static void Copy(string sourceFileName, string destFileName)
+            => Copy(sourceFileName, destFileName, false);
+
+        public static void Copy(string sourceFileName, string destFileName, bool overwrite)
+        {
+            if (string.IsNullOrEmpty(sourceFileName) || string.IsNullOrEmpty(destFileName))
+                throw new ArgumentException("The source and destination paths cannot be empty.");
+            if (!Exists(sourceFileName))
+                throw new IOException("The source file does not exist.");
+            if (!overwrite && Exists(destFileName))
+                throw new IOException("The destination file already exists.");
+            WriteAllBytes(destFileName, ReadAllBytes(sourceFileName));
+        }
+
+        public static void Move(string sourceFileName, string destFileName, bool overwrite)
+        {
+            if (overwrite && Exists(destFileName))
+                Delete(destFileName);
+            Move(sourceFileName, destFileName);
+        }
+
+        public static FileAttributes GetAttributes(string path)
+        {
+            if (!TryGetInfo(path, out FileMetadata metadata))
+                throw new IOException("The file metadata could not be read.");
+            return ToFileAttributes(metadata.Attribute);
+        }
+
+        public static void SetAttributes(string path, FileAttributes attributes)
+        {
+            if (string.IsNullOrEmpty(path))
+                throw new ArgumentNullException("The file path cannot be null or empty.");
+            if (!OpenVolume(out EFI_FILE_HANDLE* volume))
+                throw new IOException("The file system volume could not be opened.");
+
+            EFI_FILE_HANDLE* file = null;
+            try
+            {
+                fixed (char* pathPointer = path)
+                {
+                    if ((ulong)volume->Open(volume, &file, pathPointer,
+                        EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE, 0) != EFI_SUCCESS || file == null)
+                        throw new IOException("The file could not be opened.");
+                }
+
+                ulong infoSize = 0;
+                if ((ulong)file->GetInfo(file, (EFI_GUID*)EFI_FILE_INFO_ID, &infoSize, null) != EFI_BUFFER_TOO_SMALL)
+                    throw new IOException("The file metadata size could not be queried.");
+                byte[] buffer = new byte[infoSize];
+                fixed (byte* infoBuffer = buffer)
+                {
+                    if ((ulong)file->GetInfo(file, (EFI_GUID*)EFI_FILE_INFO_ID, &infoSize, infoBuffer) != EFI_SUCCESS)
+                        throw new IOException("The file metadata could not be read.");
+                    ((EFI_FILE_INFO*)infoBuffer)->Attribute = ToEfiAttributes(attributes);
+                    if ((ulong)file->SetInfo(file, (EFI_GUID*)EFI_FILE_INFO_ID, infoSize, infoBuffer) != EFI_SUCCESS)
+                        throw new IOException("The file attributes could not be updated.");
+                }
+            }
+            finally
+            {
+                if (file != null)
+                    file->Close(file);
+                volume->Close(volume);
+            }
+        }
+
         public static void Move(string sourceFileName, string destFileName)
         {
+            if (Exists(destFileName))
+                throw new IOException("The destination file already exists.");
             if (!TryMove(sourceFileName, destFileName))
                 throw new IOException("The file could not be moved.");
         }
@@ -288,6 +475,28 @@ namespace System.IO
                     file->Close(file);
                 volume->Close(volume);
             }
+        }
+
+        private static FileAttributes ToFileAttributes(ulong attributes)
+        {
+            FileAttributes result = FileAttributes.Normal;
+            if ((attributes & EFI_FILE_READ_ONLY) != 0) result |= FileAttributes.ReadOnly;
+            if ((attributes & EFI_FILE_HIDDEN) != 0) result |= FileAttributes.Hidden;
+            if ((attributes & EFI_FILE_SYSTEM) != 0) result |= FileAttributes.System;
+            if ((attributes & EFI_FILE_DIRECTORY) != 0) result |= FileAttributes.Directory;
+            if ((attributes & EFI_FILE_ARCHIVE) != 0) result |= FileAttributes.Archive;
+            return result;
+        }
+
+        private static ulong ToEfiAttributes(FileAttributes attributes)
+        {
+            ulong result = 0;
+            if ((attributes & FileAttributes.ReadOnly) != 0) result |= EFI_FILE_READ_ONLY;
+            if ((attributes & FileAttributes.Hidden) != 0) result |= EFI_FILE_HIDDEN;
+            if ((attributes & FileAttributes.System) != 0) result |= EFI_FILE_SYSTEM;
+            if ((attributes & FileAttributes.Directory) != 0) result |= EFI_FILE_DIRECTORY;
+            if ((attributes & FileAttributes.Archive) != 0) result |= EFI_FILE_ARCHIVE;
+            return result;
         }
     }
 }

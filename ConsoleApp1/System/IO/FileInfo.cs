@@ -1,6 +1,6 @@
 namespace System.IO
 {
-    public sealed class FileInfo
+    public sealed class FileInfo : FileSystemInfo
     {
         private readonly string _fullName;
 
@@ -11,9 +11,9 @@ namespace System.IO
             _fullName = fileName;
         }
 
-        public string FullName => _fullName;
+        public override string FullName => _fullName;
 
-        public string Name
+        public override string Name
         {
             get
             {
@@ -25,7 +25,7 @@ namespace System.IO
             }
         }
 
-        public bool Exists
+        public override bool Exists
         {
             get
             {
@@ -45,26 +45,14 @@ namespace System.IO
             }
         }
 
-        public DateTime CreationTime
+        public override DateTime CreationTime
             => ToDateTime(GetMetadata().CreateTime);
 
-        public DateTime LastWriteTime
+        public override DateTime LastWriteTime
             => ToDateTime(GetMetadata().ModificationTime);
 
-        public DateTime LastAccessTime
+        public override DateTime LastAccessTime
             => ToDateTime(GetMetadata().LastAccessTime);
-
-        public void Delete()
-        {
-            if (!File.TryDelete(_fullName))
-                throw new IOException("The file could not be deleted.");
-        }
-
-        public FileStream OpenRead()
-            => new FileStream(_fullName, FileMode.Open);
-
-        public FileStream OpenWrite()
-            => new FileStream(_fullName, FileMode.OpenOrCreate);
 
         private File.FileMetadata GetMetadata()
         {
@@ -72,6 +60,33 @@ namespace System.IO
                 throw new IOException("The file metadata could not be read.");
             return metadata;
         }
+
+        public override void Delete()
+        {
+            if (!File.TryDelete(_fullName))
+                throw new IOException("The file could not be deleted.");
+        }
+
+        public FileStream OpenRead()
+            => new FileStream(_fullName, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+        public FileStream OpenWrite()
+            => new FileStream(_fullName, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None);
+
+        public FileStream Open(FileMode mode, FileAccess access, FileShare share)
+            => new FileStream(_fullName, mode, access, share);
+
+        public FileInfo CopyTo(string destFileName)
+            => CopyTo(destFileName, false);
+
+        public FileInfo CopyTo(string destFileName, bool overwrite)
+        {
+            File.Copy(_fullName, destFileName, overwrite);
+            return new FileInfo(destFileName);
+        }
+
+        public void MoveTo(string destFileName)
+            => File.Move(_fullName, destFileName);
 
         private static DateTime ToDateTime(EFI_TIME time)
             => new DateTime(time.Year, time.Month, time.Day, time.Hour, time.Minute, time.Second, (int)(time.Nanosecond / 1000000));

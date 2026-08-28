@@ -1,6 +1,6 @@
 namespace System.Collections.Generic
 {
-    public class List<T> : IEnumerable<T>
+    public class List<T> : IList<T>, IReadOnlyList<T>
     {
         private const int DefaultCapacity = 4;
 
@@ -32,7 +32,17 @@ namespace System.Collections.Generic
             _size = items.Length;
         }
 
+        public List(IEnumerable<T> items)
+        {
+            if (items == null)
+                throw new ArgumentNullException("The source items cannot be null.");
+
+            _items = new T[0];
+            AddRange(items);
+        }
+
         public int Count => _size;
+        public bool IsReadOnly => false;
 
         public int Capacity
         {
@@ -79,6 +89,14 @@ namespace System.Collections.Generic
             _size += items.Length;
         }
 
+        public void AddRange(IEnumerable<T> items)
+        {
+            if (items == null)
+                throw new ArgumentNullException("The source items cannot be null.");
+            foreach (T item in items)
+                Add(item);
+        }
+
         public void Insert(int index, T item)
         {
             if ((uint)index > (uint)_size)
@@ -101,6 +119,128 @@ namespace System.Collections.Generic
                 _items[i] = _items[i + 1];
 
             _items[_size] = default(T);
+        }
+
+        public int IndexOf(T item)
+        {
+            EqualityComparer<T> comparer = EqualityComparer<T>.Default;
+            for (int i = 0; i < _size; i++)
+                if (comparer.Equals(_items[i], item))
+                    return i;
+            return -1;
+        }
+
+        public bool Contains(T item) => IndexOf(item) >= 0;
+
+        public bool Remove(T item)
+        {
+            int index = IndexOf(item);
+            if (index < 0)
+                return false;
+            RemoveAt(index);
+            return true;
+        }
+
+        public void CopyTo(T[] array, int arrayIndex)
+        {
+            if (array == null)
+                throw new ArgumentNullException("The destination array cannot be null.");
+            if (arrayIndex < 0 || arrayIndex > array.Length - _size)
+                throw new ArgumentException("The destination array range is invalid.");
+            for (int i = 0; i < _size; i++)
+                array[arrayIndex + i] = _items[i];
+        }
+
+        public void InsertRange(int index, IEnumerable<T> items)
+        {
+            if ((uint)index > (uint)_size)
+                throw new ArgumentOutOfRangeException("The insertion index is outside the list.");
+            if (items == null)
+                throw new ArgumentNullException("The source items cannot be null.");
+
+            List<T> pending = items as List<T>;
+            if (pending == this)
+                pending = new List<T>(ToArray());
+            if (pending != null)
+            {
+                EnsureCapacity(_size + pending._size);
+                for (int i = _size - 1; i >= index; i--)
+                    _items[i + pending._size] = _items[i];
+                for (int i = 0; i < pending._size; i++)
+                    _items[index + i] = pending._items[i];
+                _size += pending._size;
+                return;
+            }
+
+            foreach (T item in items)
+            {
+                Insert(index++, item);
+            }
+        }
+
+        public int RemoveAll(Predicate<T> match)
+        {
+            if (match == null)
+                throw new ArgumentNullException("The match predicate cannot be null.");
+            int write = 0;
+            int removed = 0;
+            for (int i = 0; i < _size; i++)
+            {
+                if (match(_items[i]))
+                {
+                    removed++;
+                    continue;
+                }
+                _items[write++] = _items[i];
+            }
+            for (int i = write; i < _size; i++)
+                _items[i] = default;
+            _size = write;
+            return removed;
+        }
+
+        public T Find(Predicate<T> match)
+        {
+            int index = FindIndex(match);
+            return index < 0 ? default : _items[index];
+        }
+
+        public int FindIndex(Predicate<T> match)
+        {
+            if (match == null)
+                throw new ArgumentNullException("The match predicate cannot be null.");
+            for (int i = 0; i < _size; i++)
+                if (match(_items[i]))
+                    return i;
+            return -1;
+        }
+
+        public void ForEach(Action<T> action)
+        {
+            if (action == null)
+                throw new ArgumentNullException("The action cannot be null.");
+            for (int i = 0; i < _size; i++)
+                action(_items[i]);
+        }
+
+        public void Reverse() => Array.Reverse(_items, 0, _size);
+
+        public void Sort() => Sort((IComparer<T>)null);
+
+        public void Sort(IComparer<T> comparer)
+            => Array.Sort(_items, 0, _size, comparer);
+
+        public void Sort(Comparison<T> comparison)
+            => Sort(new ComparisonComparer<T>(comparison));
+
+        public List<T> GetRange(int index, int count)
+        {
+            if (index < 0 || count < 0 || index > _size - count)
+                throw new ArgumentException("The list range is invalid.");
+            List<T> result = new List<T>(count);
+            for (int i = 0; i < count; i++)
+                result.Add(_items[index + i]);
+            return result;
         }
 
         public void Clear()

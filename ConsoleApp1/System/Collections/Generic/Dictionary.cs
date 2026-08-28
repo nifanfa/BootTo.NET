@@ -22,7 +22,7 @@ namespace System.Collections.Generic
         }
     }
 
-    public class Dictionary<TKey, TValue> : IEnumerable<KeyValuePair<TKey, TValue>>
+    public class Dictionary<TKey, TValue> : IDictionary<TKey, TValue>
     {
         private const int DefaultCapacity = 4;
 
@@ -67,6 +67,10 @@ namespace System.Collections.Generic
         }
 
         public int Count => _count - _freeCount;
+        public bool IsReadOnly => false;
+
+        public ICollection<TKey> Keys => new DictionaryKeyCollection<TKey, TValue>(this);
+        public ICollection<TValue> Values => new DictionaryValueCollection<TKey, TValue>(this);
 
         public TValue this[TKey key]
         {
@@ -84,6 +88,17 @@ namespace System.Collections.Generic
         public void Add(TKey key, TValue value)
             => Insert(key, value, true);
 
+        public void Add(KeyValuePair<TKey, TValue> item)
+            => Add(item.Key, item.Value);
+
+        public bool TryAdd(TKey key, TValue value)
+        {
+            if (ContainsKey(key))
+                return false;
+            Add(key, value);
+            return true;
+        }
+
         public bool ContainsKey(TKey key)
             => FindEntry(key) >= 0;
 
@@ -98,6 +113,40 @@ namespace System.Collections.Generic
 
             value = default;
             return false;
+        }
+
+        public bool ContainsValue(TValue value)
+        {
+            EqualityComparer<TValue> comparer = EqualityComparer<TValue>.Default;
+            for (int i = 0; i < _count; i++)
+                if (_entries[i].HashCode >= 0 && comparer.Equals(_entries[i].Value, value))
+                    return true;
+            return false;
+        }
+
+        public bool Contains(KeyValuePair<TKey, TValue> item)
+        {
+            if (!TryGetValue(item.Key, out TValue value))
+                return false;
+            return EqualityComparer<TValue>.Default.Equals(value, item.Value);
+        }
+
+        public void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex)
+        {
+            if (array == null)
+                throw new ArgumentNullException("The destination array cannot be null.");
+            if (arrayIndex < 0 || arrayIndex > array.Length - Count)
+                throw new ArgumentException("The destination array range is invalid.");
+            int index = arrayIndex;
+            foreach (KeyValuePair<TKey, TValue> item in this)
+                array[index++] = item;
+        }
+
+        public bool Remove(KeyValuePair<TKey, TValue> item)
+        {
+            if (!Contains(item))
+                return false;
+            return Remove(item.Key);
         }
 
         public bool Remove(TKey key)
@@ -309,5 +358,75 @@ namespace System.Collections.Generic
             {
             }
         }
+    }
+
+    internal sealed class DictionaryKeyCollection<TKey, TValue> : ICollection<TKey>
+    {
+        private readonly Dictionary<TKey, TValue> _dictionary;
+
+        internal DictionaryKeyCollection(Dictionary<TKey, TValue> dictionary) => _dictionary = dictionary;
+
+        public int Count => _dictionary.Count;
+        public bool IsReadOnly => true;
+        public bool Contains(TKey item) => _dictionary.ContainsKey(item);
+        public void CopyTo(TKey[] array, int arrayIndex)
+        {
+            if (array == null)
+                throw new ArgumentNullException("The destination array cannot be null.");
+            if (arrayIndex < 0 || arrayIndex > array.Length - Count)
+                throw new ArgumentException("The destination array range is invalid.");
+            int index = arrayIndex;
+            foreach (KeyValuePair<TKey, TValue> pair in _dictionary)
+                array[index++] = pair.Key;
+        }
+
+        public void Add(TKey item) => throw new NotSupportedException("The dictionary key collection is read-only.");
+        public void Clear() => throw new NotSupportedException("The dictionary key collection is read-only.");
+        public bool Remove(TKey item) => throw new NotSupportedException("The dictionary key collection is read-only.");
+
+        public IEnumerator<TKey> GetEnumerator()
+        {
+            List<TKey> result = new List<TKey>();
+            foreach (KeyValuePair<TKey, TValue> pair in _dictionary)
+                result.Add(pair.Key);
+            return result.GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
+    internal sealed class DictionaryValueCollection<TKey, TValue> : ICollection<TValue>
+    {
+        private readonly Dictionary<TKey, TValue> _dictionary;
+
+        internal DictionaryValueCollection(Dictionary<TKey, TValue> dictionary) => _dictionary = dictionary;
+
+        public int Count => _dictionary.Count;
+        public bool IsReadOnly => true;
+        public bool Contains(TValue item) => _dictionary.ContainsValue(item);
+        public void CopyTo(TValue[] array, int arrayIndex)
+        {
+            if (array == null)
+                throw new ArgumentNullException("The destination array cannot be null.");
+            if (arrayIndex < 0 || arrayIndex > array.Length - Count)
+                throw new ArgumentException("The destination array range is invalid.");
+            int index = arrayIndex;
+            foreach (KeyValuePair<TKey, TValue> pair in _dictionary)
+                array[index++] = pair.Value;
+        }
+
+        public void Add(TValue item) => throw new NotSupportedException("The dictionary value collection is read-only.");
+        public void Clear() => throw new NotSupportedException("The dictionary value collection is read-only.");
+        public bool Remove(TValue item) => throw new NotSupportedException("The dictionary value collection is read-only.");
+
+        public IEnumerator<TValue> GetEnumerator()
+        {
+            List<TValue> result = new List<TValue>();
+            foreach (KeyValuePair<TKey, TValue> pair in _dictionary)
+                result.Add(pair.Value);
+            return result.GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

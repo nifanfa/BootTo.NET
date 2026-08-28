@@ -2,7 +2,7 @@
 
 namespace System.Threading
 {
-    internal class Thread
+    public class Thread
     {
         public static void Sleep(int millisecondsTimeout) => Task.Delay(millisecondsTimeout).Wait();
     }

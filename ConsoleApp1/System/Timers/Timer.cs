@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace System.Timers
 {
-    internal unsafe class Timer
+    public unsafe class Timer
     {
         public event EventHandler Elapsed;
         bool Started;

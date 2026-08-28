@@ -18,6 +18,239 @@
             return new string(result);
         }
 
+        public bool StartsWith(string value)
+        {
+            if (value == null)
+                throw new ArgumentNullException("The value cannot be null.");
+            if (value.Length > Length)
+                return false;
+            for (int i = 0; i < value.Length; i++)
+                if (this[i] != value[i])
+                    return false;
+            return true;
+        }
+
+        public bool EndsWith(string value)
+        {
+            if (value == null)
+                throw new ArgumentNullException("The value cannot be null.");
+            if (value.Length > Length)
+                return false;
+            int start = Length - value.Length;
+            for (int i = 0; i < value.Length; i++)
+                if (this[start + i] != value[i])
+                    return false;
+            return true;
+        }
+
+        public bool Contains(char value) => IndexOf(value) >= 0;
+        public bool Contains(string value) => IndexOf(value) >= 0;
+
+        public int IndexOf(char value) => IndexOf(value, 0);
+
+        public int IndexOf(char value, int startIndex)
+        {
+            if (startIndex < 0 || startIndex > Length)
+                throw new ArgumentOutOfRangeException("The start index is outside the string.");
+            for (int i = startIndex; i < Length; i++)
+                if (this[i] == value)
+                    return i;
+            return -1;
+        }
+
+        public int IndexOf(string value) => IndexOf(value, 0);
+
+        public int IndexOf(string value, int startIndex)
+        {
+            if (value == null)
+                throw new ArgumentNullException("The value cannot be null.");
+            if (startIndex < 0 || startIndex > Length)
+                throw new ArgumentOutOfRangeException("The start index is outside the string.");
+            if (value.Length == 0)
+                return startIndex;
+            for (int i = startIndex; i <= Length - value.Length; i++)
+            {
+                bool match = true;
+                for (int j = 0; j < value.Length; j++)
+                    if (this[i + j] != value[j])
+                    {
+                        match = false;
+                        break;
+                    }
+                if (match)
+                    return i;
+            }
+            return -1;
+        }
+
+        public int LastIndexOf(char value)
+        {
+            for (int i = Length - 1; i >= 0; i--)
+                if (this[i] == value)
+                    return i;
+            return -1;
+        }
+
+        public int LastIndexOf(string value)
+        {
+            if (value == null)
+                throw new ArgumentNullException("The value cannot be null.");
+            if (value.Length == 0)
+                return Length;
+            for (int i = Length - value.Length; i >= 0; i--)
+            {
+                bool match = true;
+                for (int j = 0; j < value.Length; j++)
+                    if (this[i + j] != value[j])
+                    {
+                        match = false;
+                        break;
+                    }
+                if (match)
+                    return i;
+            }
+            return -1;
+        }
+
+        public string Trim() => TrimWhitespace(true, true);
+        public string TrimStart() => TrimWhitespace(true, false);
+        public string TrimEnd() => TrimWhitespace(false, true);
+
+        public string Trim(params char[] trimChars)
+        {
+            if (trimChars == null || trimChars.Length == 0)
+                return Trim();
+            int start = 0;
+            int end = Length;
+            while (start < end && ContainsChar(trimChars, this[start])) start++;
+            while (end > start && ContainsChar(trimChars, this[end - 1])) end--;
+            return Substring(start, end - start);
+        }
+
+        public string Replace(char oldChar, char newChar)
+        {
+            if (oldChar == newChar)
+                return this;
+            char[] result = new char[Length];
+            for (int i = 0; i < Length; i++)
+                result[i] = this[i] == oldChar ? newChar : this[i];
+            return new string(result);
+        }
+
+        public string Replace(string oldValue, string newValue)
+        {
+            if (oldValue == null)
+                throw new ArgumentNullException("The old value cannot be null.");
+            if (oldValue.Length == 0)
+                throw new ArgumentException("The old value cannot be empty.");
+            newValue = newValue ?? Empty;
+
+            Text.StringBuilder result = new Text.StringBuilder(Length);
+            int position = 0;
+            while (position < Length)
+            {
+                int match = IndexOf(oldValue, position);
+                if (match < 0)
+                {
+                    result.Append(Substring(position));
+                    position = Length;
+                    break;
+                }
+                result.Append(Substring(position, match - position));
+                result.Append(newValue);
+                position = match + oldValue.Length;
+            }
+            return Length == 0 ? this : result.ToString();
+        }
+
+        public string ToLowerInvariant() => ConvertAsciiCase(false);
+        public string ToUpperInvariant() => ConvertAsciiCase(true);
+
+        public string[] Split(params char[] separator)
+            => Split(separator, StringSplitOptions.None);
+
+        public string[] Split(char separator)
+            => Split(new char[] { separator }, StringSplitOptions.None);
+
+        public string[] Split(char[] separator, StringSplitOptions options)
+        {
+            if ((options & ~(StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) != 0)
+                throw new ArgumentException("The string split options are invalid.");
+
+            System.Collections.Generic.List<string> result = new System.Collections.Generic.List<string>();
+            int start = 0;
+            for (int i = 0; i <= Length; i++)
+            {
+                bool atSeparator = i == Length || IsSplitSeparator(separator, this[i]);
+                if (!atSeparator)
+                    continue;
+
+                string part = Substring(start, i - start);
+                if ((options & StringSplitOptions.TrimEntries) != 0)
+                    part = part.Trim();
+                if (part.Length != 0 || (options & StringSplitOptions.RemoveEmptyEntries) == 0)
+                    result.Add(part);
+                start = i + 1;
+            }
+            return result.ToArray();
+        }
+
+        public static bool IsNullOrWhiteSpace(string value)
+        {
+            if (value == null)
+                return true;
+            for (int i = 0; i < value.Length; i++)
+                if (!IsWhiteSpace(value[i]))
+                    return false;
+            return true;
+        }
+
+        public static int CompareOrdinal(string left, string right)
+        {
+            if (ReferenceEquals(left, right))
+                return 0;
+            if (left == null)
+                return -1;
+            if (right == null)
+                return 1;
+            int length = left.Length < right.Length ? left.Length : right.Length;
+            for (int i = 0; i < length; i++)
+                if (left[i] != right[i])
+                    return left[i] < right[i] ? -1 : 1;
+            return left.Length < right.Length ? -1 : (left.Length > right.Length ? 1 : 0);
+        }
+
+        public static string Join(string separator, string[] values)
+        {
+            if (values == null)
+                throw new ArgumentNullException("The values cannot be null.");
+            Text.StringBuilder result = new Text.StringBuilder();
+            separator = separator ?? Empty;
+            for (int i = 0; i < values.Length; i++)
+            {
+                if (i != 0)
+                    result.Append(separator);
+                result.Append(values[i]);
+            }
+            return result.ToString();
+        }
+
+        public static string Join<T>(string separator, System.Collections.Generic.IEnumerable<T> values)
+        {
+            if (values == null)
+                throw new ArgumentNullException("The values cannot be null.");
+            Text.StringBuilder result = new Text.StringBuilder();
+            separator = separator ?? Empty;
+            int index = 0;
+            foreach (T value in values)
+            {
+                if (index++ != 0)
+                    result.Append(separator);
+                result.Append(Convert.ToString(value));
+            }
+            return result.ToString();
+        }
+
         public static string Format(string format, object arg0)
             => Format(format, new object[] { arg0 });
 
@@ -194,5 +427,50 @@
                 result[padding + i] = digits[position + i];
             return new string(result);
         }
+
+        private string TrimWhitespace(bool trimStart, bool trimEnd)
+        {
+            int start = 0;
+            int end = Length;
+            if (trimStart)
+                while (start < end && IsWhiteSpace(this[start])) start++;
+            if (trimEnd)
+                while (end > start && IsWhiteSpace(this[end - 1])) end--;
+            return Substring(start, end - start);
+        }
+
+        private static bool ContainsChar(char[] values, char value)
+        {
+            for (int i = 0; i < values.Length; i++)
+                if (values[i] == value)
+                    return true;
+            return false;
+        }
+
+        private static bool IsSplitSeparator(char[] separators, char value)
+        {
+            if (separators == null || separators.Length == 0)
+                return IsWhiteSpace(value);
+            return ContainsChar(separators, value);
+        }
+
+        private string ConvertAsciiCase(bool upper)
+        {
+            char[] result = new char[Length];
+            for (int i = 0; i < Length; i++)
+            {
+                char value = this[i];
+                if (!upper && value >= 'A' && value <= 'Z')
+                    value = (char)(value + ('a' - 'A'));
+                else if (upper && value >= 'a' && value <= 'z')
+                    value = (char)(value - ('a' - 'A'));
+                result[i] = value;
+            }
+            return new string(result);
+        }
+
+        private static bool IsWhiteSpace(char value)
+            => value == ' ' || value == '\t' || value == '\r' || value == '\n' ||
+               value == '\f' || value == '\v';
     }
 }
