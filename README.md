@@ -37,7 +37,7 @@ QEMU mounts the bundled UEFI variable template through a temporary snapshot. Var
 # DOOM generic
 > **Key Mapping:** `W` `S` `A` `D` -> Movement | `Mouse Movement` -> Look / Camera | `Mouse Left Click` -> Fire | `E` -> Use / Open Door | `Left Shift` -> Sprint | `Enter` -> Confirm | `Esc` -> Menu / Back
 <p align="center">
-  <img alt="QQ_1787843944539" src="https://github.com/user-attachments/assets/d6e685b8-2711-4ed0-b317-39c02d64612b" />
+  <img alt="QQ_1787916501069" src="https://github.com/user-attachments/assets/18d12961-0bce-4130-9d15-50307a11ff36" />
 </p>
 
 ## NES Emulator
