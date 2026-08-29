@@ -10,13 +10,19 @@ namespace System.Media
         private const int BitsPerSample = 16;
         private const int OutputSampleRate = 44100;
         private const int OutputChannels = 2;
-        private const ulong MinimumStreamingBufferBytes =
-            OutputSampleRate * OutputChannels * 2UL / 4UL;
+        // Keep enough PCM in AudioDxe to absorb frame-time jitter.
+        private const ulong MinimumStreamingBufferBytes = 96UL * 1024UL;
+        private const int SynchronousChunkBytes = 4096;
 
         private string _soundLocation = string.Empty;
         private Stream _stream;
         private readonly int _pcmChannels;
         private readonly int _pcmSampleRate;
+        private ulong _streamInputFrames;
+        private ulong _streamOutputFrames;
+        private bool _hasStreamLastFrame;
+        private short _streamLastLeft;
+        private short _streamLastRight;
 
         private struct WavFormat
         {
@@ -131,6 +137,19 @@ namespace System.Media
                 return 0;
 
             return AppendPcm(buffer, offset, count, _pcmChannels, _pcmSampleRate);
+        }
+
+        internal ulong GetBufferedInputFrameCount(int inputSampleRate)
+        {
+            if (inputSampleRate <= 0 || (void*)s_playbackEvent == null)
+                return 0;
+
+            EFI_TPL oldTpl = gBS->RaiseTPL(TPL_NOTIFY);
+            ulong outputFrames = s_remainingBytes / (OutputChannels * sizeof(short));
+            gBS->RestoreTPL(oldTpl);
+
+            return (outputFrames * (ulong)inputSampleRate + OutputSampleRate - 1) /
+                OutputSampleRate;
         }
 
         private static int ReadFully(Stream stream, byte[] buffer, int count)
@@ -282,15 +301,14 @@ namespace System.Media
 
         private static EFI_AUDIO_IO_PROTOCOL* s_audioIo;
         private static EFI_EVENT s_playbackEvent;
-        private static void* s_currentBuffer;
         private static ulong s_outputIndexMask;
         private static uint s_outputFrequency;
         private static uint s_outputFrequencies;
-        private static bool s_hasPlayed;
         private const ulong PlaybackDelay = 0;
         private static sbyte s_gain = DefaultGain;
         private static bool s_failed;
         private static ulong s_remainingBytes;
+        private static bool s_streamingPlaybackActive;
 
         private static bool IsAvailable =>
             s_audioIo != null && (void*)s_playbackEvent != null && !s_failed;
@@ -340,8 +358,6 @@ namespace System.Media
                 return;
             }
 
-            if (s_audioIo != audioIo)
-                s_hasPlayed = false;
             s_audioIo = audioIo;
             s_outputIndexMask = outputIndexMask;
             s_outputFrequency = initialFrequency;
@@ -451,6 +467,7 @@ namespace System.Media
                 audioIo->Revision == AudioIoRevision &&
                 audioIo->GetOutputs != null &&
                 audioIo->SetupPlayback != null &&
+                audioIo->StartPlayback != null &&
                 audioIo->StartPlaybackAsync != null &&
                 audioIo->StopPlayback != null;
         }
@@ -475,25 +492,118 @@ namespace System.Media
             if (output == null || !EnsurePcmAudio(OutputSampleRate))
                 return 0;
 
-            void* rawBuffer = GarbageCollector.AllocateNative((ulong)output.Length);
-            if (rawBuffer == null)
-                return 0;
-
-            fixed (byte* source = output)
-                Unsafe.CopyBlock(rawBuffer, source, (ulong)output.Length);
-
-            EFI_STATUS status = PlayBuffer(
-                rawBuffer,
-                (ulong)output.Length,
-                s_outputIndexMask,
-                s_outputFrequencies,
-                s_outputFrequency,
-                AudioIoBits16,
-                OutputChannels);
-            return (ulong)status == EFI_SUCCESS ? count : 0;
+            return PlayOutputPcmChunks(output) ? count : 0;
         }
 
-        private static int AppendPcm(
+        private static bool PlayOutputPcmChunks(byte[] output)
+        {
+            if (output == null || output.Length == 0 ||
+                output.Length % (OutputChannels * 2) != 0)
+                return false;
+
+            // This is a complete synchronous clip. Do not append it to a
+            // previous asynchronous stream, but keep all of its chunks in one
+            // continuous HDA stream.
+            StopPlayback(false);
+
+            int offset = 0;
+            while (offset < output.Length)
+            {
+                int count = output.Length - offset;
+                if (count > SynchronousChunkBytes)
+                    count = SynchronousChunkBytes;
+
+                if (!QueueOutputPcmChunk(output, offset, count))
+                {
+                    StopPlayback(false);
+                    return false;
+                }
+                offset += count;
+            }
+
+            if (!WaitForStreamingCompletion())
+            {
+                StopPlayback(false);
+                return false;
+            }
+
+            StopPlayback(false);
+            return true;
+        }
+
+        private static bool QueueOutputPcmChunk(byte[] output, int offset, int count)
+        {
+            if (output == null || offset < 0 || count <= 0 ||
+                offset > output.Length - count || count % (OutputChannels * 2) != 0)
+                return false;
+
+            ulong outputLength = (ulong)count;
+            if (!ReserveStreamingCapacity(outputLength))
+                return false;
+
+            void* rawBuffer = GarbageCollector.AllocateNative(outputLength);
+            if (rawBuffer == null)
+            {
+                ReleaseStreamingCapacity(outputLength);
+                return false;
+            }
+
+            fixed (byte* source = output)
+                Unsafe.CopyBlock(rawBuffer, source + offset, outputLength);
+
+            EFI_TPL oldTpl = gBS->RaiseTPL(TPL_NOTIFY);
+            EFI_STATUS status = s_audioIo->SetupPlayback(
+                s_audioIo,
+                s_outputIndexMask,
+                s_gain,
+                s_outputFrequency,
+                AudioIoBits16,
+                OutputChannels,
+                PlaybackDelay);
+            if ((ulong)status == EFI_SUCCESS)
+            {
+                status = s_audioIo->StartPlaybackAsync(
+                    s_audioIo,
+                    rawBuffer,
+                    outputLength,
+                    0,
+                    &StreamingPlaybackDone,
+                    (void*)outputLength);
+            }
+            gBS->RestoreTPL(oldTpl);
+
+            gBS->FreePool(rawBuffer);
+            if ((ulong)status == EFI_SUCCESS)
+            {
+                s_streamingPlaybackActive = true;
+                return true;
+            }
+
+            ReleaseStreamingCapacity(outputLength);
+            s_failed = true;
+            return false;
+        }
+
+        private static bool WaitForStreamingCompletion()
+        {
+            while (true)
+            {
+                EFI_TPL oldTpl = gBS->RaiseTPL(TPL_NOTIFY);
+                bool complete = s_remainingBytes == 0;
+                gBS->RestoreTPL(oldTpl);
+
+                if (complete)
+                    return IsAvailable;
+                if (!IsAvailable)
+                    return false;
+
+                // Let AudioDxe's periodic HDA poll callback release completed
+                // transfers and advance the streaming queue.
+                gBS->Stall(1000);
+            }
+        }
+
+        private int AppendPcm(
             byte[] buffer,
             int offset,
             int count,
@@ -509,11 +619,23 @@ namespace System.Media
             if (count % frameBytes != 0)
                 return 0;
 
-            byte[] output = ConvertToOutputPcm(buffer, offset, count, channels, sampleRate);
+            byte[] output = ConvertStreamingPcm(
+                buffer,
+                offset,
+                count,
+                channels,
+                sampleRate,
+                out ulong outputFrames);
             if (output == null || !EnsurePcmAudio(OutputSampleRate))
                 return 0;
 
             ulong outputLength = (ulong)output.Length;
+            if (outputLength == 0)
+            {
+                CommitStreamingPcmState(buffer, offset, count, channels, outputFrames);
+                return count;
+            }
+
             if (!ReserveStreamingCapacity(outputLength))
                 return 0;
 
@@ -548,18 +670,152 @@ namespace System.Media
             }
             gBS->RestoreTPL(oldTpl);
 
-            // AudioDxe copies queued input before StartPlaybackAsync returns.
-            // The streaming path therefore owns no caller buffer after this
-            // point and needs no managed completion callback.
             gBS->FreePool(rawBuffer);
-            if ((ulong)status != EFI_SUCCESS)
+            if ((ulong)status == EFI_SUCCESS)
             {
-                ReleaseStreamingCapacity(outputLength);
-                s_failed = true;
-                return 0;
+                s_streamingPlaybackActive = true;
+                CommitStreamingPcmState(buffer, offset, count, channels, outputFrames);
+                return count;
             }
 
-            return count;
+            ReleaseStreamingCapacity(outputLength);
+            s_failed = true;
+            return 0;
+        }
+
+        private byte[] ConvertStreamingPcm(
+            byte[] input,
+            int offset,
+            int count,
+            int inputChannels,
+            int inputSampleRate,
+            out ulong outputFrames)
+        {
+            outputFrames = 0;
+            int inputFrames = count / (inputChannels * 2);
+            if (inputFrames == 0)
+                return null;
+
+            ulong totalInputFrames = _streamInputFrames + (ulong)inputFrames;
+            ulong lastInputPosition = (totalInputFrames - 1) * (ulong)OutputSampleRate;
+            ulong lastOutputFrame = lastInputPosition / (ulong)inputSampleRate;
+            if (lastOutputFrame < _streamOutputFrames)
+                return new byte[0];
+
+            outputFrames = lastOutputFrame - _streamOutputFrames + 1;
+            if (outputFrames > int.MaxValue / (OutputChannels * 2))
+            {
+                outputFrames = 0;
+                return null;
+            }
+
+            byte[] output = new byte[(int)outputFrames * OutputChannels * 2];
+            ulong previousInputFrames = _streamInputFrames;
+            ulong combinedBaseFrame = previousInputFrames == 0 ? 0 : previousInputFrames - 1;
+
+            for (ulong outputFrame = 0; outputFrame < outputFrames; outputFrame++)
+            {
+                ulong globalOutputFrame = _streamOutputFrames + outputFrame;
+                ulong sourcePosition = globalOutputFrame * (ulong)inputSampleRate;
+                ulong sourceFrame = sourcePosition / (ulong)OutputSampleRate;
+                int fraction = (int)(sourcePosition % (ulong)OutputSampleRate);
+                ulong nextFrame = sourceFrame + 1 < totalInputFrames
+                    ? sourceFrame + 1
+                    : sourceFrame;
+
+                int sourceLocalFrame = checked((int)(sourceFrame - combinedBaseFrame));
+                int nextLocalFrame = checked((int)(nextFrame - combinedBaseFrame));
+                short left = InterpolateStreamingSample(
+                    input,
+                    offset,
+                    inputChannels,
+                    previousInputFrames,
+                    sourceLocalFrame,
+                    nextLocalFrame,
+                    0,
+                    fraction);
+                short right = inputChannels == 1
+                    ? left
+                    : InterpolateStreamingSample(
+                        input,
+                        offset,
+                        inputChannels,
+                        previousInputFrames,
+                        sourceLocalFrame,
+                        nextLocalFrame,
+                        1,
+                        fraction);
+
+                int outputOffset = checked((int)outputFrame * OutputChannels * 2);
+                output[outputOffset] = (byte)left;
+                output[outputOffset + 1] = (byte)(left >> 8);
+                output[outputOffset + 2] = (byte)right;
+                output[outputOffset + 3] = (byte)(right >> 8);
+            }
+
+            return output;
+        }
+
+        private short InterpolateStreamingSample(
+            byte[] input,
+            int offset,
+            int channels,
+            ulong previousInputFrames,
+            int sourceLocalFrame,
+            int nextLocalFrame,
+            int channel,
+            int fraction)
+        {
+            int source = ReadStreamingSample(
+                input,
+                offset,
+                channels,
+                previousInputFrames,
+                sourceLocalFrame,
+                channel);
+            int next = ReadStreamingSample(
+                input,
+                offset,
+                channels,
+                previousInputFrames,
+                nextLocalFrame,
+                channel);
+            long difference = next - source;
+            return (short)(source + (difference * fraction + OutputSampleRate / 2) / OutputSampleRate);
+        }
+
+        private int ReadStreamingSample(
+            byte[] input,
+            int offset,
+            int channels,
+            ulong previousInputFrames,
+            int localFrame,
+            int channel)
+        {
+            if (_hasStreamLastFrame && localFrame == 0 && previousInputFrames != 0)
+                return channel == 0 ? _streamLastLeft : _streamLastRight;
+
+            int inputFrame = localFrame - (previousInputFrames == 0 ? 0 : 1);
+            int sampleOffset = offset + (inputFrame * channels + channel) * 2;
+            return (short)(input[sampleOffset] | (input[sampleOffset + 1] << 8));
+        }
+
+        private void CommitStreamingPcmState(
+            byte[] input,
+            int offset,
+            int count,
+            int channels,
+            ulong outputFrames)
+        {
+            int inputFrames = count / (channels * 2);
+            int lastOffset = offset + (inputFrames - 1) * channels * 2;
+            _streamLastLeft = (short)(input[lastOffset] | (input[lastOffset + 1] << 8));
+            _streamLastRight = channels == 1
+                ? _streamLastLeft
+                : (short)(input[lastOffset + 2] | (input[lastOffset + 3] << 8));
+            _hasStreamLastFrame = true;
+            _streamInputFrames += (ulong)inputFrames;
+            _streamOutputFrames += outputFrames;
         }
 
         private static bool ReserveStreamingCapacity(ulong byteCount)
@@ -567,11 +823,12 @@ namespace System.Media
             if (byteCount == 0)
                 return false;
 
-            // Keep the next block queued while the current block is playing.
-            // Large producer blocks otherwise leave a gap at every completion.
-            ulong bufferLimit = byteCount * 2;
-            if (bufferLimit < MinimumStreamingBufferBytes)
-                bufferLimit = MinimumStreamingBufferBytes;
+            ulong bufferLimit = MinimumStreamingBufferBytes;
+            if (byteCount > bufferLimit)
+                return false;
+
+            if (!IsAvailable)
+                return false;
 
             while (IsAvailable)
             {
@@ -656,7 +913,8 @@ namespace System.Media
             int nextOffset = offset + (nextFrame * channels + channel) * 2;
             int source = (short)(input[sourceOffset] | (input[sourceOffset + 1] << 8));
             int next = (short)(input[nextOffset] | (input[nextOffset + 1] << 8));
-            return (short)(source + ((next - source) * fraction + OutputSampleRate / 2) / OutputSampleRate);
+            long difference = next - source;
+            return (short)(source + (difference * fraction + OutputSampleRate / 2) / OutputSampleRate);
         }
 
         private static bool CompletePlayback()
@@ -668,104 +926,20 @@ namespace System.Media
             return !s_failed;
         }
 
-        private static EFI_STATUS PlayBuffer(
-            void* rawBuffer,
-            ulong rawBufferSize,
-            ulong outputIndexMask,
-            uint outputFrequencies,
-            uint frequency,
-            uint bits,
-            byte channels)
-        {
-            if (s_audioIo == null || rawBuffer == null || rawBufferSize == 0)
-            {
-                if (rawBuffer != null)
-                    gBS->FreePool(rawBuffer);
-                return (EFI_STATUS)EFI_ABORTED;
-            }
-
-            // OcAudio owns only one provider buffer. A new play request first
-            // finishes the previous request, then replaces CurrentBuffer.
-            StopPlayback(true);
-
-            EFI_TPL oldTpl = gBS->RaiseTPL(TPL_NOTIFY);
-            if (s_hasPlayed)
-            {
-                // AudioDxe keeps the HDA DMA cursor when a stream is stopped and
-                // only resets it when the stream format changes. Toggle through
-                // another supported rate so each independent clip starts at zero.
-                uint resetFrequency = GetAlternateFrequency(outputFrequencies, frequency);
-                if (resetFrequency != 0)
-                {
-                    s_audioIo->SetupPlayback(
-                        s_audioIo,
-                        outputIndexMask,
-                        s_gain,
-                        resetFrequency,
-                        bits,
-                        channels,
-                        PlaybackDelay);
-                }
-            }
-
-            EFI_STATUS status = s_audioIo->SetupPlayback(
-                s_audioIo,
-                outputIndexMask,
-                s_gain,
-                frequency,
-                bits,
-                channels,
-                PlaybackDelay);
-            if ((ulong)status == EFI_SUCCESS)
-            {
-                s_currentBuffer = rawBuffer;
-                status = s_audioIo->StartPlaybackAsync(
-                    s_audioIo,
-                    rawBuffer,
-                    rawBufferSize,
-                    0,
-                    &PlaybackDone,
-                    rawBuffer);
-                if ((ulong)status != EFI_SUCCESS)
-                {
-                    s_currentBuffer = null;
-                    gBS->FreePool(rawBuffer);
-                }
-                else
-                {
-                    s_hasPlayed = true;
-                }
-            }
-            else
-            {
-                gBS->FreePool(rawBuffer);
-            }
-            gBS->RestoreTPL(oldTpl);
-
-            if ((ulong)status != EFI_SUCCESS)
-                s_failed = true;
-            return status;
-        }
-
         private static void StopPlayback(bool wait)
         {
             if (s_audioIo == null || (void*)s_playbackEvent == null)
                 return;
 
             bool checkEvent = true;
-            if (wait)
-            {
-                if (s_currentBuffer != null && WaitForPlaybackCompletion())
-                    checkEvent = false;
-            }
+            _ = wait;
 
             EFI_TPL oldTpl = gBS->RaiseTPL(TPL_NOTIFY);
-            if (s_currentBuffer != null)
+            if (s_streamingPlaybackActive)
             {
                 // AudioIo StopPlayback deliberately does not invoke the callback.
                 s_audioIo->StopPlayback(s_audioIo);
-                gBS->FreePool(s_currentBuffer);
-                s_currentBuffer = null;
+                s_streamingPlaybackActive = false;
             }
 
             // StopPlayback does not invoke queued transfer callbacks.
@@ -774,26 +948,6 @@ namespace System.Media
             if (checkEvent)
                 gBS->CheckEvent(s_playbackEvent);
             gBS->RestoreTPL(oldTpl);
-        }
-
-        private static bool WaitForPlaybackCompletion()
-        {
-            ulong index = 0;
-            EFI_EVENT playbackEvent = s_playbackEvent;
-            EFI_STATUS status = gBS->WaitForEvent(1, &playbackEvent, &index);
-            return (ulong)status == EFI_SUCCESS;
-        }
-
-        [UnmanagedCallersOnly]
-        private static void PlaybackDone(EFI_AUDIO_IO_PROTOCOL* audioIo, void* context)
-        {
-            if (context != null)
-            {
-                gBS->FreePool(context);
-                if (s_currentBuffer == context)
-                    s_currentBuffer = null;
-            }
-            gBS->SignalEvent(s_playbackEvent);
         }
 
         [UnmanagedCallersOnly]

@@ -11,17 +11,17 @@
 
 static unsigned char audio_buffer[BTDN_AUDIO_BYTES];
 static uint64_t submitted_frames;
-static uint64_t clock_frame;
-static uint32_t clock_milliseconds;
-static int clock_started;
 
 extern int QG_AudioWrite(const short *samples, int frame_count);
-extern uint32_t BTDN_GetMilliseconds(void);
+extern uint64_t QG_AudioGetBufferedFrames(void);
 
 qboolean SNDDMA_Init(void)
 {
     memset((void *)&sn, 0, sizeof(sn));
     memset(audio_buffer, 0, sizeof(audio_buffer));
+
+    // Keep real mixed PCM queued across slow software-rendering frames.
+    Cvar_Set("_snd_mixahead", "0.25");
 
     shm = &sn;
     shm->channels = BTDN_AUDIO_CHANNELS;
@@ -35,32 +35,21 @@ qboolean SNDDMA_Init(void)
     shm->buffer = audio_buffer;
 
     submitted_frames = 0;
-    clock_frame = 0;
-    clock_milliseconds = BTDN_GetMilliseconds();
-    clock_started = 0;
     return true;
 }
 
 int SNDDMA_GetDMAPos(void)
 {
-    uint32_t now;
-    uint32_t elapsed;
+    uint64_t buffered_frames;
     uint64_t played_frames;
 
-    if (shm == NULL || !clock_started)
+    if (shm == NULL)
         return 0;
 
-    now = BTDN_GetMilliseconds();
-    elapsed = now - clock_milliseconds;
-    played_frames = clock_frame +
-        ((uint64_t)elapsed * BTDN_AUDIO_RATE) / 1000;
-
-    if (played_frames >= submitted_frames)
-    {
-        played_frames = submitted_frames;
-        clock_frame = played_frames;
-        clock_milliseconds = now;
-    }
+    buffered_frames = QG_AudioGetBufferedFrames();
+    played_frames = buffered_frames < submitted_frames
+        ? submitted_frames - buffered_frames
+        : 0;
 
     shm->samplepos = (int)((played_frames & (BTDN_AUDIO_FRAMES - 1)) *
                            BTDN_AUDIO_CHANNELS);
@@ -98,12 +87,6 @@ void SNDDMA_Submit(void)
         if (written > frame_count)
             written = frame_count;
 
-        if (!clock_started)
-        {
-            clock_frame = submitted_frames;
-            clock_milliseconds = BTDN_GetMilliseconds();
-            clock_started = 1;
-        }
         submitted_frames += (uint64_t)written;
         if (written != frame_count)
             break;
@@ -115,5 +98,4 @@ void SNDDMA_Shutdown(void)
     sn.soundalive = false;
     sn.gamealive = false;
     submitted_frames = 0;
-    clock_started = 0;
 }

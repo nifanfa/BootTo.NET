@@ -28,7 +28,8 @@ internal static unsafe class quakegeneric
     private static Bitmap s_screen;
     private static Graphics s_graphics;
     private static Stopwatch s_clock;
-    private static uint s_frameMillisecondRemainder;
+    private static long s_frameStartTimestamp;
+    private static long s_frameTickRemainder;
     private static bool s_quitRequested;
 
     public static void Run()
@@ -47,11 +48,19 @@ internal static unsafe class quakegeneric
         }
 
         Program.PrintFrame();
+        s_frameStartTimestamp = Stopwatch.GetTimestamp();
+        s_frameTickRemainder = 0;
         while (!s_quitRequested)
         {
+            long frameTimestamp = Stopwatch.GetTimestamp();
+            long elapsedTicks = unchecked(frameTimestamp - s_frameStartTimestamp);
+            s_frameStartTimestamp = frameTimestamp;
+
             Control.PumpMouseState();
-            QG_Tick(1.0 / QuakeFrameRate);
-            WaitForNextFrame();
+            QG_Tick(elapsedTicks > 0
+                ? elapsedTicks / (double)Stopwatch.Frequency
+                : 1.0 / QuakeFrameRate);
+            WaitForNextFrame(frameTimestamp);
         }
     }
 
@@ -136,6 +145,10 @@ internal static unsafe class quakegeneric
             : 0;
     }
 
+    [RuntimeExport("QG_AudioGetBufferedFrames")]
+    public static ulong AudioGetBufferedFrames()
+        => SoundOutput.GetBufferedInputFrameCount(QuakeAudioRate);
+
     [RuntimeExport("BTDN_GetMilliseconds")]
     public static uint GetMilliseconds()
     {
@@ -189,12 +202,21 @@ internal static unsafe class quakegeneric
         return (int)scaled;
     }
 
-    private static void WaitForNextFrame()
+    private static void WaitForNextFrame(long frameTimestamp)
     {
-        s_frameMillisecondRemainder += 1000;
-        uint milliseconds = s_frameMillisecondRemainder / QuakeFrameRate;
-        s_frameMillisecondRemainder %= QuakeFrameRate;
-        if (milliseconds != 0)
-            gBS->Stall((ulong)milliseconds * 1000);
+        s_frameTickRemainder += Stopwatch.Frequency;
+        long targetTicks = s_frameTickRemainder / QuakeFrameRate;
+        s_frameTickRemainder %= QuakeFrameRate;
+
+        long elapsedTicks = unchecked(Stopwatch.GetTimestamp() - frameTimestamp);
+        long remainingTicks = targetTicks - elapsedTicks;
+        if (remainingTicks <= 0)
+            return;
+
+        ulong microseconds = (ulong)(
+            (remainingTicks * 1000000L + Stopwatch.Frequency - 1) /
+            Stopwatch.Frequency);
+        if (microseconds != 0)
+            gBS->Stall(microseconds);
     }
 }
