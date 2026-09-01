@@ -31,7 +31,7 @@
   <!--CustomizeReferences-->
   <Target Name="CustomizeReferences" BeforeTargets="BeforeCompile" AfterTargets="FindReferenceAssembliesForReferences">
     <ItemGroup>
-      <ReferencePathWithRefAssemblies Remove="@(ReferencePathWithRefAssemblies)" Condition="%(Filename) != 'Corlib'" />
+      <ReferencePathWithRefAssemblies Remove="@(ReferencePathWithRefAssemblies)" />
       <ReferencePath Remove="@(ReferencePath)" />
     </ItemGroup>
   </Target>
