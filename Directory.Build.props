@@ -1,0 +1,5 @@
+<Project>
+  <PropertyGroup>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+  </PropertyGroup>
+</Project>

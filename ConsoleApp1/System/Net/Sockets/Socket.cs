@@ -40,6 +40,7 @@ namespace System.Net.Sockets
         private TaskCompletionSource<int> receiveCompletion;
         private TaskCompletionSource<int> transmitCompletion;
         private TaskCompletionSource closeCompletion;
+        private TaskCompletionSource listenCompletion;
         private TaskCompletionSource<Socket> acceptCompletion;
         private TaskCompletionSource<SocketReceiveResult> receiveFromCompletion;
         private TaskCompletionSource<int> udpReceiveCompletion;
@@ -74,6 +75,46 @@ namespace System.Net.Sockets
             this.socketType = socketType;
             this.protocolType = protocolType;
             poller = new SocketPoller(this);
+        }
+
+        public IPAddress LocalAddress
+        {
+            get
+            {
+                if (TryGetTcpEndpoints(out IPAddress address, out _, out _, out _))
+                    return address;
+                return localAddress;
+            }
+        }
+
+        public int LocalPort
+        {
+            get
+            {
+                if (TryGetTcpEndpoints(out _, out int port, out _, out _))
+                    return port;
+                return localPort;
+            }
+        }
+
+        public IPAddress RemoteAddress
+        {
+            get
+            {
+                if (TryGetTcpEndpoints(out _, out _, out IPAddress address, out _))
+                    return address;
+                return remoteAddress;
+            }
+        }
+
+        public int RemotePort
+        {
+            get
+            {
+                if (TryGetTcpEndpoints(out _, out _, out _, out int port))
+                    return port;
+                return remotePort;
+            }
         }
 
         private Socket(EFI_TCP4* acceptedTcp, EFI_HANDLE acceptedHandle, EFI_SERVICE_BINDING* binding,
@@ -154,8 +195,7 @@ namespace System.Net.Sockets
             if ((ulong)status == EFI_NO_MAPPING)
             {
                 StartConnectTimeout();
-                waitingForAddress = true;
-                UpdatePollingRegistration();
+                WaitForDhcp();
             }
             else if ((ulong)status == EFI_SUCCESS)
             {
@@ -179,6 +219,47 @@ namespace System.Net.Sockets
             result.Addr[2] = bytes[2];
             result.Addr[3] = bytes[3];
             return result;
+        }
+
+        private static IPAddress FromEfiIPv4Address(EFI_IPv4_ADDRESS address)
+            => new IPAddress(new byte[]
+            {
+                address.Addr[0],
+                address.Addr[1],
+                address.Addr[2],
+                address.Addr[3]
+            });
+
+        private bool TryGetTcpEndpoints(
+            out IPAddress currentLocalAddress,
+            out int currentLocalPort,
+            out IPAddress currentRemoteAddress,
+            out int currentRemotePort)
+        {
+            currentLocalAddress = null;
+            currentLocalPort = 0;
+            currentRemoteAddress = null;
+            currentRemotePort = 0;
+
+            if (tcp == null || tcp->GetModeData == null)
+                return false;
+
+            EFI_TCP4_CONFIG_DATA currentConfiguration = default;
+            EFI_STATUS status = tcp->GetModeData(
+                tcp,
+                null,
+                &currentConfiguration,
+                null,
+                null,
+                null);
+            if ((ulong)status != EFI_SUCCESS)
+                return false;
+
+            currentLocalAddress = FromEfiIPv4Address(currentConfiguration.AccessPoint.StationAddress);
+            currentLocalPort = currentConfiguration.AccessPoint.StationPort;
+            currentRemoteAddress = FromEfiIPv4Address(currentConfiguration.AccessPoint.RemoteAddress);
+            currentRemotePort = currentConfiguration.AccessPoint.RemotePort;
+            return true;
         }
 
         public void Send(byte[] buffer)
@@ -355,6 +436,56 @@ namespace System.Net.Sockets
             listening = true;
         }
 
+        public Task ListenAsync(int backlog)
+        {
+            if (socketType != SocketType.Stream)
+                return Task.FromException(new SocketException(EFI_UNSUPPORTED));
+            if (backlog < 0)
+                return Task.FromException(new ArgumentException("The listen backlog cannot be negative."));
+            if (listening || listenCompletion != null)
+                return Task.FromException(new SocketException(EFI_ALREADY_STARTED));
+
+            try
+            {
+                if (!bound)
+                    Bind(IPAddress.Any, 0);
+            }
+            catch (Exception exception)
+            {
+                return Task.FromException(exception);
+            }
+
+            EFI_STATUS status = InitializeTcp();
+            if ((ulong)status != EFI_SUCCESS)
+                return Task.FromException(new SocketException(status));
+
+            configuration = new EFI_TCP4_CONFIG_DATA();
+            configuration.TimeToLive = 188;
+            configuration.AccessPoint.UseDefaultAddress = localAddress == null || localAddress.Equals(IPAddress.Any);
+            configuration.AccessPoint.StationAddress = ToEfiIPv4Address(localAddress ?? IPAddress.Any);
+            configuration.AccessPoint.StationPort = (ushort)localPort;
+            configuration.AccessPoint.ActiveFlag = false;
+            controlOption = new EFI_TCP4_OPTION();
+            controlOption.MaxSynBackLog = (uint)backlog;
+            status = ConfigureTcp();
+
+            if ((ulong)status == EFI_SUCCESS)
+            {
+                listening = true;
+                return Task.CompletedTask;
+            }
+            if ((ulong)status != EFI_NO_MAPPING)
+            {
+                ReleaseTcp();
+                return Task.FromException(new SocketException(status));
+            }
+
+            TaskCompletionSource completion = new TaskCompletionSource();
+            listenCompletion = completion;
+            WaitForDhcp();
+            return completion.Task;
+        }
+
         public Socket Accept()
             => AcceptAsync().GetAwaiter().GetResult();
 
@@ -480,7 +611,7 @@ namespace System.Net.Sockets
             EFI_STATUS status = tcp->Poll(tcp);
 
             if (waitingForAddress)
-                PollAddressConfiguration();
+                PollTcpAddressConfiguration();
 
             if (connectCompletion != null && !waitingForAddress && IsSignaled(connectionToken.CompletionToken.Event))
                 CompleteConnect(connectionToken.CompletionToken.Status);
@@ -672,25 +803,10 @@ namespace System.Net.Sockets
 
         private void PollUdpAddressConfiguration()
         {
-            EFI_IP4_MODE_DATA mode = new EFI_IP4_MODE_DATA();
-            EFI_STATUS status = udp->GetModeData(udp, null, &mode, null, null);
-            if ((ulong)status != EFI_SUCCESS && (ulong)status != EFI_NO_MAPPING)
-            {
-                CompleteUdpAddressConfiguration(status);
+            if (!TryConfigureWhenAddressAvailable(out EFI_STATUS status))
                 return;
-            }
-            if (!mode.IsConfigured)
-                return;
-            status = ConfigureUdp(remoteAddress, remotePort);
-            if ((ulong)status == EFI_NO_MAPPING)
-                return;
-            if ((ulong)status != EFI_SUCCESS)
-            {
-                CompleteUdpAddressConfiguration(status);
-                return;
-            }
 
-            CompleteUdpAddressConfiguration(EFI_SUCCESS);
+            CompleteUdpAddressConfiguration(status);
         }
 
         private void BeginUdpAddressConfigurationWait()
@@ -698,11 +814,10 @@ namespace System.Net.Sockets
             if (waitingForAddress)
                 return;
 
-            waitingForAddress = true;
             uint attempt = ++udpAddressConfigurationAttempt;
             Task.Delay((int)(DefaultConnectionTimeoutSeconds * 1000)).AddContinuation(
                 () => UdpAddressConfigurationTimedOut(attempt));
-            UpdatePollingRegistration();
+            WaitForDhcp();
         }
 
         private void UdpAddressConfigurationTimedOut(uint attempt)
@@ -711,6 +826,12 @@ namespace System.Net.Sockets
                 return;
 
             CompleteUdpAddressConfiguration(EFI_TIMEOUT);
+        }
+
+        private void WaitForDhcp()
+        {
+            waitingForAddress = true;
+            UpdatePollingRegistration();
         }
 
         private void CompleteUdpAddressConfiguration(EFI_STATUS status)
@@ -1203,31 +1324,61 @@ namespace System.Net.Sockets
             CompleteConnect(EFI_TIMEOUT);
         }
 
-        private void PollAddressConfiguration()
+        private void PollTcpAddressConfiguration()
         {
-            EFI_IP4_MODE_DATA mode = new EFI_IP4_MODE_DATA();
-            EFI_STATUS status = tcp->GetModeData(tcp, null, null, &mode, null, null);
-            if ((ulong)status != EFI_SUCCESS && (ulong)status != EFI_NO_MAPPING)
+            if (!TryConfigureWhenAddressAvailable(out EFI_STATUS status))
+                return;
+
+            if (listenCompletion != null)
             {
-                CompleteConnect(status);
+                CompleteListen(status);
                 return;
             }
 
-            if (!mode.IsConfigured)
-                return;
-
-            status = ConfigureTcp();
-
-            if ((ulong)status == EFI_NO_MAPPING)
-                return;
             if ((ulong)status != EFI_SUCCESS)
             {
                 CompleteConnect(status);
                 return;
             }
-
             waitingForAddress = false;
             SubmitConnect();
+        }
+
+        private bool TryConfigureWhenAddressAvailable(out EFI_STATUS status)
+        {
+            EFI_IP4_MODE_DATA mode = new EFI_IP4_MODE_DATA();
+            if (socketType == SocketType.Stream)
+            {
+                if (tcp == null)
+                {
+                    status = EFI_NOT_STARTED;
+                    return true;
+                }
+
+                status = tcp->GetModeData(tcp, null, null, &mode, null, null);
+            }
+            else
+            {
+                if (udp == null)
+                {
+                    status = EFI_NOT_STARTED;
+                    return true;
+                }
+
+                status = udp->GetModeData(udp, null, &mode, null, null);
+            }
+
+            if ((ulong)status == EFI_NO_MAPPING || ((ulong)status == EFI_SUCCESS && !mode.IsConfigured))
+                return false;
+            if ((ulong)status != EFI_SUCCESS)
+                return true;
+
+            status = socketType == SocketType.Stream
+                ? ConfigureTcp()
+                : ConfigureUdp(remoteAddress, remotePort);
+            if ((ulong)status == EFI_NO_MAPPING)
+                return false;
+            return true;
         }
 
         private EFI_STATUS ConfigureTcp()
@@ -1247,6 +1398,26 @@ namespace System.Net.Sockets
             }
 
             return status;
+        }
+
+        private void CompleteListen(EFI_STATUS status)
+        {
+            TaskCompletionSource completion = listenCompletion;
+            listenCompletion = null;
+            waitingForAddress = false;
+
+            if ((ulong)status == EFI_SUCCESS)
+            {
+                listening = true;
+                completion.TrySetResult();
+            }
+            else
+            {
+                ReleaseTcp();
+                completion.TrySetException(new SocketException(status));
+            }
+
+            UpdatePollingRegistration();
         }
 
         private bool IsSignaled(EFI_EVENT e)
@@ -1354,7 +1525,7 @@ namespace System.Net.Sockets
         private void UpdatePollingRegistration()
         {
             if (waitingForAddress || connectCompletion != null || receiveCompletion != null || transmitCompletion != null ||
-                closeCompletion != null || acceptCompletion != null || receiveFromCompletion != null ||
+                closeCompletion != null || listenCompletion != null || acceptCompletion != null || receiveFromCompletion != null ||
                 udpReceiveCompletion != null || udpTransmitCompletion != null || udpCloseCompletion != null)
                 TaskScheduler.Register(poller);
             else

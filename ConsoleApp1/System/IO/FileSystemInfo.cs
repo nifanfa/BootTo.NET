@@ -12,24 +12,46 @@ namespace System.IO
             set => File.SetAttributes(FullName, value);
         }
 
-        public virtual DateTime CreationTime => ToDateTime(GetMetadata().CreateTime);
-        public virtual DateTime LastAccessTime => ToDateTime(GetMetadata().LastAccessTime);
-        public virtual DateTime LastWriteTime => ToDateTime(GetMetadata().ModificationTime);
+        public virtual DateTime CreationTime
+        {
+            get => File.GetCreationTime(FullName);
+            set => File.SetCreationTime(FullName, value);
+        }
+
+        public virtual DateTime LastAccessTime
+        {
+            get => File.GetLastAccessTime(FullName);
+            set => File.SetLastAccessTime(FullName, value);
+        }
+
+        public virtual DateTime LastWriteTime
+        {
+            get => File.GetLastWriteTime(FullName);
+            set => File.SetLastWriteTime(FullName, value);
+        }
+
+        public virtual DateTime CreationTimeUtc
+        {
+            get => CreationTime;
+            set => CreationTime = value;
+        }
+
+        public virtual DateTime LastAccessTimeUtc
+        {
+            get => LastAccessTime;
+            set => LastAccessTime = value;
+        }
+
+        public virtual DateTime LastWriteTimeUtc
+        {
+            get => LastWriteTime;
+            set => LastWriteTime = value;
+        }
 
         public abstract void Delete();
 
         public virtual void Refresh() { }
         public virtual void Dispose() { }
 
-        private File.FileMetadata GetMetadata()
-        {
-            if (!File.TryGetInfo(FullName, out File.FileMetadata metadata))
-                throw new IOException("The file metadata could not be read.");
-            return metadata;
-        }
-
-        private static DateTime ToDateTime(EFI_TIME time)
-            => new DateTime(time.Year, time.Month, time.Day, time.Hour, time.Minute,
-                time.Second, (int)(time.Nanosecond / 1000000));
     }
 }

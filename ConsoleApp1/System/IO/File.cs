@@ -31,6 +31,24 @@ namespace System.IO
                 (metadata.Attribute & EFI_FILE_DIRECTORY) == 0;
         }
 
+        public static DateTime GetCreationTime(string path)
+            => ToDateTime(GetInfo(path).CreateTime);
+
+        public static DateTime GetLastAccessTime(string path)
+            => ToDateTime(GetInfo(path).LastAccessTime);
+
+        public static DateTime GetLastWriteTime(string path)
+            => ToDateTime(GetInfo(path).ModificationTime);
+
+        public static void SetCreationTime(string path, DateTime creationTime)
+            => SetTime(path, creationTime, FileTimeKind.Creation);
+
+        public static void SetLastAccessTime(string path, DateTime lastAccessTime)
+            => SetTime(path, lastAccessTime, FileTimeKind.LastAccess);
+
+        public static void SetLastWriteTime(string path, DateTime lastWriteTime)
+            => SetTime(path, lastWriteTime, FileTimeKind.LastWrite);
+
         public static void WriteAllBytes(string path, byte[] buffer)
         {
             FileStream fs = new FileStream(path, FileMode.Create);
@@ -297,6 +315,95 @@ namespace System.IO
                 volume->Close(volume);
             }
         }
+
+        private enum FileTimeKind
+        {
+            Creation,
+            LastAccess,
+            LastWrite
+        }
+
+        private static FileMetadata GetInfo(string path)
+        {
+            if (!TryGetInfo(path, out FileMetadata metadata))
+                throw new IOException("The file metadata could not be read.");
+            return metadata;
+        }
+
+        private static void SetTime(string path, DateTime time, FileTimeKind kind)
+        {
+            if (string.IsNullOrEmpty(path))
+                throw new ArgumentNullException("The file path cannot be null or empty.");
+            if (!OpenVolume(out EFI_FILE_HANDLE* volume))
+                throw new IOException("The file system volume could not be opened.");
+
+            EFI_FILE_HANDLE* file = null;
+            try
+            {
+                fixed (char* pathPointer = path)
+                {
+                    if ((ulong)volume->Open(volume, &file, pathPointer,
+                        EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE, 0) != EFI_SUCCESS || file == null)
+                        throw new IOException("The file could not be opened.");
+                }
+
+                ulong infoSize = 0;
+                if ((ulong)file->GetInfo(file, (EFI_GUID*)EFI_FILE_INFO_ID, &infoSize, null) != EFI_BUFFER_TOO_SMALL || infoSize == 0)
+                    throw new IOException("The file metadata size could not be queried.");
+
+                byte[] buffer = new byte[infoSize];
+                fixed (byte* infoBuffer = buffer)
+                {
+                    if ((ulong)file->GetInfo(file, (EFI_GUID*)EFI_FILE_INFO_ID, &infoSize, infoBuffer) != EFI_SUCCESS)
+                        throw new IOException("The file metadata could not be read.");
+
+                    EFI_TIME efiTime = ToEfiTime(time);
+                    EFI_FILE_INFO* info = (EFI_FILE_INFO*)infoBuffer;
+                    switch (kind)
+                    {
+                        case FileTimeKind.Creation:
+                            info->CreateTime = efiTime;
+                            break;
+                        case FileTimeKind.LastAccess:
+                            info->LastAccessTime = efiTime;
+                            break;
+                        default:
+                            info->ModificationTime = efiTime;
+                            break;
+                    }
+
+                    if ((ulong)file->SetInfo(file, (EFI_GUID*)EFI_FILE_INFO_ID, infoSize, infoBuffer) != EFI_SUCCESS)
+                        throw new IOException("The file timestamp could not be updated.");
+                }
+            }
+            finally
+            {
+                if (file != null)
+                    file->Close(file);
+                volume->Close(volume);
+            }
+        }
+
+        private static DateTime ToDateTime(EFI_TIME time)
+        {
+            if (time.Year == 0 || time.Month == 0 || time.Day == 0)
+                return DateTime.MinValue;
+            return new DateTime(time.Year, time.Month, time.Day, time.Hour, time.Minute,
+                time.Second, (int)(time.Nanosecond / 1000000));
+        }
+
+        private static EFI_TIME ToEfiTime(DateTime time)
+            => new EFI_TIME
+            {
+                Year = (ushort)time.Year,
+                Month = (byte)time.Month,
+                Day = (byte)time.Day,
+                Hour = (byte)time.Hour,
+                Minute = (byte)time.Minute,
+                Second = (byte)time.Second,
+                Nanosecond = (uint)time.Millisecond * 1000000,
+                TimeZone = (short)EFI_UNSPECIFIED_TIMEZONE
+            };
 
         internal static string[] ReadDirectory(string path, bool directoriesOnly)
         {

@@ -6,7 +6,7 @@
   <PropertyGroup Condition="'$(BuildingInsideVisualStudio)' == 'true'">
     <StartAction>Program</StartAction>
     <StartProgram>dotnet</StartProgram>
-	<StartArguments>publish --tl:off -r win-x64 $(AssemblyName)</StartArguments>
+	<StartArguments>publish --tl:off $(AssemblyName)</StartArguments>
     <StartWorkingDirectory>$(MSBuildThisFileDirectory)</StartWorkingDirectory>
   </PropertyGroup>
 

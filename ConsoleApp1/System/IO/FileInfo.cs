@@ -13,6 +13,19 @@ namespace System.IO
 
         public override string FullName => _fullName;
 
+        public string DirectoryName => Path.GetDirectoryName(_fullName);
+
+        public DirectoryInfo Directory
+        {
+            get
+            {
+                string directoryName = DirectoryName;
+                return directoryName == null ? null : new DirectoryInfo(directoryName);
+            }
+        }
+
+        public string Extension => Path.GetExtension(_fullName);
+
         public override string Name
         {
             get
@@ -45,14 +58,17 @@ namespace System.IO
             }
         }
 
-        public override DateTime CreationTime
-            => ToDateTime(GetMetadata().CreateTime);
-
-        public override DateTime LastWriteTime
-            => ToDateTime(GetMetadata().ModificationTime);
-
-        public override DateTime LastAccessTime
-            => ToDateTime(GetMetadata().LastAccessTime);
+        public bool IsReadOnly
+        {
+            get => (Attributes & FileAttributes.ReadOnly) != 0;
+            set
+            {
+                FileAttributes attributes = Attributes;
+                Attributes = value
+                    ? attributes | FileAttributes.ReadOnly
+                    : attributes & ~FileAttributes.ReadOnly;
+            }
+        }
 
         private File.FileMetadata GetMetadata()
         {
@@ -73,8 +89,20 @@ namespace System.IO
         public FileStream OpenWrite()
             => new FileStream(_fullName, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None);
 
+        public FileStream Create()
+            => new FileStream(_fullName, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
+
         public FileStream Open(FileMode mode, FileAccess access, FileShare share)
             => new FileStream(_fullName, mode, access, share);
+
+        public StreamReader OpenText()
+            => new StreamReader(_fullName);
+
+        public StreamWriter CreateText()
+            => new StreamWriter(_fullName, false);
+
+        public StreamWriter AppendText()
+            => new StreamWriter(_fullName, true);
 
         public FileInfo CopyTo(string destFileName)
             => CopyTo(destFileName, false);
@@ -88,8 +116,8 @@ namespace System.IO
         public void MoveTo(string destFileName)
             => File.Move(_fullName, destFileName);
 
-        private static DateTime ToDateTime(EFI_TIME time)
-            => new DateTime(time.Year, time.Month, time.Day, time.Hour, time.Minute, time.Second, (int)(time.Nanosecond / 1000000));
+        public void MoveTo(string destFileName, bool overwrite)
+            => File.Move(_fullName, destFileName, overwrite);
 
         private static string Substring(string value, int start)
         {

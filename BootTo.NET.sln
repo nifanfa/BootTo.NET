@@ -23,7 +23,9 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "解决方案项", "解决方案项", "{4F3BB79A-0A62-4DC3-ABC9-DC970BF0DD66}"
 	ProjectSection(SolutionItems) = preProject
 		Directory.Build.targets = Directory.Build.targets
+		Directory.Build.props = Directory.Build.props
 		Qemu.targets = Qemu.targets
+		nuget.config = nuget.config
 	EndProjectSection
 EndProject
 Global
