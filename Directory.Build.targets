@@ -2,7 +2,6 @@
 
   <Import Project="Qemu.targets" />
 
-  <!-- See https://aka.ms/dotnet/msbuild/customize for more details on customizing your build -->
   <PropertyGroup Condition="'$(BuildingInsideVisualStudio)' == 'true'">
     <StartAction>Program</StartAction>
     <StartProgram>dotnet</StartProgram>
