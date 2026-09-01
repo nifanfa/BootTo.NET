@@ -48,7 +48,7 @@ QEMU mounts the bundled UEFI variable template through a temporary snapshot. Var
   
 ## Running on real hardware
 
-Format a USB drive as FAT32 and copy the contents of `Drive` to its root. To use UEFI network support on real hardware, enable it in the firmware settings.
+Format a USB drive as FAT32, copy the contents of `Drive` to its root, and boot from it. To use UEFI network support on real hardware, enable it in the BIOS, as shown in the image below.
 
 <p align="center">
   <img src="https://user-images.githubusercontent.com/54205437/188054542-60a4bc00-a2f2-462d-9602-6a55b146b127.png" />
