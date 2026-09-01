@@ -13,5 +13,14 @@ namespace System
                 return Encoding.UTF8.GetString(new ReadOnlySpan<byte>(buffer, 0, length));
             }
         }
+
+        public static double Parse(string value)
+        {
+            if (!TryParse(value, out double result)) throw new FormatException("The value is not a valid Double.");
+            return result;
+        }
+
+        public static bool TryParse(string value, out double result)
+            => Number.TryParseDouble(value, out result);
     }
 }

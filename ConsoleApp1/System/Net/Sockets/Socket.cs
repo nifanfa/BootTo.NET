@@ -1569,28 +1569,4 @@ namespace System.Net.Sockets
         }
     }
 
-    public sealed class SocketReceiveResult
-    {
-        internal SocketReceiveResult(int bytesReceived, IPAddress remoteAddress, int remotePort)
-        {
-            BytesReceived = bytesReceived;
-            RemoteAddress = remoteAddress;
-            RemotePort = remotePort;
-        }
-
-        public int BytesReceived { get; }
-        public IPAddress RemoteAddress { get; }
-        public int RemotePort { get; }
-    }
-
-    public sealed class SocketException : Exception
-    {
-        public SocketException(EFI_STATUS status) : base("The UEFI socket operation failed with status " + (ulong)status + ".")
-            => Status = status;
-
-        public SocketException(EFI_STATUS status, string message) : base(message)
-            => Status = status;
-
-        public EFI_STATUS Status { get; }
-    }
 }

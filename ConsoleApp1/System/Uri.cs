@@ -3,41 +3,6 @@ using System.Text;
 
 namespace System
 {
-    public enum UriKind
-    {
-        RelativeOrAbsolute = 0,
-        Absolute = 1,
-        Relative = 2
-    }
-
-    public enum UriHostNameType
-    {
-        Unknown,
-        Basic,
-        Dns,
-        IPv4,
-        IPv6
-    }
-
-    public enum UriPartial
-    {
-        Scheme,
-        Authority,
-        Path,
-        Query
-    }
-
-    public class UriFormatException : FormatException
-    {
-        private readonly string _message;
-
-        public UriFormatException() : this("Invalid URI: The format of the URI could not be determined.") { }
-
-        public UriFormatException(string message) => _message = message;
-
-        public override string Message => _message;
-    }
-
     // Compact URI implementation for the firmware networking stack.
     public class Uri
     {

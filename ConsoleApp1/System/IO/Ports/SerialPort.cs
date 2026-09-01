@@ -2,23 +2,6 @@ using System.Threading.Tasks;
 
 namespace System.IO.Ports
 {
-    public enum Parity
-    {
-        None,
-        Odd,
-        Even,
-        Mark,
-        Space,
-    }
-
-    public enum StopBits
-    {
-        None,
-        One,
-        OnePointFive,
-        Two,
-    }
-
     public unsafe sealed class SerialPort : IDisposable
     {
         private sealed class ReadPoller : TaskPoller

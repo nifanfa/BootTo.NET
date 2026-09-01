@@ -1,68 +1,6 @@
 namespace System.Reflection.PortableExecutable
 {
     [Flags]
-    public enum Characteristics : ushort
-    {
-        RelocsStripped = 0x0001,
-        ExecutableImage = 0x0002,
-        LineNumsStripped = 0x0004,
-        LocalSymsStripped = 0x0008,
-        AggressiveWSTrim = 0x0010,
-        LargeAddressAware = 0x0020,
-        BytesReversedLo = 0x0080,
-        Bit32Machine = 0x0100,
-        DebugStripped = 0x0200,
-        RemovableRunFromSwap = 0x0400,
-        NetRunFromSwap = 0x0800,
-        System = 0x1000,
-        Dll = 0x2000,
-        UpSystemOnly = 0x4000,
-        BytesReversedHi = 0x8000,
-    }
-
-    public enum PEMagic : ushort
-    {
-        PE32 = 0x010B,
-        PE32Plus = 0x020B,
-    }
-
-    public enum Subsystem : ushort
-    {
-        Unknown = 0,
-        Native = 1,
-        WindowsGui = 2,
-        WindowsCui = 3,
-        OS2Cui = 5,
-        PosixCui = 7,
-        NativeWindows = 8,
-        WindowsCEGui = 9,
-        EfiApplication = 10,
-        EfiBootServiceDriver = 11,
-        EfiRuntimeDriver = 12,
-        EfiRom = 13,
-        Xbox = 14,
-        WindowsBootApplication = 16,
-    }
-
-    [Flags]
-    public enum DllCharacteristics : ushort
-    {
-        ProcessInit = 0x0001,
-        ProcessTerm = 0x0002,
-        ThreadInit = 0x0004,
-        ThreadTerm = 0x0008,
-        HighEntropyVirtualAddressSpace = 0x0020,
-        DynamicBase = 0x0040,
-        NxCompatible = 0x0100,
-        NoIsolation = 0x0200,
-        NoSeh = 0x0400,
-        NoBind = 0x0800,
-        AppContainer = 0x1000,
-        WdmDriver = 0x2000,
-        TerminalServerAware = 0x8000,
-    }
-
-    [Flags]
     public enum SectionCharacteristics : uint
     {
         TypeReg = 0x00000000,

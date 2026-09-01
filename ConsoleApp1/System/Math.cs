@@ -2,12 +2,6 @@ using Internal.Runtime.CompilerServices;
 
 namespace System
 {
-    public enum MidpointRounding
-    {
-        ToEven = 0,
-        AwayFromZero = 1,
-    }
-
     public static class Math
     {
         public const double E = 2.7182818284590452354;

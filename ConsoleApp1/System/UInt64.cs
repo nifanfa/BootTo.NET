@@ -13,5 +13,14 @@ namespace System
                 return Encoding.UTF8.GetString(new ReadOnlySpan<byte>(buffer, 0, length));
             }
         }
+
+        public static ulong Parse(string value)
+        {
+            if (!TryParse(value, out ulong result)) throw new FormatException("The value is not a valid UInt64.");
+            return result;
+        }
+
+        public static bool TryParse(string value, out ulong result)
+            => Number.TryParseUnsigned(value, out result);
     }
 }
