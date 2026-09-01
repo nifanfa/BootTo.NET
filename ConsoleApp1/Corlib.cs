@@ -1601,7 +1601,7 @@ namespace System.Threading.Tasks
         public void Wait()
         {
             while (!IsCompleted)
-                Yield();
+                TaskScheduler.Wait();
 
             ThrowIfFaulted();
         }

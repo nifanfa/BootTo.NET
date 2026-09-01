@@ -1,5 +1,19 @@
 ﻿using System;
+using System.Drawing;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+
+Console.CursorVisible = false;
+{
+    Bitmap icon = new Bitmap(@"\Icon.png");
+    Graphics g = CreateGraphics();
+    g.Clear(Color.FromArgb(104, 42, 123));
+    g.DrawImage(icon, (g.VisibleClipBounds.Width / 2) - (icon.Width / 2), (g.VisibleClipBounds.Height / 2) - (icon.Height / 2));
+    await Task.Delay(1000);
+    g.Clear(Color.Black);
+}
+Console.CursorVisible = true;
 
 new System.Media.SoundPlayer(@"\dragon-studio-computer-startup-sound-effect.wav").PlaySync();
 

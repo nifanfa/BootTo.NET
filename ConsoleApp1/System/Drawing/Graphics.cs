@@ -64,6 +64,15 @@ namespace System.Drawing
             }
         }
 
+        public void Clear(Color color)
+        {
+            EnsureOpen();
+            Rectangle visibleClipBounds = VisibleClipBounds;
+            int displayWidth = visibleClipBounds.Width;
+            int displayHeight = visibleClipBounds.Height;
+            _graphics->Blt(_graphics, (EFI_GRAPHICS_OUTPUT_BLT_PIXEL*)&color, EfiBltVideoFill, 0, 0, 0, 0, (ulong)displayWidth, (ulong)displayHeight, 0);
+        }
+
         public void Dispose()
         {
             _graphics = null;

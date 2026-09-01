@@ -982,11 +982,6 @@ namespace System.Media
             for (ulong index = 0; index < portCount && index < 64; index++)
             {
                 EFI_AUDIO_IO_PROTOCOL_PORT port = ports[index];
-                Console.WriteLine(
-                    "Audio output " + index.ToString() +
-                    ": device=" + port.Device.ToString() +
-                    ", location=" + port.Location.ToString() +
-                    ", surface=" + port.Surface.ToString());
 
                 if (port.Type != AudioIoTypeOutput ||
                     (port.SupportedBits & bits) == 0 ||

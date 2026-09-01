@@ -40,9 +40,11 @@
     <ClCompile Include="CpuHelpers.c" />
     <ClCompile Include="string.c" />
     <ClCompile Include="printf.c" />
+    <ClCompile Include="lodepng.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="printf.h" />
+    <ClInclude Include="lodepng.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>
@@ -148,6 +150,7 @@
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
       <BufferSecurityCheck>false</BufferSecurityCheck>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <CompileAs>CompileAsC</CompileAs>
       <SupportJustMyCode>false</SupportJustMyCode>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
@@ -174,6 +177,7 @@
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
       <BufferSecurityCheck>false</BufferSecurityCheck>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <CompileAs>CompileAsC</CompileAs>
     </ClCompile>
     <Link>

@@ -9,6 +9,25 @@ namespace System.Drawing
 
         protected Image(int width, int height)
         {
+            int pixelCount = ValidateDimensions(width, height);
+            Width = width;
+            Height = height;
+            pixels = new Color[pixelCount];
+        }
+
+        protected Image(int width, int height, Color[] pixels)
+        {
+            int pixelCount = ValidateDimensions(width, height);
+            if (pixels == null || pixels.Length != pixelCount)
+                throw new ArgumentException("The pixel buffer does not match the image dimensions.");
+
+            Width = width;
+            Height = height;
+            this.pixels = pixels;
+        }
+
+        private static int ValidateDimensions(int width, int height)
+        {
             if (width <= 0 || height <= 0)
                 throw new ArgumentException("Image dimensions must be positive.");
 
@@ -16,9 +35,7 @@ namespace System.Drawing
             if (pixelCount > int.MaxValue)
                 throw new ArgumentException("Image dimensions are too large.");
 
-            Width = width;
-            Height = height;
-            pixels = new Color[(int)pixelCount];
+            return (int)pixelCount;
         }
 
         public void Dispose() => Dispose(true);

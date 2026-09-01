@@ -55,12 +55,6 @@ internal static unsafe class doomgeneric
         }
     }
 
-    [RuntimeExport("malloc")]
-    public static nint Malloc(ulong size) => (nint)GarbageCollector.AllocateNative(size == 0 ? 1UL : size);
-
-    [RuntimeExport("free")]
-    public static void Free(nint pointer) => GarbageCollector.FreeNative((void*)pointer);
-
     [RuntimeExport("DG_PresentFrame")]
     public static void PresentFrame(uint* pixels, int width, int height)
     {

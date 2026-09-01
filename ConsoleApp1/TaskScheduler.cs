@@ -101,8 +101,6 @@ internal static class TaskScheduler
 
     internal static bool Yield()
     {
-        // A poller can complete a task and run a continuation synchronously.
-        // Do not recursively walk the same list when that continuation yields.
         if (s_yielding)
         {
             s_yieldAgain = true;
@@ -116,16 +114,7 @@ internal static class TaskScheduler
             do
             {
                 s_yieldAgain = false;
-                if (s_pollers != null)
-                    hadPollers = true;
-
-                TaskPoller current = s_pollers;
-                while (current != null)
-                {
-                    TaskPoller next = current.Next;
-                    current.Poll();
-                    current = next;
-                }
+                hadPollers |= PollOnce();
             }
             while (s_yieldAgain);
 
@@ -136,5 +125,30 @@ internal static class TaskScheduler
             s_yielding = false;
             s_yieldAgain = false;
         }
+    }
+
+    internal static bool Wait()
+    {
+        if (!s_yielding)
+            return Yield();
+
+        // A synchronous wrapper can be called from an async continuation.
+        // It must poll its I/O task even though the outer continuation pass is active.
+        s_yieldAgain = true;
+        return PollOnce();
+    }
+
+    private static bool PollOnce()
+    {
+        bool hadPollers = s_pollers != null;
+        TaskPoller current = s_pollers;
+        while (current != null)
+        {
+            TaskPoller next = current.Next;
+            current.Poll();
+            current = next;
+        }
+
+        return hadPollers;
     }
 }

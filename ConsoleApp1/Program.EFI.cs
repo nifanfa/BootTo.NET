@@ -60,8 +60,10 @@ partial class Program
         #endregion
 #endif
 
-        EFI_STATUS certificateStatus = InstallTlsCaCertificates(@"\EFI\Certificates\TlsCaCertificate.esl");
-        Console.WriteLine($"TLS CA certificates {(certificateStatus == EFI_SUCCESS ? "are available!" : "are unavailable!")}");
+        if(InstallTlsCaCertificates(@"\EFI\Certificates\TlsCaCertificate.esl") != EFI_SUCCESS)
+        {
+            Console.WriteLine("Unable to load TLS CA certificates!");
+        }
 
         foreach (var driver in DxeDrivers)
         {
@@ -72,9 +74,10 @@ partial class Program
             }
         }
 
-        Console.WriteLine("Connecting PCI controllers...");
-        EFI_STATUS connectStatus = ConnectPciControllers();
-        Console.WriteLine($"PCI controllers {(connectStatus == EFI_SUCCESS ? "are connected!" : "failed to connect!")}");
+        if (ConnectPciControllers() != EFI_SUCCESS)
+        {
+            Console.WriteLine($"Unable to connect PCI controllers!");
+        }
 
         ManagedMain(0, null);
 

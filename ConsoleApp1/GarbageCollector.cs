@@ -1,6 +1,7 @@
 using Internal.Runtime;
 using Internal.Runtime.CompilerServices;
 using System;
+using System.Runtime;
 using System.Runtime.InteropServices;
 
 // BootTo.NET is single-threaded while UEFI boot services are active. This collector
@@ -80,6 +81,7 @@ internal static unsafe class GarbageCollector
         s_gcStaticsEnd = end;
     }
 
+    [RuntimeExport("malloc")]
     internal static void* AllocateNative(ulong size)
     {
         void* allocation = null;
@@ -139,6 +141,7 @@ internal static unsafe class GarbageCollector
         return objectAddress;
     }
 
+    [RuntimeExport("free")]
     internal static void FreeNative(void* pointer)
     {
         if (pointer == null)

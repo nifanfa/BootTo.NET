@@ -91,9 +91,8 @@ namespace System
         private static readonly object s_syncRoot = new object();
         static Console()
         {
-            BackgroundColor = ConsoleColor.Black;
-            ForegroundColor = ConsoleColor.Gray;
-            gST->ConOut->EnableCursor(gST->ConOut, true);
+            CursorVisible = true;
+            ResetColor();
             Clear();
         }
 
@@ -283,6 +282,26 @@ namespace System
             {
                 gST->ConOut->ClearScreen(gST->ConOut);
                 s_lineWrapped = false;
+            }
+        }
+
+        public static void ResetColor()
+        {
+            lock (s_syncRoot)
+            {
+                BackgroundColor = ConsoleColor.Black;
+                ForegroundColor = ConsoleColor.Gray;
+            }
+        }
+
+        public static bool CursorVisible
+        {
+            set 
+            {
+                lock (s_syncRoot)
+                {
+                    gST->ConOut->EnableCursor(gST->ConOut, value);
+                }
             }
         }
 
