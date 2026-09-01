@@ -31,9 +31,9 @@ internal static unsafe class doomgeneric
         s_screen = new Bitmap(DoomWidth, DoomHeight);
         s_graphics = CreateGraphics();
 
-        byte[] program = "doomgeneric\0"u8;
-        byte[] iwadArgument = "-iwad\0"u8;
-        byte[] wadName = "DOOM1.WAD\0"u8;
+        byte[] program = "doomgeneric"u8;
+        byte[] iwadArgument = "-iwad"u8;
+        byte[] wadName = "DOOM1.WAD"u8;
 
         fixed (byte* programPointer = program)
         fixed (byte* iwadPointer = iwadArgument)

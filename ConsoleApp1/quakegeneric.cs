@@ -39,7 +39,7 @@ internal static unsafe class quakegeneric
         s_clock = Stopwatch.StartNew();
         s_quitRequested = false;
 
-        byte[] program = "quakegeneric\0"u8;
+        byte[] program = "quakegeneric"u8;
         fixed (byte* programPointer = program)
         {
             char** arguments = stackalloc char*[1];
