@@ -556,7 +556,7 @@ public sealed class FtpServer
                 try
                 {
                     byte[] buffer = new byte[TransferBufferSize];
-                    for (;;)
+                    for (; ; )
                     {
                         int count = await stream.ReadAsync(buffer);
                         if (count == 0)
@@ -609,7 +609,7 @@ public sealed class FtpServer
                 try
                 {
                     byte[] buffer = new byte[TransferBufferSize];
-                    for (;;)
+                    for (; ; )
                     {
                         int count = await data.ReceiveAsync(buffer);
                         if (count == 0)
@@ -778,7 +778,7 @@ public sealed class FtpServer
 
         private async Task<string> ReadLineAsync()
         {
-            for (;;)
+            for (; ; )
             {
                 for (int i = 0; i < _controlLength; i++)
                 {

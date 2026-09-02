@@ -60,7 +60,7 @@ partial class Program
         #endregion
 #endif
 
-        if(InstallTlsCaCertificates(@"\EFI\Certificates\TlsCaCertificate.esl") != EFI_SUCCESS)
+        if (InstallTlsCaCertificates(@"\EFI\Certificates\TlsCaCertificate.esl") != EFI_SUCCESS)
         {
             Console.WriteLine("Unable to load TLS CA certificates!");
         }

@@ -296,7 +296,7 @@ namespace System
 
         public static bool CursorVisible
         {
-            set 
+            set
             {
                 lock (s_syncRoot)
                 {

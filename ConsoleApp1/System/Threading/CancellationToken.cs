@@ -1,6 +1,3 @@
-using System.Collections.Generic;
-using System.Threading.Tasks;
-
 namespace System.Threading
 {
     public readonly struct CancellationToken
