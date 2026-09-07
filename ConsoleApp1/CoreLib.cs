@@ -219,6 +219,27 @@ namespace System
         public const double MinValue = -1.7976931348623157E+308;
         public const double MaxValue = 1.7976931348623157E+308;
     }
+
+    public readonly struct Index
+    {
+        private readonly int _value;
+
+        public Index(int value, bool fromEnd)
+        {
+            _value = fromEnd ? ~value : value;
+        }
+
+        public int Value => _value < 0 ? ~_value : _value;
+        public bool IsFromEnd => _value < 0;
+
+        public int GetOffset(int length)
+            => IsFromEnd ? length - Value : Value;
+
+        public static Index FromStart(int value) => new Index(value, false);
+        public static Index FromEnd(int value) => new Index(value, true);
+        public static implicit operator Index(int value) => FromStart(value);
+    }
+
     public unsafe class Type
     {
         private readonly EEType* _eeType;
@@ -1145,6 +1166,11 @@ namespace System
     namespace Runtime.CompilerServices
     {
         public sealed class ExtensionAttribute : Attribute { }
+
+        // The compiler emits this marker for init-only setters. It has no
+        // runtime behavior, but must be present in the core library so the
+        // language feature can be compiled without the platform CoreLib.
+        public sealed class IsExternalInit { }
 
         public static class IsVolatile
         {
@@ -3319,15 +3345,28 @@ namespace System.Runtime
             if (pEEType == null)
                 return null;
 
+            ref byte dataAdjustedForNullable = ref data;
+
+            // Nullable<T> is never represented by a boxed Nullable<T> object.
+            // A value is boxed as T, while an empty Nullable<T> boxes as null.
+            if (pEEType->IsNullable)
+            {
+                if (data == 0)
+                    return null;
+
+                dataAdjustedForNullable = ref Unsafe.Add(ref data, pEEType->NullableValueOffset);
+                pEEType = pEEType->NullableType;
+                if (pEEType == null)
+                    return null;
+            }
+
             object result = RhpNewFast(pEEType);
             if (result == null)
                 return null;
 
-            // BaseSize includes the object header and EEType pointer. The remaining
-            // bytes are the value-type payload (including any alignment padding).
-            uint valueSize = pEEType->BaseSize - (uint)sizeof(ObjHeader) - (uint)sizeof(EEType*);
+            uint valueSize = pEEType->ValueTypeSize;
             fixed (byte* destination = &result.GetRawData())
-            fixed (byte* source = &data)
+            fixed (byte* source = &dataAdjustedForNullable)
                 Unsafe.CopyBlock(destination, source, valueSize);
 
             return result;
@@ -4081,6 +4120,148 @@ namespace Internal.Runtime
         private const int ValueTypePaddingHighShift = 8;
         private const uint ValueTypePaddingAlignmentMask = 0xF8;
         private const int ValueTypePaddingAlignmentShift = 3;
+
+        internal bool HasOptionalFields
+            => (Flags & EETypeFlags.OptionalFieldsFlag) != 0;
+
+        internal bool IsGeneric
+            => (Flags & EETypeFlags.IsGenericFlag) != 0;
+
+        internal EETypeElementType ElementType
+            => (EETypeElementType)(((ushort)Flags & (ushort)EETypeFlags.ElementTypeMask) >>
+                (int)EETypeFlags.ElementTypeShift);
+
+        internal bool IsNullable
+            => ElementType == EETypeElementType.Nullable;
+
+        internal bool HasGCPointers
+            => (Flags & EETypeFlags.HasPointersFlag) != 0;
+
+        // Static EETypes in this image use four-byte relative pointers in the
+        // trailing data. This matches the existing dispatch-map reader.
+        private byte* GetTrailingFields()
+        {
+            byte* field = (byte*)Unsafe.AsPointer(ref this) +
+                sizeof(EEType) + sizeof(IntPtr) * NumVtableSlots +
+                sizeof(EEInterfaceInfo) * NumInterfaces;
+            field += sizeof(int); // type manager indirection
+            field += sizeof(int); // writable data
+            if ((Flags & EETypeFlags.HasFinalizerFlag) != 0)
+                field += sizeof(int);
+            return field;
+        }
+
+        private byte* GetOptionalFields()
+        {
+            if (!HasOptionalFields)
+                return null;
+
+            int* field = (int*)GetTrailingFields();
+            return (byte*)field + *field;
+        }
+
+        private static uint DecodeOptionalUnsigned(ref byte* data)
+        {
+            uint first = *data;
+            if ((first & 1) == 0)
+            {
+                data++;
+                return first >> 1;
+            }
+            if ((first & 2) == 0)
+            {
+                uint value = (first >> 2) | ((uint)data[1] << 6);
+                data += 2;
+                return value;
+            }
+            if ((first & 4) == 0)
+            {
+                uint value = (first >> 3) | ((uint)data[1] << 5) | ((uint)data[2] << 13);
+                data += 3;
+                return value;
+            }
+            if ((first & 8) == 0)
+            {
+                uint value = (first >> 4) | ((uint)data[1] << 4) |
+                    ((uint)data[2] << 12) | ((uint)data[3] << 20);
+                data += 4;
+                return value;
+            }
+
+            data++;
+            uint result = *(uint*)data;
+            data += sizeof(uint);
+            return result;
+        }
+
+        private uint GetOptionalField(byte requestedTag, uint defaultValue)
+        {
+            byte* fields = GetOptionalFields();
+            if (fields == null)
+                return defaultValue;
+
+            bool last;
+            do
+            {
+                byte header = *fields++;
+                last = (header & 0x80) != 0;
+                byte tag = (byte)(header & 0x7f);
+                uint value = DecodeOptionalUnsigned(ref fields);
+                if (tag == requestedTag)
+                    return value;
+            }
+            while (!last);
+
+            return defaultValue;
+        }
+
+        internal byte NullableValueOffset
+            => (byte)(GetOptionalField(3, 0) + 1);
+
+        private byte* GetGenericCompositionField()
+        {
+            byte* field = GetTrailingFields();
+            if (HasOptionalFields)
+                field += sizeof(int);
+
+            // Generic EETypes carry the generic definition and composition
+            // pointers consecutively after the common EEType tail.
+            field += sizeof(int); // generic definition
+            return field;
+        }
+
+        internal EEType* NullableType
+        {
+            get
+            {
+                if (!IsNullable || !IsGeneric)
+                    return null;
+
+                int* compositionField = (int*)GetGenericCompositionField();
+                byte* composition = (byte*)compositionField + *compositionField;
+                if (*(ushort*)composition == 0)
+                    return null;
+
+                byte* argument = composition + sizeof(IntPtr);
+                ulong value = *(ulong*)argument;
+                if ((value & 1) != 0)
+                    return *(EEType**)(value - 1);
+
+                return (EEType*)(void*)value;
+            }
+        }
+
+        internal uint ValueTypeSize
+        {
+            get
+            {
+                uint encodedPadding = GetOptionalField(2, 0);
+                uint padding = encodedPadding & ValueTypePaddingLowMask;
+                padding |= (encodedPadding & ValueTypePaddingHighMask) >>
+                    (ValueTypePaddingHighShift - ValueTypePaddingAlignmentShift);
+                return BaseSize - ((uint)sizeof(ObjHeader) + (uint)sizeof(EEType*) + padding);
+            }
+        }
     }
 }
 
