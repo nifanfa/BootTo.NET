@@ -1,0 +1,22 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/Targets/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Build.targets" />
+    <File Path="Qemu.targets" />
+  </Folder>
+  <Project Path="ConsoleApp1/ConsoleApp1.csproj">
+    <BuildDependency Project="doomgeneric/doomgeneric.vcxproj" />
+    <BuildDependency Project="NativeLib/NativeLib.vcxproj" />
+    <BuildDependency Project="quakegeneric/quakegeneric.vcxproj" />
+  </Project>
+  <Project Path="doomgeneric/doomgeneric.vcxproj" Id="ad8c72d1-a8d1-4e72-8afa-e410324628d1" />
+  <Project Path="NativeLib/NativeLib.vcxproj" Id="d51f9603-001b-4272-aba9-62fdb20453bc" />
+  <Project Path="NES/NES.shproj" />
+  <Project Path="quakegeneric/quakegeneric.vcxproj" Id="e2bf760f-4a9e-45e8-a2ef-d4b1f9c9bba9" />
+  <Project Path="uefi-cs/uefi-cs.shproj" />
+</Solution>
