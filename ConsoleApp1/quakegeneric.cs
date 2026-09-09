@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Drawing;
 using System.Media;
 using System.Runtime;
@@ -27,16 +26,16 @@ internal static unsafe class quakegeneric
 
     private static Bitmap s_screen;
     private static Graphics s_graphics;
-    private static Stopwatch s_clock;
-    private static long s_frameStartTimestamp;
-    private static long s_frameTickRemainder;
+    private static uint s_elapsedMilliseconds;
+    private static int s_frameMillisecondRemainder;
     private static bool s_quitRequested;
 
     public static void Run()
     {
         s_screen = new Bitmap(QuakeWidth, QuakeHeight);
         s_graphics = CreateGraphics();
-        s_clock = Stopwatch.StartNew();
+        s_elapsedMilliseconds = 0;
+        s_frameMillisecondRemainder = 0;
         s_quitRequested = false;
 
         byte[] program = "quakegeneric"u8;
@@ -48,19 +47,43 @@ internal static unsafe class quakegeneric
         }
 
         Program.PrintFrame();
-        s_frameStartTimestamp = Stopwatch.GetTimestamp();
-        s_frameTickRemainder = 0;
-        while (!s_quitRequested)
+        EFI_EVENT frameTimer = null;
+        EFI_STATUS createTimerStatus = gBS->CreateEvent(
+            (uint)EVT_TIMER,
+            TPL_APPLICATION,
+            null,
+            null,
+            &frameTimer);
+        if ((ulong)createTimerStatus == EFI_SUCCESS)
         {
-            long frameTimestamp = Stopwatch.GetTimestamp();
-            long elapsedTicks = unchecked(frameTimestamp - s_frameStartTimestamp);
-            s_frameStartTimestamp = frameTimestamp;
+            EFI_STATUS setTimerStatus = gBS->SetTimer(
+                frameTimer,
+                TimerPeriodic,
+                10000000 / QuakeFrameRate);
+            if ((ulong)setTimerStatus != EFI_SUCCESS)
+            {
+                gBS->CloseEvent(frameTimer);
+                frameTimer = null;
+            }
+        }
 
-            Control.PumpMouseState();
-            QG_Tick(elapsedTicks > 0
-                ? elapsedTicks / (double)Stopwatch.Frequency
-                : 1.0 / QuakeFrameRate);
-            WaitForNextFrame(frameTimestamp);
+        try
+        {
+            while (!s_quitRequested)
+            {
+                Control.PumpMouseState();
+                QG_Tick(1.0 / QuakeFrameRate);
+                AdvanceGameClock();
+                WaitForNextFrame(frameTimer);
+            }
+        }
+        finally
+        {
+            if ((void*)frameTimer != null)
+            {
+                gBS->SetTimer(frameTimer, TimerCancel, 0);
+                gBS->CloseEvent(frameTimer);
+            }
         }
     }
 
@@ -151,13 +174,7 @@ internal static unsafe class quakegeneric
 
     [RuntimeExport("BTDN_GetMilliseconds")]
     public static uint GetMilliseconds()
-    {
-        if (s_clock == null)
-            return 0;
-        long milliseconds = s_clock.ElapsedMilliseconds;
-        return milliseconds <= 0 ? 0 :
-            milliseconds >= uint.MaxValue ? uint.MaxValue : (uint)milliseconds;
-    }
+        => s_elapsedMilliseconds;
 
     [RuntimeExport("BTDN_RequestQuit")]
     public static void RequestQuit()
@@ -202,21 +219,24 @@ internal static unsafe class quakegeneric
         return (int)scaled;
     }
 
-    private static void WaitForNextFrame(long frameTimestamp)
+    private static void AdvanceGameClock()
     {
-        s_frameTickRemainder += Stopwatch.Frequency;
-        long targetTicks = s_frameTickRemainder / QuakeFrameRate;
-        s_frameTickRemainder %= QuakeFrameRate;
+        s_frameMillisecondRemainder += 1000;
+        s_elapsedMilliseconds += (uint)(s_frameMillisecondRemainder / QuakeFrameRate);
+        s_frameMillisecondRemainder %= QuakeFrameRate;
+    }
 
-        long elapsedTicks = unchecked(Stopwatch.GetTimestamp() - frameTimestamp);
-        long remainingTicks = targetTicks - elapsedTicks;
-        if (remainingTicks <= 0)
-            return;
+    private static void WaitForNextFrame(EFI_EVENT frameTimer)
+    {
+        if ((void*)frameTimer != null)
+        {
+            EFI_EVENT* events = stackalloc EFI_EVENT[1];
+            events[0] = frameTimer;
+            ulong index = 0;
+            if ((ulong)gBS->WaitForEvent(1, events, &index) == EFI_SUCCESS)
+                return;
+        }
 
-        ulong microseconds = (ulong)(
-            (remainingTicks * 1000000L + Stopwatch.Frequency - 1) /
-            Stopwatch.Frequency);
-        if (microseconds != 0)
-            gBS->Stall(microseconds);
+        gBS->Stall(1000000 / QuakeFrameRate);
     }
 }

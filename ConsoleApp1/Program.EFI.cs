@@ -127,9 +127,7 @@ partial class Program
 
 #if false
         doomgeneric.Run();
-#endif
-
-#if true
+#else
         quakegeneric.Run();
 #endif
 
