@@ -445,15 +445,69 @@ namespace System
         }
     }
 
-    public readonly unsafe ref struct ReadOnlySpan<T>(T[] array, int start, int length)
+    public unsafe ref struct Span<T>
+    {
+        private readonly ByReference<T> _pointer;
+        private readonly int _length;
+
+        public Span(T[] array, int start, int length)
+        {
+            _pointer = new ByReference<T>(ref (array.Length == 0
+                ? ref Unsafe.AsRef<T>((void*)0)
+                : ref Unsafe.Add(ref array[0], start)));
+            _length = length;
+        }
+
+        internal Span(ref T reference, int length)
+        {
+            _pointer = new ByReference<T>(ref reference);
+            _length = length;
+        }
+
+        public int Length => _length;
+
+        public bool IsEmpty => _length == 0;
+
+        public ref T this[int index]
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                if ((uint)index >= (uint)_length)
+                    ThrowHelpers.ThrowIndexOutOfRangeException();
+                return ref Unsafe.Add(ref _pointer.Value, index);
+            }
+        }
+
+        public Span<T> Slice(int start) => Slice(start, _length - start);
+
+        public Span<T> Slice(int start, int length)
+        {
+            if ((uint)start > (uint)_length || (uint)length > (uint)(_length - start))
+                ThrowHelpers.ThrowIndexOutOfRangeException();
+            return new Span<T>(ref Unsafe.Add(ref _pointer.Value, start), length);
+        }
+
+        internal ref T DangerousGetReference() => ref _pointer.Value;
+
+        public static implicit operator Span<T>(T[] array) => new Span<T>(array, 0, array.Length);
+    }
+
+    public readonly unsafe ref struct ReadOnlySpan<T>
     {
         // An empty span has no element at index zero, but its reference still
         // needs a valid representation because Encoding and parsers routinely
         // construct spans over empty arrays.
-        internal readonly ByReference<T> _pointer = new ByReference<T>(ref (array.Length == 0
-            ? ref Unsafe.AsRef<T>((void*)0)
-            : ref Unsafe.Add(ref array[0], start)));
-        private readonly int _length = length;
+        internal readonly ByReference<T> _pointer;
+        private readonly int _length;
+
+        public ReadOnlySpan(T[] array, int start, int length)
+        {
+            _pointer = new ByReference<T>(ref (array.Length == 0
+                ? ref Unsafe.AsRef<T>((void*)0)
+                : ref Unsafe.Add(ref array[0], start)));
+            _length = length;
+        }
 
         public int Length
         {
@@ -461,6 +515,12 @@ namespace System
         }
 
         public bool IsEmpty => _length == 0;
+
+        internal ReadOnlySpan(ref T reference, int length)
+        {
+            _pointer = new ByReference<T>(ref reference);
+            _length = length;
+        }
 
         public ref readonly T this[int index]
         {
@@ -475,6 +535,18 @@ namespace System
         }
 
         public static implicit operator ReadOnlySpan<T>(T[] array) => new ReadOnlySpan<T>(array, 0, array.Length);
+
+        public static implicit operator ReadOnlySpan<T>(Span<T> span)
+            => new ReadOnlySpan<T>(ref span.DangerousGetReference(), span.Length);
+
+        public ReadOnlySpan<T> Slice(int start) => Slice(start, _length - start);
+
+        public ReadOnlySpan<T> Slice(int start, int length)
+        {
+            if ((uint)start > (uint)_length || (uint)length > (uint)(_length - start))
+                ThrowHelpers.ThrowIndexOutOfRangeException();
+            return new ReadOnlySpan<T>(ref Unsafe.Add(ref _pointer.Value, start), length);
+        }
 
         public static implicit operator T[](ReadOnlySpan<T> readOnlySpan)
         {
@@ -4261,6 +4333,32 @@ namespace Internal.Runtime
                     (ValueTypePaddingHighShift - ValueTypePaddingAlignmentShift);
                 return BaseSize - ((uint)sizeof(ObjHeader) + (uint)sizeof(EEType*) + padding);
             }
+        }
+    }
+}
+
+namespace System.Runtime
+{
+    internal static unsafe class RuntimeImports
+    {
+        // Required by the ILC-generated Set accessor for multidimensional
+        // reference arrays.
+        internal static void RhCheckArrayStore(object array, object value)
+        {
+            if (value == null)
+                return;
+
+            EEType* arrayType = array.EEType;
+            EEType* elementType = (arrayType->Flags & EETypeFlags.RelatedTypeViaIATFlag) != 0
+                ? *arrayType->RelatedType.RelatedParameterTypeViaIAT
+                : arrayType->RelatedType.RelatedParameterType;
+
+            if (TypeCast.IsInstanceOfClass(elementType, value) != null ||
+                TypeCast.IsInstanceOfInterface(elementType, value) != null ||
+                TypeCast.IsInstanceOfArray(elementType, value) != null)
+                return;
+
+            throw new InvalidCastException("The value cannot be stored in this array.");
         }
     }
 }
