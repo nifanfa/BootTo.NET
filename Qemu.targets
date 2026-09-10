@@ -12,10 +12,6 @@
     <QemuDiskImage>$(MSBuildThisFileDirectory)Drive.img</QemuDiskImage>
   </PropertyGroup>
 
-  <Target Name="CopyEFI" AfterTargets="Publish">
-    <Copy SourceFiles="$(MSBuildProjectDirectory)\$(NativeOutputPath)$(TargetName)$(NativeBinaryExt)" DestinationFiles="$(QemuDriveDirectory)\EFI\BOOT\BOOTX64.efi" />
-  </Target>
-
   <Target Name="CreateQemuDiskImage" AfterTargets="CopyEFI">
     <Error Text="Bundled qemu-img was not found at $(QemuImgExecutable)." Condition="!Exists('$(QemuImgExecutable)')" />
     <Delete Files="$(QemuDiskImage)" Condition="Exists('$(QemuDiskImage)')" />
