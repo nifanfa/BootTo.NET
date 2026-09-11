@@ -5,7 +5,6 @@
     <Platform Name="x86" />
   </Configurations>
   <Folder Name="/Targets/">
-    <File Path="Directory.Build.props" />
     <File Path="Directory.Build.targets" />
     <File Path="Qemu.targets" />
   </Folder>
@@ -15,6 +14,9 @@
     <BuildDependency Project="quakegeneric/quakegeneric.vcxproj" />
   </Project>
   <Project Path="doomgeneric/doomgeneric.vcxproj" Id="ad8c72d1-a8d1-4e72-8afa-e410324628d1" />
+  <Project Path="EfiApplication/EfiApplication.vcxproj" Id="178ca28f-a6d9-4f60-b35e-3a50bb9054b9">
+    <BuildDependency Project="ConsoleApp1/ConsoleApp1.csproj" />
+  </Project>
   <Project Path="NativeLib/NativeLib.vcxproj" Id="d51f9603-001b-4272-aba9-62fdb20453bc" />
   <Project Path="NES/NES.shproj" />
   <Project Path="quakegeneric/quakegeneric.vcxproj" Id="e2bf760f-4a9e-45e8-a2ef-d4b1f9c9bba9" />

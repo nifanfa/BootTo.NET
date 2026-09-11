@@ -32,9 +32,7 @@ global using static UI_STRING_TYPE;
 global using static EFI_NETWORK_INTERFACE_TYPE;
 #pragma warning restore
 
-using Internal.Runtime.CompilerHelpers;
 using System;
-using System.Reflection.PortableExecutable;
 
 public unsafe partial class efi
 {
@@ -45,21 +43,6 @@ public unsafe partial class efi
         gRT = systemTable->RuntimeServices;
         gImageHandle = imageHandle;
 
-        //C# startup
-        EFI_LOADED_IMAGE_PROTOCOL* loadedimage = null;
-        gBS->HandleProtocol(gImageHandle, (EFI_GUID*)EFI_LOADED_IMAGE_PROTOCOL_GUID, (void**)&loadedimage);
-        byte* imageBase = (byte*)loadedimage->ImageBase;
-        NativeDosHeader* doshdr = (NativeDosHeader*)imageBase;
-        NativeNtHeaders64* nthdr = (NativeNtHeaders64*)(imageBase + doshdr->e_lfanew);
-        NativeSectionHeader* sections = ((NativeSectionHeader*)(imageBase + doshdr->e_lfanew + sizeof(NativeNtHeaders64)));
-        IntPtr moduleSec = IntPtr.Zero;
-        for (int i = 0; i < nthdr->FileHeader.NumberOfSections; i++)
-        {
-            if (*(ulong*)sections[i].Name == 0x73656C75646F6D2E) moduleSec = (IntPtr)(imageBase + sections[i].VirtualAddress);
-        }
-        StartupCodeHelpers.InitializeModules(imageBase, moduleSec,
-            imageBase + nthdr->OptionalHeader.ExceptionTable.VirtualAddress,
-            nthdr->OptionalHeader.ExceptionTable.Size);
     }
 
     public static EFI_SYSTEM_TABLE* gST;

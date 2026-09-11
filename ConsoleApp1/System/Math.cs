@@ -1,8 +1,6 @@
-using Internal.Runtime.CompilerServices;
-
 namespace System
 {
-    public static class Math
+    public static unsafe class Math
     {
         public const double E = 2.7182818284590452354;
         public const double PI = 3.14159265358979323846;
@@ -408,44 +406,44 @@ namespace System
 
         private static bool IsNegative(float value)
         {
-            int bits = Unsafe.As<float, int>(ref value);
+            int bits = *(int*)&value;
             return bits < 0;
         }
 
         private static bool IsNegative(double value)
         {
-            long bits = Unsafe.As<double, long>(ref value);
+            long bits = *(long*)&value;
             return bits < 0;
         }
 
         public static bool IsNaN(float value)
         {
-            int bits = Unsafe.As<float, int>(ref value) & 0x7FFFFFFF;
+            int bits = *(int*)&value & 0x7FFFFFFF;
             return bits > 0x7F800000;
         }
 
         public static bool IsNaN(double value)
         {
-            long bits = Unsafe.As<double, long>(ref value) & 0x7FFFFFFFFFFFFFFF;
+            long bits = *(long*)&value & 0x7FFFFFFFFFFFFFFF;
             return (ulong)bits > 0x7FF0000000000000UL;
         }
 
         public static bool IsFinite(double value) => !IsNaN(value) && !IsInfinity(value);
         public static bool IsFinite(float value)
         {
-            int bits = Unsafe.As<float, int>(ref value) & 0x7FFFFFFF;
+            int bits = *(int*)&value & 0x7FFFFFFF;
             return bits < 0x7F800000;
         }
 
         public static bool IsInfinity(double value)
         {
-            long bits = Unsafe.As<double, long>(ref value) & 0x7FFFFFFFFFFFFFFF;
+            long bits = *(long*)&value & 0x7FFFFFFFFFFFFFFF;
             return (ulong)bits == 0x7FF0000000000000UL;
         }
 
         public static bool IsInfinity(float value)
         {
-            int bits = Unsafe.As<float, int>(ref value) & 0x7FFFFFFF;
+            int bits = *(int*)&value & 0x7FFFFFFF;
             return bits == 0x7F800000;
         }
 
@@ -458,6 +456,6 @@ namespace System
         private static readonly double PositiveInfinity = FromBits(unchecked((long)0x7FF0000000000000UL));
         private static readonly double NegativeInfinity = FromBits(unchecked((long)0xFFF0000000000000UL));
 
-        private static double FromBits(long bits) => Unsafe.As<long, double>(ref bits);
+        private static double FromBits(long bits) => *(double*)&bits;
     }
 }

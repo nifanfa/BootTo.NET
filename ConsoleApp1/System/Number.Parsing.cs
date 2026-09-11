@@ -1,6 +1,6 @@
 namespace System
 {
-    internal static class Number
+    internal static partial class Number
     {
         internal static bool TryParseSigned(string text, out long result)
         {

@@ -37,34 +37,36 @@ namespace System.Text
             if (bytes.IsEmpty)
                 return string.Empty;
 
-            byte* source = (byte*)(void*)bytes;
-            int charCount = 0;
-            int index = 0;
-            while (index < bytes.Length)
-                charCount += ReadUtf8(source, bytes.Length, ref index) <= 0xFFFF ? 1 : 2;
-
-            char[] chars = new char[charCount];
-            fixed (char* destination = &chars[0])
+            fixed (byte* source = bytes)
             {
-                int sourceIndex = 0;
-                int destinationIndex = 0;
-                while (sourceIndex < bytes.Length)
+                int charCount = 0;
+                int index = 0;
+                while (index < bytes.Length)
+                    charCount += ReadUtf8(source, bytes.Length, ref index) <= 0xFFFF ? 1 : 2;
+
+                char[] chars = new char[charCount];
+                fixed (char* destination = &chars[0])
                 {
-                    uint codePoint = ReadUtf8(source, bytes.Length, ref sourceIndex);
-                    if (codePoint <= 0xFFFF)
+                    int sourceIndex = 0;
+                    int destinationIndex = 0;
+                    while (sourceIndex < bytes.Length)
                     {
-                        destination[destinationIndex++] = (char)codePoint;
-                    }
-                    else
-                    {
-                        codePoint -= 0x10000;
-                        destination[destinationIndex++] = (char)(0xD800 + (codePoint >> 10));
-                        destination[destinationIndex++] = (char)(0xDC00 + (codePoint & 0x3FF));
+                        uint codePoint = ReadUtf8(source, bytes.Length, ref sourceIndex);
+                        if (codePoint <= 0xFFFF)
+                        {
+                            destination[destinationIndex++] = (char)codePoint;
+                        }
+                        else
+                        {
+                            codePoint -= 0x10000;
+                            destination[destinationIndex++] = (char)(0xD800 + (codePoint >> 10));
+                            destination[destinationIndex++] = (char)(0xDC00 + (codePoint & 0x3FF));
+                        }
                     }
                 }
-            }
 
-            return new string(chars);
+                return new string(chars);
+            }
         }
 
         private static uint ReadUtf16(char* chars, int length, ref int index)

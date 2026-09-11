@@ -1,5 +1,4 @@
-﻿using Internal.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 
 namespace System.Timers
 {
@@ -11,9 +10,12 @@ namespace System.Timers
         [UnmanagedCallersOnly]
         static void TimerProc(EFI_EVENT Event, void* Context)
         {
-            IntPtr context = (IntPtr)Context;
-            Timer timer = Unsafe.As<IntPtr, Timer>(ref context);
-            timer.Elapsed?.Invoke(timer, EventArgs.Empty);
+            Timer timer = RuntimeObjectHandle.Get<Timer>((IntPtr)Context);
+            if (timer == null)
+                return;
+            if (timer.Elapsed == null)
+                return;
+            timer.Elapsed.Invoke(timer, EventArgs.Empty);
         }
 
         public double Interval;
@@ -21,6 +23,7 @@ namespace System.Timers
         public Timer(double interval) => Interval = interval;
 
         EFI_EVENT TimerEvent;
+        IntPtr ContextHandle;
 
         public void Start()
         {
@@ -30,19 +33,22 @@ namespace System.Timers
                 return;
             }
 
-            Timer timer = this;
-            IntPtr context = Unsafe.As<Timer, IntPtr>(ref timer);
+            ContextHandle = RuntimeObjectHandle.Allocate(this);
             fixed (EFI_EVENT* evt = &TimerEvent)
             {
                 EFI_STATUS status = gBS->CreateEvent(
                     (uint)EVT_TIMER | EVT_NOTIFY_SIGNAL,
                     TPL_CALLBACK,
                     &TimerProc,
-                    (void*)context,
+                    (void*)ContextHandle,
                     evt
                 );
                 if ((ulong)status != EFI_SUCCESS)
+                {
+                    RuntimeObjectHandle.Free(ContextHandle);
+                    ContextHandle = IntPtr.Zero;
                     return;
+                }
             }
 
             EFI_STATUS setTimerStatus = gBS->SetTimer(
@@ -54,6 +60,8 @@ namespace System.Timers
             {
                 gBS->CloseEvent(TimerEvent);
                 TimerEvent = default;
+                RuntimeObjectHandle.Free(ContextHandle);
+                ContextHandle = IntPtr.Zero;
                 return;
             }
 
@@ -68,6 +76,8 @@ namespace System.Timers
             gBS->SetTimer(TimerEvent, TimerCancel, 0);
             gBS->CloseEvent(TimerEvent);
             TimerEvent = default;
+            RuntimeObjectHandle.Free(ContextHandle);
+            ContextHandle = IntPtr.Zero;
             Started = false;
         }
     }

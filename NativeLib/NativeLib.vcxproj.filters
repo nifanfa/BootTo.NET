@@ -40,19 +40,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <MASM Include="MiscStubs.asm">
-      <Filter>源文件</Filter>
-    </MASM>
-    <MASM Include="GcRegisters.asm">
-      <Filter>源文件</Filter>
-    </MASM>
-    <MASM Include="StubDispatch.asm">
-      <Filter>源文件</Filter>
-    </MASM>
-    <MASM Include="WriteBarriers.asm">
-      <Filter>源文件</Filter>
-    </MASM>
-    <MASM Include="ExceptionHandling.asm">
+    <MASM Include="Runtime.asm">
       <Filter>源文件</Filter>
     </MASM>
   </ItemGroup>

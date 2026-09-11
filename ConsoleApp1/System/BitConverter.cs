@@ -1,8 +1,6 @@
-using Internal.Runtime.CompilerServices;
-
 namespace System
 {
-    public static class BitConverter
+    public static unsafe class BitConverter
     {
         public static readonly bool IsLittleEndian = true;
 
@@ -20,13 +18,13 @@ namespace System
 
         public static byte[] GetBytes(float value)
         {
-            int bits = Unsafe.As<float, int>(ref value);
+            int bits = *(int*)&value;
             return GetBytes(bits);
         }
 
         public static byte[] GetBytes(double value)
         {
-            long bits = Unsafe.As<double, long>(ref value);
+            long bits = *(long*)&value;
             return GetBytes(bits);
         }
 
@@ -51,17 +49,17 @@ namespace System
         public static float ToSingle(byte[] value, int startIndex)
         {
             int bits = ToInt32(value, startIndex);
-            return Unsafe.As<int, float>(ref bits);
+            return *(float*)&bits;
         }
 
         public static double ToDouble(byte[] value, int startIndex)
         {
             long bits = ToInt64(value, startIndex);
-            return Unsafe.As<long, double>(ref bits);
+            return *(double*)&bits;
         }
 
-        public static long DoubleToInt64Bits(double value) => Unsafe.As<double, long>(ref value);
-        public static double Int64BitsToDouble(long value) => Unsafe.As<long, double>(ref value);
+        public static long DoubleToInt64Bits(double value) => *(long*)&value;
+        public static double Int64BitsToDouble(long value) => *(double*)&value;
 
         public static string ToString(byte[] value) => ToString(value, 0, value == null ? 0 : value.Length);
         public static string ToString(byte[] value, int startIndex)

@@ -85,24 +85,6 @@ namespace System.Linq
             return SingleCore(source, predicate, true, true);
         }
 
-        public static IEnumerable<TSource> Skip<TSource>(this IEnumerable<TSource> source, int count)
-        {
-            if (source == null)
-                throw new ArgumentNullException("The source sequence cannot be null.");
-            if (count < 0)
-                throw new ArgumentOutOfRangeException("The skip count cannot be negative.");
-            return new SkipTakeEnumerable<TSource>(source, count, -1);
-        }
-
-        public static IEnumerable<TSource> Take<TSource>(this IEnumerable<TSource> source, int count)
-        {
-            if (source == null)
-                throw new ArgumentNullException("The source sequence cannot be null.");
-            if (count < 0)
-                throw new ArgumentOutOfRangeException("The take count cannot be negative.");
-            return new SkipTakeEnumerable<TSource>(source, 0, count);
-        }
-
         public static TSource ElementAt<TSource>(this IEnumerable<TSource> source, int index)
         {
             if (source == null)
@@ -193,16 +175,6 @@ namespace System.Linq
             Dictionary<TKey, TElement> result = new Dictionary<TKey, TElement>(comparer);
             foreach (TSource item in source)
                 result.Add(keySelector(item), elementSelector(item));
-            return result;
-        }
-
-        public static int Sum(this IEnumerable<int> source)
-        {
-            if (source == null)
-                throw new ArgumentNullException("The source sequence cannot be null.");
-            int result = 0;
-            foreach (int value in source)
-                result = checked(result + value);
             return result;
         }
 

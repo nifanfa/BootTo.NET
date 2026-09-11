@@ -244,7 +244,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_LIB;R_Init=Q_R_Init;R_InitTextures=Q_R_InitTextures;Z_CheckHeap=Q_Z_CheckHeap;Z_ClearZone=Q_Z_ClearZone;Z_Free=Q_Z_Free;Z_Malloc=Q_Z_Malloc;WritePCXfile=Q_WritePCXfile;S_Init=Q_S_Init;S_Shutdown=Q_S_Shutdown;S_StartSound=Q_S_StartSound;S_StopSound=Q_S_StopSound;precache=Q_precache;V_Init=Q_V_Init;R_SetupFrame=Q_R_SetupFrame;M_Init=Q_M_Init;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>Default</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
@@ -270,7 +270,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_LIB;R_Init=Q_R_Init;R_InitTextures=Q_R_InitTextures;Z_CheckHeap=Q_Z_CheckHeap;Z_ClearZone=Q_Z_ClearZone;Z_Free=Q_Z_Free;Z_Malloc=Q_Z_Malloc;WritePCXfile=Q_WritePCXfile;S_Init=Q_S_Init;S_Shutdown=Q_S_Shutdown;S_StartSound=Q_S_StartSound;S_StopSound=Q_S_StopSound;precache=Q_precache;V_Init=Q_V_Init;R_SetupFrame=Q_R_SetupFrame;M_Init=Q_M_Init;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>Default</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>

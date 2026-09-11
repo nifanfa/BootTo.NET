@@ -1,4 +1,3 @@
-﻿using Internal.Runtime.CompilerServices;
 using System;
 using System.Drawing;
 
@@ -27,7 +26,9 @@ namespace NES
                 {
                     fixed (Color* dst = textureScreenBuffer.pixels)
                     {
-                        Unsafe.CopyBlock(dst, src, (ulong)byteToWrite.Length);
+                        byte* destination = (byte*)dst;
+                        for (int index = 0; index < byteToWrite.Length; index++)
+                            destination[index] = src[index];
 
                         // Color is a packed 32-bit ARGB value. Avoid the
                         // per-pixel SetPixel call and coordinate arithmetic.

@@ -2,6 +2,10 @@ namespace System.Threading.Tasks
 {
     public partial class Task
     {
+        static partial void WaitForCompletion() => TaskScheduler.Wait();
+
+        internal void AddContinuation(Action continuation) => OnCompleted(continuation);
+
         public static Task Delay(int millisecondsDelay)
         {
             if (millisecondsDelay < Timeout.Infinite)

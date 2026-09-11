@@ -1,4 +1,3 @@
-using Internal.Runtime.CompilerServices;
 using System.Text;
 
 namespace System.IO
@@ -67,13 +66,13 @@ namespace System.IO
         public float ReadSingle()
         {
             int bits = ReadInt32();
-            return Unsafe.As<int, float>(ref bits);
+            return *(float*)&bits;
         }
 
         public double ReadDouble()
         {
             long bits = ReadInt64();
-            return Unsafe.As<long, double>(ref bits);
+            return *(double*)&bits;
         }
 
         public char ReadChar() => (char)ReadUInt16();

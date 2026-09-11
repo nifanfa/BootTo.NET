@@ -1,5 +1,3 @@
-using System.Runtime;
-
 namespace System
 {
     public static class Environment
@@ -37,6 +35,6 @@ namespace System
         public static string GetFolderPath(SpecialFolder folder) => string.Empty;
         public static string GetFolderPath(SpecialFolder folder, SpecialFolderOption option) => string.Empty;
         public static void Exit(int exitCode) => _exitCode = exitCode;
-        public static void FailFast(string message) => InternalCalls.__fail_fast();
+        public static void FailFast(string message) => Runtime.ExceptionRuntime.Abort();
     }
 }

@@ -1,4 +1,3 @@
-using Internal.Runtime.CompilerServices;
 using System.IO;
 using System.Runtime.InteropServices;
 
@@ -541,7 +540,7 @@ namespace System.Media
             if (!ReserveStreamingCapacity(outputLength))
                 return false;
 
-            void* rawBuffer = GarbageCollector.AllocateNative(outputLength);
+            void* rawBuffer = EfiNativeMemory.Allocate(outputLength);
             if (rawBuffer == null)
             {
                 ReleaseStreamingCapacity(outputLength);
@@ -549,7 +548,7 @@ namespace System.Media
             }
 
             fixed (byte* source = output)
-                Unsafe.CopyBlock(rawBuffer, source + offset, outputLength);
+                EfiNativeMemory.Copy(rawBuffer, source + offset, outputLength);
 
             EFI_TPL oldTpl = gBS->RaiseTPL(TPL_NOTIFY);
             EFI_STATUS status = s_audioIo->SetupPlayback(
@@ -639,7 +638,7 @@ namespace System.Media
             if (!ReserveStreamingCapacity(outputLength))
                 return 0;
 
-            void* rawBuffer = GarbageCollector.AllocateNative(outputLength);
+            void* rawBuffer = EfiNativeMemory.Allocate(outputLength);
             if (rawBuffer == null)
             {
                 ReleaseStreamingCapacity(outputLength);
@@ -647,7 +646,7 @@ namespace System.Media
             }
 
             fixed (byte* source = output)
-                Unsafe.CopyBlock(rawBuffer, source, outputLength);
+                EfiNativeMemory.Copy(rawBuffer, source, outputLength);
 
             EFI_TPL oldTpl = gBS->RaiseTPL(TPL_NOTIFY);
             EFI_STATUS status = s_audioIo->SetupPlayback(

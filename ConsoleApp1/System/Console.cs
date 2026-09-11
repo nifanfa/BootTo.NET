@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 namespace System
 {
-    public static unsafe class Console
+    public static unsafe partial class Console
     {
         private sealed class ReadKeyOperation : TaskPoller
         {

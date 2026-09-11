@@ -1,4 +1,3 @@
-using Internal.Runtime.CompilerServices;
 using System.Text;
 
 namespace System.IO
@@ -62,13 +61,13 @@ namespace System.IO
 
         public void Write(float value)
         {
-            int bits = Unsafe.As<float, int>(ref value);
+            int bits = *(int*)&value;
             Write(bits);
         }
 
         public void Write(double value)
         {
-            long bits = Unsafe.As<double, long>(ref value);
+            long bits = *(long*)&value;
             Write(bits);
         }
 

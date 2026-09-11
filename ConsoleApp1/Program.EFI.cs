@@ -5,16 +5,15 @@ using System.IO;
 using System.IO.Ports;
 using System.Net;
 using System.Runtime;
-using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
 partial class Program
 {
-    [RuntimeImport("*", "__managed__Main")]
-    [MethodImpl(MethodImplOptions.InternalCall)]
-    private static extern unsafe int ManagedMain(int argc, char** argv);
+    [DllImport("*", EntryPoint = "managed_Main")]
+    private static extern void ManagedMain(string[] args);
 
     static readonly List<string> DxeDrivers = new()
     {
@@ -30,12 +29,9 @@ partial class Program
         @"\EFI\Drivers\Original\UsbMouseDxe.efi"
     };
 
-    [RuntimeExport("EfiMain")]
+    [RuntimeExport("ManagedEfiMain")]
     unsafe static EFI_STATUS EfiMain(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* systemTable)
     {
-        ulong stackMarker = 0;
-        GarbageCollector.InitializeStack(&stackMarker);
-
         InitializeLib(imageHandle, systemTable);
 
         //Disable watchdog timer
@@ -79,7 +75,7 @@ partial class Program
             Console.WriteLine($"Unable to connect PCI controllers!");
         }
 
-        ManagedMain(0, null);
+        ManagedMain(null);
 
         try
         {

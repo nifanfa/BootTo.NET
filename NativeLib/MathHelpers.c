@@ -2,12 +2,6 @@
 #include <intrin.h>
 #include <smmintrin.h>
 
-// Used by Native AOT
-uint64_t RhpDbl2ULng(double val)
-{
-	return((uint64_t)val);
-}
-
 double MathSqrt(double value)
 {
 	__m128d input = _mm_set_sd(value);

@@ -19,19 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <MASM Include="MiscStubs.asm">
-      <FileType>Document</FileType>
-    </MASM>
-    <MASM Include="GcRegisters.asm">
-      <FileType>Document</FileType>
-    </MASM>
-    <MASM Include="ExceptionHandling.asm">
-      <FileType>Document</FileType>
-    </MASM>
-    <MASM Include="StubDispatch.asm">
-      <FileType>Document</FileType>
-    </MASM>
-    <MASM Include="WriteBarriers.asm">
+    <MASM Include="Runtime.asm">
       <FileType>Document</FileType>
     </MASM>
   </ItemGroup>

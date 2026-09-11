@@ -1,46 +1,58 @@
 <Project>
 
-  <Import Project="Qemu.targets" />
+  <Import Project="Qemu.targets" Condition="'$(MSBuildProjectExtension)' == '.csproj'" />
 
-  <PropertyGroup Condition="'$(BuildingInsideVisualStudio)' == 'true'">
+  <PropertyGroup Condition="'$(BuildingInsideVisualStudio)' == 'true' and '$(MSBuildProjectExtension)' == '.csproj'">
     <StartAction>Program</StartAction>
-    <StartProgram>dotnet</StartProgram>
-	<StartArguments>publish --tl:off $(AssemblyName)</StartArguments>
+    <StartProgram>cmd.exe</StartProgram>
+    <StartArguments>/d /s /c &quot;&quot;$(QemuExecutable)&quot; $(QemuArguments)&quot;</StartArguments>
     <StartWorkingDirectory>$(MSBuildThisFileDirectory)</StartWorkingDirectory>
   </PropertyGroup>
 
-  <PropertyGroup>
+  <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.csproj'">
     <OutputType>Exe</OutputType>
-    <EmitLegacyAssetsFileItems>true</EmitLegacyAssetsFileItems>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <NoStdLib>true</NoStdLib>
     <NoConfig>true</NoConfig>
-    <RuntimeMetadataVersion>v4.0.30319</RuntimeMetadataVersion>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
-    <IlcSystemModule>$(AssemblyName)</IlcSystemModule>
-    <EntryPointSymbol>EfiMain</EntryPointSymbol>
-    <LinkerSubsystem>EFI_APPLICATION</LinkerSubsystem>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IL2LLVMTool>$(MSBuildThisFileDirectory)IL2LLVM\IL2LLVM.exe</IL2LLVMTool>
+    <IL2LLVMTarget>x86_64-pc-windows-msvc</IL2LLVMTarget>
+    <IL2LLVMObject>$(ProjectDir)obj\$(Configuration)\$(TargetName).obj</IL2LLVMObject>
+    <EfiApplicationProject>$(MSBuildThisFileDirectory)EfiApplication\EfiApplication.vcxproj</EfiApplicationProject>
+    <DisableFastUpToDateCheck Condition="'$(BuildingInsideVisualStudio)' == 'true'">true</DisableFastUpToDateCheck>
   </PropertyGroup>
 
-  <!--Warning: This package is modified(/packages). Using official one may cause it fail to compile!-->
-  <ItemGroup>
-    <PackageReference Include="Microsoft.DotNet.ILCompiler" Version="7.0.0-alpha.1.22074.1" />
-  </ItemGroup>
-
   <!--CustomizeReferences-->
-  <Target Name="CustomizeReferences" BeforeTargets="BeforeCompile" AfterTargets="FindReferenceAssembliesForReferences">
+  <Target Name="CustomizeReferences" BeforeTargets="BeforeCompile" AfterTargets="FindReferenceAssembliesForReferences" Condition="'$(MSBuildProjectExtension)' == '.csproj'">
     <ItemGroup>
       <ReferencePathWithRefAssemblies Remove="@(ReferencePathWithRefAssemblies)" />
       <ReferencePath Remove="@(ReferencePath)" />
     </ItemGroup>
   </Target>
 
-  <Target Name="CopyEFI" AfterTargets="Publish">
-    <Copy SourceFiles="$(MSBuildProjectDirectory)\$(NativeOutputPath)$(TargetName)$(NativeBinaryExt)" DestinationFiles="$(QemuDriveDirectory)\EFI\BOOT\BOOTX64.efi" />
+  <Target Name="CompileWithIL2LLVM"
+          AfterTargets="Build"
+          Inputs="$(TargetPath);$(IL2LLVMTool)"
+          Outputs="$(IL2LLVMObject)"
+          Condition="'$(MSBuildProjectExtension)' == '.csproj'">
+    <Error Condition="!Exists('$(IL2LLVMTool)')" Text="IL2LLVM was not found at $(IL2LLVMTool)." />
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(IL2LLVMObject)'))" />
+    <Exec Command="&quot;$(IL2LLVMTool)&quot; &quot;$(TargetPath)&quot; &quot;$(IL2LLVMObject)&quot; &quot;$(IL2LLVMTarget)&quot;" />
   </Target>
 
-  <Target Name="PrepareForILLink">
+  <Target Name="BuildEfiApplication"
+          AfterTargets="CompileWithIL2LLVM"
+          Condition="'$(BuildingInsideVisualStudio)' == 'true' and '$(MSBuildProjectExtension)' == '.csproj'">
+    <MSBuild Projects="$(EfiApplicationProject)"
+             Targets="Build"
+             Properties="Configuration=$(Configuration);Platform=x64;SolutionDir=$(MSBuildThisFileDirectory)" />
   </Target>
+
+  <Target Name="CreateQemuDiskImageAfterEfiApplication"
+          AfterTargets="BuildEfiApplication"
+          DependsOnTargets="CreateQemuDiskImage"
+          Condition="'$(BuildingInsideVisualStudio)' == 'true' and '$(MSBuildProjectExtension)' == '.csproj'" />
 
 </Project>

@@ -1,8 +1,8 @@
 # BootTo.NET Project
 
-## Debugging
-1. **Open Project**: Open the `BootTo.NET.sln` solution in Visual Studio.
-2. **Launch**: Run `ConsoleApp1`, or simply press **F5**. The MSBuild targets will handle the rest.
+## Building
+
+Open `BootTo.NET.slnx` in Visual Studio and build the `x64` configuration. The managed project is compiled to IL, IL2LLVM produces `ConsoleApp1.obj`, and `EfiApplication` links it with the native libraries into `Drive/EFI/BOOT/BOOTX64.efi`.
 <p align="center">
   <img alt="QQ_1787932865567" src="https://github.com/user-attachments/assets/aedd8930-933e-41c8-90c0-48376e5329e0" />
 </p>
@@ -10,9 +10,7 @@
 ## Synopsis
 *When will hobby OS developers realize that we don't need to implement everything from scratch? With a clean environment providing basic network, graphics, filesystem, and USB support, there's no need to build it yourself—just load a DXE driver and go ahead with your 'OS'.*  
 
-Publishing updates the boot files in `Drive`, then starts the repository-local QEMU x64 emulator with that directory exposed directly as a writable virtual FAT disk. QEMU, its Windows runtime dependencies, and the EDK2 UEFI firmware are included in `qemu`; no system QEMU installation and no administrator privileges are required.
-
-Use `dotnet publish --tl:off -c Release ConsoleApp1` to publish and run with live build output. Pass `-p:RunQemu=false` to publish without starting QEMU.
+The repository includes QEMU, its Windows runtime dependencies, and EDK2 firmware; no system QEMU installation is required. After building the solution, run the `RunQemu` target from `ConsoleApp1.csproj` to create `Drive.img` and boot it.
 
 QEMU mounts the bundled UEFI variable template through a temporary snapshot. Variable changes are discarded when QEMU exits, so stale physical-network settings cannot override the `-netdev user` DHCP configuration and no per-build `.vars.fd` file is created.
 
@@ -56,6 +54,6 @@ Format a USB drive as FAT32, copy the contents of `Drive` to its root, and boot 
 
 ## Debugging with QEMU
 
-After publishing, `CopyEFI` updates `Drive/EFI/BOOT/BOOTX64.efi`, and `RunQemu` exposes `Drive` directly as a writable virtual FAT disk and boots it with the bundled EDK2 firmware. Pass `-p:RunQemu=false` to publish without starting the emulator.
+After building `EfiApplication`, invoke the `RunQemu` target. It packages `Drive` as a writable FAT disk image and boots it with the bundled EDK2 firmware.
 
 The SDL window uses QEMU's default `Left Ctrl+Left Alt+G` shortcut to release mouse and keyboard input. On Windows, select the English input method for the QEMU window because an active IME can intercept this shortcut.
