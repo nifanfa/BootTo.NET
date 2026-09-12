@@ -107,7 +107,7 @@ partial class Program
         Console.WriteLine(@"|_______/  \______/  \______/    \___/  |__/ \______/|__/|__/  \__/|________/   |__/   ");
         Console.ForegroundColor = ConsoleColor.Gray;
 
-        printf("GC.Collect freed %d unreferenced objects!\n"u8, GC.Collect());
+        printf("GC.Collect freed %d unreferenced objects!\n"u8, __arglist(GC.Collect()));
 
 #if true
         Console.WriteLine("Press any key to continue...");
@@ -235,7 +235,7 @@ partial class Program
             Console.Write("Content of Test.txt is: ");
             unsafe
             {
-                printf("%s\n"u8, buffer);
+                printf("%s\n"u8, __arglist((ByReference<byte>)buffer));
             }
         }
     }
@@ -254,7 +254,7 @@ partial class Program
             await socket.ReceiveAsync(buffer);
             unsafe
             {
-                printf("Buffer received: %s\n"u8, buffer);
+                printf("Buffer received: %s\n"u8, __arglist((ByReference<byte>)buffer));
             }
             socket.Close();
         }
@@ -275,7 +275,7 @@ partial class Program
             await socket.ReceiveAsync(buffer);
             unsafe
             {
-                printf("Buffer received: %s\n"u8, buffer);
+                printf("Buffer received: %s\n"u8, __arglist((ByReference<byte>)buffer));
             }
             socket.Close();
         }

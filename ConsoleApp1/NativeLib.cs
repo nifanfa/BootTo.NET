@@ -66,16 +66,6 @@ internal unsafe class NativeLib
             return snprintf(buffer, count, pointer, va);
     }
 
-    [DllImport("*", EntryPoint = "vprintf_")]
-    private static extern int vprintf(void* format, NativeVariableArgument* va);
-
-    public static int printf(void* format, params VariableArgument[] va)
-    {
-        NativeVariableArgument[] arguments = GetNativeArguments(va);
-        fixed (NativeVariableArgument* pointer = arguments)
-            return vprintf(format, pointer);
-    }
-
     private static NativeVariableArgument[] GetNativeArguments(VariableArgument[] arguments)
     {
         NativeVariableArgument[] nativeArguments = new NativeVariableArgument[arguments.Length];
@@ -92,14 +82,8 @@ internal unsafe class NativeLib
         return nativeArguments;
     }
 
-    public static int printf(ReadOnlySpan<byte> format, params VariableArgument[] va)
-    {
-        byte[] bytes = new byte[format.Length + 1];
-        for (int index = 0; index < format.Length; index++)
-            bytes[index] = format[index];
-        fixed (byte* pointer = bytes)
-            return printf(pointer, va);
-    }
+    [DllImport("*", EntryPoint = "printf_")]
+    public static extern int printf(ByReference<byte> format, __arglist);
 
     static char lastCharacter;
 

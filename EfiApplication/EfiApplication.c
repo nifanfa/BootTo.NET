@@ -41,17 +41,6 @@ typedef struct efi_system_table
     efi_boot_services* boot_services;
 } efi_system_table;
 
-extern void* memcpy(void* destination, const void* source, runtime_size_t count);
-extern void* memset(void* destination, int value, runtime_size_t count);
-extern int setjmp(void* buffer, void* stack_pointer);
-extern void longjmp(void* buffer, int value);
-extern void PushGCFrame(void* frame, void* roots, int root_count);
-extern void PopGCFrame(void* frame);
-extern void* GetTopGCFrame(void);
-extern void UnwindGCFrames(void* frame);
-extern void PushExceptionFrame(void* frame, void* buffer);
-extern void PopExceptionFrame(void* frame);
-extern void* GetTopExceptionFrame(void);
 extern efi_status ManagedEfiMain(void* image_handle, efi_system_table* system_table);
 
 static allocate_pool_fn allocate_pool;
@@ -97,68 +86,6 @@ void free(void* allocation)
 {
     if (allocation != 0 && free_pool != 0)
         free_pool(allocation);
-}
-
-typedef struct GCFrame GCFrame;
-typedef struct ExceptionFrame ExceptionFrame;
-
-struct GCFrame
-{
-    GCFrame* Previous;
-    void* Roots;
-    int RootCount;
-};
-
-struct ExceptionFrame
-{
-    ExceptionFrame* Previous;
-    void* Buffer;
-    GCFrame* GCFrame;
-};
-
-static GCFrame* topGCFrame;
-static ExceptionFrame* topExceptionFrame;
-
-void PushGCFrame(GCFrame* frame, void* roots, int rootCount)
-{
-    frame->Previous = topGCFrame;
-    frame->Roots = roots;
-    frame->RootCount = rootCount;
-    topGCFrame = frame;
-}
-
-void PopGCFrame(GCFrame* frame)
-{
-    topGCFrame = frame->Previous;
-}
-
-void* GetTopGCFrame(void)
-{
-    return topGCFrame;
-}
-
-void UnwindGCFrames(GCFrame* frame)
-{
-    topGCFrame = frame;
-}
-
-void PushExceptionFrame(ExceptionFrame* frame, void* buffer)
-{
-    frame->Previous = topExceptionFrame;
-    frame->Buffer = buffer;
-    frame->GCFrame = topGCFrame;
-    topExceptionFrame = frame;
-}
-
-void PopExceptionFrame(ExceptionFrame* frame)
-{
-    if (topExceptionFrame == frame)
-        topExceptionFrame = frame->Previous;
-}
-
-void* GetTopExceptionFrame(void)
-{
-    return topExceptionFrame;
 }
 
 __declspec(noreturn) void abort(void)

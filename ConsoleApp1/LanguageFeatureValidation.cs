@@ -16,6 +16,7 @@ public static class LanguageFeatureValidation
     private static volatile int s_expectedSum;
     private static volatile int s_runtimeBias = 1;
     private static int s_instructionStatic;
+    private static object s_objectPointerValue = new object();
     private static readonly bool s_boolean = true;
     private static readonly char s_character = 'L';
     private static readonly sbyte s_sbyte = -1;
@@ -194,6 +195,16 @@ public static class LanguageFeatureValidation
         public override int Evaluate() => base.Evaluate() + 1;
 
         public void RaiseChanged() => Changed?.Invoke();
+    }
+
+    private sealed class ObjectPointerHolder
+    {
+        public object Value;
+
+        public ObjectPointerHolder(object value)
+        {
+            Value = value;
+        }
     }
 
     private sealed class HiddenFeature : FeatureBase
@@ -482,6 +493,8 @@ public static class LanguageFeatureValidation
         VerifyBoxing();
         VerifyStructures();
         VerifyLatestSyntax();
+        VerifyTypedReferences();
+        VerifyArglist();
         VerifyModernLanguageFeatures(values);
         VerifySpans();
         VerifyArrays();
@@ -664,6 +677,130 @@ public static class LanguageFeatureValidation
 
         if (default(FeatureValue).Value != RuntimeValue(0) || list.Count != values.Length)
             Fail("default or collection");
+    }
+
+    private static unsafe void VerifyTypedReferences()
+    {
+        int integer = RuntimeValue(17);
+        TypedReference integerReference = __makeref(integer);
+        if (__refvalue(integerReference, int) != RuntimeValue(17) ||
+            __reftype(integerReference) != typeof(int))
+            Fail("typed reference int load or type");
+        __refvalue(integerReference, int) = RuntimeValue(23);
+        if (integer != RuntimeValue(23))
+            Fail("typed reference int aliasing");
+        bool invalidType = false;
+        try { _ = __refvalue(integerReference, long); }
+        catch (InvalidCastException) { invalidType = true; }
+        if (!invalidType)
+            Fail("typed reference type mismatch");
+
+        byte small = (byte)RuntimeValue(7);
+        TypedReference smallReference = __makeref(small);
+        if (__refvalue(smallReference, byte) != (byte)RuntimeValue(7) ||
+            __reftype(smallReference) != typeof(byte))
+            Fail("typed reference byte load or type");
+        __refvalue(smallReference, byte) = (byte)RuntimeValue(8);
+        if (small != (byte)RuntimeValue(8))
+            Fail("typed reference byte aliasing");
+
+        char character = 'A';
+        TypedReference characterReference = __makeref(character);
+        if (__refvalue(characterReference, char) != 'A' ||
+            __reftype(characterReference) != typeof(char))
+            Fail("typed reference char load or type");
+        __refvalue(characterReference, char) = 'B';
+        if (character != 'B')
+            Fail("typed reference char aliasing");
+
+        bool boolean = true;
+        TypedReference booleanReference = __makeref(boolean);
+        if (!__refvalue(booleanReference, bool) ||
+            __reftype(booleanReference) != typeof(bool))
+            Fail("typed reference bool load or type");
+        __refvalue(booleanReference, bool) = false;
+        if (boolean)
+            Fail("typed reference bool aliasing");
+
+        long wide = 0x102030405060708L;
+        TypedReference wideReference = __makeref(wide);
+        if (__refvalue(wideReference, long) != 0x102030405060708L ||
+            __reftype(wideReference) != typeof(long))
+            Fail("typed reference long load or type");
+        __refvalue(wideReference, long) = 0x807060504030201L;
+        if (wide != 0x807060504030201L)
+            Fail("typed reference long aliasing");
+
+        double real = 12.5;
+        TypedReference realReference = __makeref(real);
+        if (__refvalue(realReference, double) != 12.5 ||
+            __reftype(realReference) != typeof(double))
+            Fail("typed reference double load or type");
+        __refvalue(realReference, double) = -25.25;
+        if (real != -25.25)
+            Fail("typed reference double aliasing");
+
+        object referenceValue = new FeatureObject(RuntimeValue(31));
+        TypedReference objectReference = __makeref(referenceValue);
+        if (__refvalue(objectReference, object) != referenceValue ||
+            __reftype(objectReference) != typeof(object))
+            Fail("typed reference object load or type");
+        object replacement = new FeatureObject(RuntimeValue(32));
+        __refvalue(objectReference, object) = replacement;
+        if (referenceValue != replacement)
+            Fail("typed reference object aliasing");
+
+        Coordinate coordinate = new Coordinate(RuntimeValue(3), RuntimeValue(4));
+        TypedReference structureReference = __makeref(coordinate);
+        Coordinate recovered = __refvalue(structureReference, Coordinate);
+        if (recovered.X != RuntimeValue(3) || recovered.Y != RuntimeValue(4) ||
+            __reftype(structureReference) != typeof(Coordinate))
+            Fail("typed reference struct load or type");
+        __refvalue(structureReference, Coordinate) = new Coordinate(RuntimeValue(5), RuntimeValue(6));
+        if (coordinate.X != RuntimeValue(5) || coordinate.Y != RuntimeValue(6))
+            Fail("typed reference struct aliasing");
+
+        int[] values = [RuntimeValue(7), RuntimeValue(8), RuntimeValue(9)];
+        TypedReference elementReference = __makeref(values[RuntimeValue(1)]);
+        if (__refvalue(elementReference, int) != RuntimeValue(8) ||
+            __reftype(elementReference) != typeof(int))
+            Fail("typed reference array element load or type");
+        __refvalue(elementReference, int) = RuntimeValue(10);
+        if (values[RuntimeValue(1)] != RuntimeValue(10))
+            Fail("typed reference array element aliasing");
+
+        TypedReference fieldReference = __makeref(coordinate.X);
+        __refvalue(fieldReference, int) = RuntimeValue(11);
+        if (coordinate.X != RuntimeValue(11) || __reftype(fieldReference) != typeof(int))
+            Fail("typed reference field aliasing or type");
+    }
+
+    private static void VerifyArglist()
+    {
+        ReadArglist(__arglist(RuntimeValue(1), RuntimeValue(2)));
+        ReadPrefixedArglist("fixed", __arglist(RuntimeValue(3), RuntimeValue(4)));
+    }
+
+    private static void ReadArglist(__arglist)
+    {
+        ArgIterator iterator = new ArgIterator(__arglist);
+        TypedReference first = iterator.GetNextArg();
+        TypedReference second = iterator.GetNextArg();
+        int firstValue = __refvalue(first, int);
+        int secondValue = __refvalue(second, int);
+        if (firstValue != RuntimeValue(1) || secondValue != RuntimeValue(2))
+            Fail("arglist values");
+    }
+
+    private static void ReadPrefixedArglist(string prefix, __arglist)
+    {
+        ArgIterator iterator = new ArgIterator(__arglist);
+        TypedReference first = iterator.GetNextArg();
+        TypedReference second = iterator.GetNextArg();
+        if (prefix.Length != RuntimeValue(5) ||
+            __refvalue(first, int) != RuntimeValue(3) ||
+            __refvalue(second, int) != RuntimeValue(4))
+            Fail("arglist with fixed parameter");
     }
 
     private static void VerifyEnums()
@@ -1548,6 +1685,8 @@ public static class LanguageFeatureValidation
         if (ReadObjectReference(ref objectReference) != replacement)
             Fail("indirect reference load");
 
+        VerifyObjectPointers();
+
         int* stackValues = stackalloc int[2];
         stackValues[0] = RuntimeValue(6);
         stackValues[1] = RuntimeValue(7);
@@ -1721,6 +1860,50 @@ public static class LanguageFeatureValidation
 
         if (nestedRethrown != expected)
             Fail("nested exception rethrow");
+
+        Exception inner = new Exception("inner exception");
+        Exception withInner = new Exception("outer exception", inner);
+        string exceptionText = withInner.ToString();
+        if (withInner.InnerException != inner ||
+            exceptionText.IndexOf("System.Exception: outer exception") != 0 ||
+            exceptionText.IndexOf("System.Exception: inner exception") < 0 ||
+            exceptionText.IndexOf("End of inner exception stack trace") < 0)
+            Fail("exception message, type, or inner exception diagnostics");
+
+        Exception nullThrown = null;
+        try
+        {
+            throw null;
+        }
+        catch (Exception exception)
+        {
+            nullThrown = exception;
+        }
+
+        if (nullThrown is not NullReferenceException ||
+            nullThrown.Message != "Object reference not set to an instance of an object.")
+            Fail("throw null");
+
+        Exception finallyThrown = new Exception("finally exception");
+        Exception finallyCaught = null;
+        try
+        {
+            try
+            {
+                throw new Exception("original exception");
+            }
+            finally
+            {
+                throw finallyThrown;
+            }
+        }
+        catch (Exception exception)
+        {
+            finallyCaught = exception;
+        }
+
+        if (finallyCaught != finallyThrown)
+            Fail("finally exception replacement");
 
         int nestedFinallyState = 0;
         if (ReturnThroughNestedFinally(ref nestedFinallyState) != RuntimeValue(7) ||
@@ -1961,6 +2144,130 @@ public static class LanguageFeatureValidation
     private static unsafe int ReadPointer(int* pointer) => *pointer;
 
     private static unsafe int* ReturnPointer(int* pointer) => pointer;
+
+    private static unsafe void VerifyObjectPointers()
+    {
+        object original = new FeatureObject(RuntimeValue(31));
+        object replacement = new FeatureObject(RuntimeValue(32));
+        object third = new FeatureObject(RuntimeValue(33));
+
+        System.Object* slot = &original;
+        if (*slot != original)
+            Fail("object pointer load");
+
+        WriteObjectPointer(slot, replacement);
+        if (original != replacement || ReadObjectPointer(slot) != replacement)
+            Fail("object pointer store or parameter");
+
+        System.Object* returned = ReturnObjectPointer(slot);
+        if (returned != slot || *returned != replacement)
+            Fail("object pointer return or equality");
+
+        System.Object* nullPointer = null;
+        if (nullPointer != null)
+            Fail("object pointer null comparison");
+
+        System.Object** pointerPointer = &slot;
+        if (*pointerPointer != slot || **pointerPointer != replacement)
+            Fail("object pointer to pointer");
+
+        System.Object*** pointer3 = &pointerPointer;
+        System.Object**** pointer4 = &pointer3;
+        System.Object***** pointer5 = &pointer4;
+        System.Object****** pointer6 = &pointer5;
+        System.Object******* pointer7 = &pointer6;
+        System.Object******** pointer8 = &pointer7;
+        if (********pointer8 != replacement)
+            Fail("object eight-level pointer dereference");
+
+        void* erased = slot;
+        System.Object* restored = (System.Object*)erased;
+        nint signedAddress = (nint)slot;
+        nuint unsignedAddress = (nuint)slot;
+        if (restored != slot || *restored != replacement ||
+            (System.Object*)signedAddress != slot || (System.Object*)unsignedAddress != slot)
+            Fail("object pointer address conversions");
+
+        System.Object* alias = slot;
+        System.Object* thirdSlot = &third;
+        ReplaceObjectPointer(ref alias, thirdSlot);
+        if (alias != thirdSlot || *alias != third)
+            Fail("object pointer ref parameter");
+
+        object[] values = new object[] { original, replacement, third };
+        fixed (System.Object* first = values)
+        {
+            System.Object* second = first + 1;
+            if (*first != original || second[0] != replacement || *(second + 1) != third ||
+                second - first != 1 || first >= second || second <= first)
+                Fail("object pointer indexing, arithmetic, or ordering");
+            second[0] = third;
+            if (values[1] != third)
+                Fail("object pointer array element store");
+        }
+
+        System.Array arrayReference = values;
+        object erasedArrayReference = values;
+        if (erasedArrayReference is not System.Array || (System.Array)erasedArrayReference != arrayReference)
+            Fail("object to array type compatibility");
+        IFeatureValue[] interfaceValues = new IFeatureValue[] { new FeatureObject(RuntimeValue(34)) };
+        object erasedInterfaceArray = interfaceValues;
+        if (erasedInterfaceArray is not System.Array ||
+            ((System.Array)erasedInterfaceArray).Length != RuntimeValue(1))
+            Fail("interface element array type compatibility");
+        System.Array* arraySlot = &arrayReference;
+        System.Array replacementArray = new object[] { third, replacement };
+        if (*arraySlot != arrayReference || arraySlot->Length != RuntimeValue(3))
+            Fail("array reference pointer load");
+        *arraySlot = replacementArray;
+        if (arrayReference != replacementArray || arraySlot->Length != RuntimeValue(2))
+            Fail("array reference pointer store");
+
+        delegate* managed<System.Object*, object> read = &ReadObjectPointer;
+        delegate* managed<System.Object*, object, void> write = &WriteObjectPointer;
+        delegate* managed<System.Object*, System.Object*> returnPointer = &ReturnObjectPointer;
+        delegate* unmanaged<System.Object*, System.Object*, System.Object*> select = &SelectObjectPointerUnmanaged;
+        void* functionAddress = (void*)read;
+        delegate* managed<System.Object*, object> restoredRead =
+            (delegate* managed<System.Object*, object>)functionAddress;
+        write(slot, original);
+        if (read(slot) != original || restoredRead(slot) != original || returnPointer(slot) != slot ||
+            select(slot, thirdSlot) != slot || select(slot, null) != null)
+            Fail("object pointer managed or unmanaged function pointers");
+
+        s_objectPointerValue = original;
+        fixed (System.Object* staticSlot = &s_objectPointerValue)
+        {
+            if (*staticSlot != original)
+                Fail("static object field pointer load");
+            *staticSlot = replacement;
+            if (s_objectPointerValue != replacement)
+                Fail("static object field pointer store");
+        }
+
+        ObjectPointerHolder holder = new ObjectPointerHolder(original);
+        fixed (System.Object* field = &holder.Value)
+        {
+            if (*field != original)
+                Fail("object field pointer load");
+            *field = replacement;
+            if (holder.Value != replacement)
+                Fail("object field pointer store");
+        }
+    }
+
+    private static unsafe void WriteObjectPointer(System.Object* pointer, object value) => *pointer = value;
+
+    private static unsafe object ReadObjectPointer(System.Object* pointer) => *pointer;
+
+    private static unsafe System.Object* ReturnObjectPointer(System.Object* pointer) => pointer;
+
+    private static unsafe void ReplaceObjectPointer(ref System.Object* pointer, System.Object* replacement)
+        => pointer = replacement;
+
+    [UnmanagedCallersOnly]
+    private static unsafe System.Object* SelectObjectPointerUnmanaged(
+        System.Object* source, System.Object* destination) => destination == null ? null : source;
 
     private static unsafe int SumPointerValues(int* values, int length)
     {

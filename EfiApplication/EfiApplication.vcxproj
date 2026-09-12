@@ -71,7 +71,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <ItemGroup Condition="'$(Platform)'=='x64'">
-    <ClCompile Include="Runtime.c" />
+    <ClCompile Include="EfiApplication.c" />
   </ItemGroup>
   <ItemGroup Condition="'$(Platform)'=='x64'">
     <Link Include="$(SolutionDir)ConsoleApp1\obj\$(Configuration)\ConsoleApp1.obj" />
