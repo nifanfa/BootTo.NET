@@ -11,5 +11,12 @@ namespace System
         }
 
         public static implicit operator T[](ReadOnlySpan<T> span) => span.ToArray();
+        public static unsafe implicit operator void*(ReadOnlySpan<T> span)
+        {
+            fixed(T* ptr = &span.GetPinnableReference())
+            {
+                return ptr;
+            }
+        }
     }
 }
