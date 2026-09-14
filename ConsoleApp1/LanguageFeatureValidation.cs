@@ -1323,6 +1323,14 @@ public static class LanguageFeatureValidation
         if (original.Sum() != RuntimeValue(7) || changed.Sum() != RuntimeValue(16))
             Fail("struct value parameter copy");
 
+        NestedValue returned = ReturnNestedValue(value);
+        if (returned.Coordinate.X != RuntimeValue(21) ||
+            returned.Coordinate.Y != RuntimeValue(2) ||
+            returned.Wide != RuntimeValue(34) ||
+            returned.Total != RuntimeValue(65) ||
+            value.Coordinate.X != RuntimeValue(1) || value.Wide != RuntimeValue(4))
+            Fail("struct return value copy");
+
     }
 
     private static void CreateNestedValue(out NestedValue value)
@@ -2172,6 +2180,13 @@ public static class LanguageFeatureValidation
     private static Coordinate ChangeCoordinate(Coordinate value)
     {
         value.X += RuntimeValue(9);
+        return value;
+    }
+
+    private static NestedValue ReturnNestedValue(NestedValue value)
+    {
+        value.Coordinate.X += RuntimeValue(20);
+        value.Wide += RuntimeValue(30);
         return value;
     }
 
