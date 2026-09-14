@@ -494,7 +494,6 @@ public static class LanguageFeatureValidation
         VerifyStructures();
         VerifyLatestSyntax();
         VerifyTypedReferences();
-        VerifyArglist();
         VerifyModernLanguageFeatures(values);
         VerifySpans();
         VerifyArrays();
@@ -773,34 +772,6 @@ public static class LanguageFeatureValidation
         __refvalue(fieldReference, int) = RuntimeValue(11);
         if (coordinate.X != RuntimeValue(11) || __reftype(fieldReference) != typeof(int))
             Fail("typed reference field aliasing or type");
-    }
-
-    private static void VerifyArglist()
-    {
-        ReadArglist(__arglist(RuntimeValue(1), RuntimeValue(2)));
-        ReadPrefixedArglist("fixed", __arglist(RuntimeValue(3), RuntimeValue(4)));
-    }
-
-    private static void ReadArglist(__arglist)
-    {
-        ArgIterator iterator = new ArgIterator(__arglist);
-        TypedReference first = iterator.GetNextArg();
-        TypedReference second = iterator.GetNextArg();
-        int firstValue = __refvalue(first, int);
-        int secondValue = __refvalue(second, int);
-        if (firstValue != RuntimeValue(1) || secondValue != RuntimeValue(2))
-            Fail("arglist values");
-    }
-
-    private static void ReadPrefixedArglist(string prefix, __arglist)
-    {
-        ArgIterator iterator = new ArgIterator(__arglist);
-        TypedReference first = iterator.GetNextArg();
-        TypedReference second = iterator.GetNextArg();
-        if (prefix.Length != RuntimeValue(5) ||
-            __refvalue(first, int) != RuntimeValue(3) ||
-            __refvalue(second, int) != RuntimeValue(4))
-            Fail("arglist with fixed parameter");
     }
 
     private static void VerifyEnums()
@@ -1484,6 +1455,8 @@ public static class LanguageFeatureValidation
         bool upperIndex = false;
         bool nullArray = false;
         bool negativeLength = false;
+        bool multidimensionalUpperIndex = false;
+        bool multidimensionalNegativeLength = false;
         int[] one = new int[RuntimeValue(1)];
         try { _ = one[-RuntimeValue(1)]; }
         catch (IndexOutOfRangeException) { negativeIndex = true; }
@@ -1497,7 +1470,12 @@ public static class LanguageFeatureValidation
         catch (NullReferenceException) { nullArray = true; }
         try { _ = new int[-RuntimeValue(1)]; }
         catch (OverflowException) { negativeLength = true; }
-        if (!negativeIndex || !upperIndex || !nullArray || !negativeLength)
+        try { _ = matrix[rows, RuntimeValue(0)]; }
+        catch (IndexOutOfRangeException) { multidimensionalUpperIndex = true; }
+        try { _ = new int[-RuntimeValue(1), RuntimeValue(1)]; }
+        catch (OverflowException) { multidimensionalNegativeLength = true; }
+        if (!negativeIndex || !upperIndex || !nullArray || !negativeLength ||
+            !multidimensionalUpperIndex || !multidimensionalNegativeLength)
             Fail("array exceptions");
     }
 

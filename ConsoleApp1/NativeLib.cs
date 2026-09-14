@@ -72,6 +72,9 @@ internal unsafe class NativeLib
         }
     }
 
+    [DllImport("*", EntryPoint = "printf_")]
+    public static extern int printf(void* format, __arglist);
+
     static char lastCharacter;
 
     [RuntimeExport("_putchar")]

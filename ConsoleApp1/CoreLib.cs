@@ -1047,22 +1047,22 @@ namespace System
         internal ulong[] EnumValues;
         internal bool IsFlagsEnum;
         internal bool IsSignedEnum;
-
-        internal Type(string name, string @namespace, string fullName)
-        {
-            Name = name;
-            Namespace = @namespace;
-            FullName = fullName;
-        }
+        internal void* Factory;
 
         public static Type GetTypeFromHandle(RuntimeTypeHandle handle) => handle.Type;
         public static bool operator ==(Type left, Type right) => ReferenceEquals(left, right);
         public static bool operator !=(Type left, Type right) => !ReferenceEquals(left, right);
     }
 
-    public static class Activator
+    public static unsafe class Activator
     {
-        public static T CreateInstance<T>() => default;
+        public static T CreateInstance<T>()
+        {
+            delegate*<T> factory = (delegate*<T>)typeof(T).Factory;
+            if (factory == null)
+                throw new InvalidOperationException("The type cannot be created.");
+            return factory();
+        }
     }
 
     public struct RuntimeTypeHandle
@@ -1076,23 +1076,10 @@ namespace System
         internal void* Value;
     }
 
-    public unsafe struct ArgIterator
-    {
-        private void* _handle;
-        public ArgIterator(RuntimeArgumentHandle handle)
-        {
-            _handle = handle.Value;
-        }
-        public int GetRemainingCount() => throw new NotSupportedException(
-            "A native variable argument list does not expose its remaining argument count.");
-        public TypedReference GetNextArg() => default;
-    }
-
     public unsafe struct TypedReference
     {
         internal void* Value;
         internal RuntimeTypeHandle Type;
-        internal int Kind;
     }
 
     public unsafe struct RuntimeFieldHandle
@@ -1603,6 +1590,23 @@ namespace System.Runtime
             }
         }
 
+    }
+
+    internal static unsafe class MemoryRuntime
+    {
+        [NoGCFrame]
+        public static void Copy(byte* destination, byte* source, nuint length)
+        {
+            for (nuint index = 0; index < length; index++)
+                destination[index] = source[index];
+        }
+
+        [NoGCFrame]
+        public static void Fill(byte* destination, byte value, nuint length)
+        {
+            for (nuint index = 0; index < length; index++)
+                destination[index] = value;
+        }
     }
 
     internal struct StackPointer { }

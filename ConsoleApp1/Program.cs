@@ -20,7 +20,8 @@ Console.WriteLine($"Hello world, Time: {DateTime.Now}");
 unsafe
 {
     byte[] time = Encoding.UTF8.GetBytes(DateTime.Now.ToString());
-    vprintf("Hello world from printf, Time:%s\n"u8, time);
+    vprintf("Hello world from vprintf, Time:%s\n"u8, time);
+    printf("Hello world from printf, Time:%s\n"u8, __arglist((ByReference<byte>)time));
 }
 
 LanguageFeatureValidation.Run();
