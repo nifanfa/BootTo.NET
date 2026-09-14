@@ -494,6 +494,7 @@ public static class LanguageFeatureValidation
         VerifyStructures();
         VerifyLatestSyntax();
         VerifyTypedReferences();
+        VerifyArglist();
         VerifyModernLanguageFeatures(values);
         VerifySpans();
         VerifyArrays();
@@ -772,6 +773,63 @@ public static class LanguageFeatureValidation
         __refvalue(fieldReference, int) = RuntimeValue(11);
         if (coordinate.X != RuntimeValue(11) || __reftype(fieldReference) != typeof(int))
             Fail("typed reference field aliasing or type");
+    }
+
+    private static void VerifyArglist()
+    {
+        ReadArglist(__arglist(RuntimeValue(1), RuntimeValue(2)));
+        ReadPrefixedArglist("fixed", __arglist(RuntimeValue(3), RuntimeValue(4)));
+        unsafe
+        {
+            ReadMixedArglist(__arglist(RuntimeValue(5), 6.5,
+                new IntPtr((void*)RuntimeValue(7)), RuntimeValue(8)));
+        }
+    }
+
+    private static void ReadArglist(__arglist)
+    {
+        ArgIterator iterator = new ArgIterator(__arglist);
+        if (iterator.GetRemainingCount() != RuntimeValue(2) ||
+            Type.GetTypeFromHandle(iterator.GetNextArgType()) != typeof(int))
+            Fail("arglist type and count");
+        TypedReference first = iterator.GetNextArg();
+        TypedReference second = iterator.GetNextArg();
+        int firstValue = __refvalue(first, int);
+        int secondValue = __refvalue(second, int);
+        if (firstValue != RuntimeValue(1) || secondValue != RuntimeValue(2))
+            Fail("arglist values");
+    }
+
+    private static void ReadPrefixedArglist(string prefix, __arglist)
+    {
+        ArgIterator iterator = new ArgIterator(__arglist);
+        TypedReference first = iterator.GetNextArg();
+        TypedReference second = iterator.GetNextArg();
+        if (prefix.Length != RuntimeValue(5) ||
+            __refvalue(first, int) != RuntimeValue(3) ||
+            __refvalue(second, int) != RuntimeValue(4) ||
+            iterator.GetRemainingCount() != 0)
+            Fail("arglist with fixed parameter");
+    }
+
+    private static void ReadMixedArglist(__arglist)
+    {
+        ArgIterator iterator = new ArgIterator(__arglist);
+        if (iterator.GetRemainingCount() != RuntimeValue(4) ||
+            Type.GetTypeFromHandle(iterator.GetNextArgType()) != typeof(int))
+            Fail("mixed arglist initial type and count");
+        int integer = __refvalue(iterator.GetNextArg(), int);
+        if (Type.GetTypeFromHandle(iterator.GetNextArgType()) != typeof(double))
+            Fail("mixed arglist double type");
+        double real = __refvalue(iterator.GetNextArg(), double);
+        if (Type.GetTypeFromHandle(iterator.GetNextArgType()) != typeof(IntPtr))
+            Fail("mixed arglist pointer type");
+        IntPtr pointer = __refvalue(iterator.GetNextArg(), IntPtr);
+        int trailingInteger = __refvalue(iterator.GetNextArg(), int);
+        if (integer != RuntimeValue(5) || real != 6.5 ||
+            (long)pointer != RuntimeValue(7) || trailingInteger != RuntimeValue(8) ||
+            iterator.GetRemainingCount() != 0)
+            Fail("mixed arglist values");
     }
 
     private static void VerifyEnums()

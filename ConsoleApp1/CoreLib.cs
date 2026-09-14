@@ -1071,9 +1071,49 @@ namespace System
     }
 
     public struct RuntimeMethodHandle { }
-    public unsafe struct RuntimeArgumentHandle
+    internal unsafe struct VariableArgument
     {
         internal void* Value;
+        internal RuntimeTypeHandle Type;
+    }
+
+    public unsafe struct RuntimeArgumentHandle
+    {
+        internal VariableArgument* Arguments;
+        internal int Count;
+    }
+
+    public unsafe struct ArgIterator
+    {
+        private VariableArgument* _current;
+        private int _remaining;
+
+        public ArgIterator(RuntimeArgumentHandle handle)
+        {
+            _current = handle.Arguments;
+            _remaining = handle.Count;
+        }
+
+        public int GetRemainingCount() => _remaining;
+
+        public RuntimeTypeHandle GetNextArgType()
+        {
+            if (_remaining == 0)
+                throw new InvalidOperationException("The argument list is empty.");
+            return _current->Type;
+        }
+
+        public TypedReference GetNextArg()
+        {
+            if (_remaining == 0)
+                throw new InvalidOperationException("The argument list is empty.");
+            TypedReference result = default;
+            result.Value = _current->Value;
+            result.Type = _current->Type;
+            _current++;
+            _remaining--;
+            return result;
+        }
     }
 
     public unsafe struct TypedReference
