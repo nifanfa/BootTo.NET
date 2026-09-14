@@ -1278,8 +1278,6 @@ namespace System.Runtime
         public RuntimeExportAttribute(string entry) { }
     }
 
-    [AttributeUsage(AttributeTargets.Method)]
-    public sealed class NoGCFrameAttribute : Attribute { }
 }
 
 namespace System.Runtime.CompilerServices
@@ -1505,7 +1503,6 @@ namespace System.Runtime
             return (Object*)((byte*)allocation + sizeof(GCAllocation));
         }
 
-        [NoGCFrame]
         public static void Push(GCFrame* frame, GCRoot* roots, int rootCount)
         {
             frame->Previous = s_frames;
@@ -1514,16 +1511,13 @@ namespace System.Runtime
             s_frames = frame;
         }
 
-        [NoGCFrame]
         public static void Pop(GCFrame* frame)
         {
             s_frames = frame->Previous;
         }
 
-        [NoGCFrame]
         public static GCFrame* GetTopFrame() => s_frames;
 
-        [NoGCFrame]
         public static void UnwindTo(GCFrame* frame) => s_frames = frame;
 
         public static int Collect()
@@ -1634,14 +1628,12 @@ namespace System.Runtime
 
     internal static unsafe class MemoryRuntime
     {
-        [NoGCFrame]
         public static void Copy(byte* destination, byte* source, nuint length)
         {
             for (nuint index = 0; index < length; index++)
                 destination[index] = source[index];
         }
 
-        [NoGCFrame]
         public static void Fill(byte* destination, byte value, nuint length)
         {
             for (nuint index = 0; index < length; index++)
@@ -1667,7 +1659,6 @@ namespace System.Runtime
         private static ExceptionFrame* _top;
         private static Exception _current;
 
-        [NoGCFrame]
         public static void Push(ExceptionFrame* frame, JumpBuffer* buffer)
         {
             frame->Previous = _top;
@@ -1676,7 +1667,6 @@ namespace System.Runtime
             _top = frame;
         }
 
-        [NoGCFrame]
         public static void Pop(ExceptionFrame* frame)
         {
             if (_top == frame)
@@ -1685,7 +1675,6 @@ namespace System.Runtime
 
         public static JumpBuffer* GetBuffer(ExceptionFrame* frame) => frame->Buffer;
 
-        [NoGCFrame]
         public static ExceptionFrame* GetTop() => _top;
 
         public static Exception GetCurrent() => _current;
