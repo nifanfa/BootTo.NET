@@ -22,6 +22,7 @@
     <IL2LLVMObject>$(ProjectDir)obj\$(Configuration)\$(TargetName).obj</IL2LLVMObject>
     <EfiApplicationProject>$(MSBuildThisFileDirectory)EfiApplication\EfiApplication.vcxproj</EfiApplicationProject>
     <DisableFastUpToDateCheck Condition="'$(BuildingInsideVisualStudio)' == 'true'">true</DisableFastUpToDateCheck>
+    <Nullable>disable</Nullable>
   </PropertyGroup>
 
   <!--CustomizeReferences-->

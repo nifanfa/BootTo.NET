@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace System
 {
@@ -142,6 +143,8 @@ namespace System
         public static unsafe explicit operator long(IntPtr value) => unchecked((long)value._value);
         public static unsafe bool operator ==(IntPtr value1, IntPtr value2) => value1._value == value2._value;
         public static unsafe bool operator !=(IntPtr value1, IntPtr value2) => value1._value != value2._value;
+        public override bool Equals(object other) => other is IntPtr value && this == value;
+        public override unsafe int GetHashCode() => unchecked((int)(long)_value);
     }
     public struct UIntPtr
     {
@@ -377,9 +380,9 @@ namespace System
         }
     }
 
-    public ref struct ByReference<T>
+    public readonly ref struct ByReference<T>
     {
-        private ref T _value;
+        private readonly ref T _value;
 
         internal ByReference(ref T value)
         {
@@ -432,7 +435,7 @@ namespace System
         public Span(T[] array)
             : this(array, 0, array == null ? 0 : array.Length) { }
 
-        public unsafe Span(T[] array, int start, int length)
+        public Span(T[] array, int start, int length)
         {
             if (array == null)
             {
@@ -444,7 +447,7 @@ namespace System
             }
             if (start < 0 || length < 0 || start > array.Length - length)
                 throw new ArgumentException("The span range is invalid.");
-            _pointer = length == 0 ? default : new ByReference<T>((void*)(array.m_pData + (nint)start * sizeof(T)));
+            _pointer = length == 0 ? default : new ByReference<T>(ref array[start]);
             _length = length;
         }
 
@@ -499,7 +502,7 @@ namespace System
         public ReadOnlySpan(T[] array)
             : this(array, 0, array == null ? 0 : array.Length) { }
 
-        public unsafe ReadOnlySpan(T[] array, int start, int length)
+        public ReadOnlySpan(T[] array, int start, int length)
         {
             if (array == null)
             {
@@ -511,7 +514,7 @@ namespace System
             }
             if (start < 0 || length < 0 || start > array.Length - length)
                 throw new ArgumentException("The span range is invalid.");
-            _pointer = length == 0 ? default : new ByReference<T>((void*)(array.m_pData + (nint)start * sizeof(T)));
+            _pointer = length == 0 ? default : new ByReference<T>(ref array[start]);
             _length = length;
         }
 
@@ -654,7 +657,7 @@ namespace System
             if (args == null)
                 throw new ArgumentNullException("The format arguments cannot be null.");
 
-            Text.StringBuilder result = new Text.StringBuilder(format.Length + 16);
+            StringBuilder result = new StringBuilder(format.Length + 16);
             int index = 0;
             while (index < format.Length)
             {
@@ -738,7 +741,7 @@ namespace System
                 int width = ParseWidth(specifier);
                 string text = value.ToString();
                 int sign = text.Length > 0 && text[0] == '-' ? 1 : 0;
-                Text.StringBuilder padded = new Text.StringBuilder(text.Length > width + sign ? text.Length : width + sign);
+                StringBuilder padded = new StringBuilder(text.Length > width + sign ? text.Length : width + sign);
                 if (sign != 0)
                     padded.Append('-');
                 for (int index = text.Length - sign; index < width; index++)
@@ -1112,6 +1115,8 @@ namespace System
         public static Type GetTypeFromHandle(RuntimeTypeHandle handle) => handle.Type;
         public static bool operator ==(Type left, Type right) => ReferenceEquals(left, right);
         public static bool operator !=(Type left, Type right) => !ReferenceEquals(left, right);
+        public override bool Equals(object other) => ReferenceEquals(this, other);
+        public override int GetHashCode() => RuntimeTypeId;
     }
 
     public static unsafe class Activator
@@ -1137,15 +1142,15 @@ namespace System
         internal RuntimeTypeHandle Type;
     }
 
-    public unsafe struct RuntimeArgumentHandle
+    public ref struct RuntimeArgumentHandle
     {
-        internal VariableArgument* Arguments;
+        internal ByReference<VariableArgument> Arguments;
         internal int Count;
     }
 
-    public unsafe struct ArgIterator
+    public unsafe ref struct ArgIterator
     {
-        private VariableArgument* _current;
+        private ByReference<VariableArgument> _current;
         private int _remaining;
 
         public ArgIterator(RuntimeArgumentHandle handle)
@@ -1160,7 +1165,7 @@ namespace System
         {
             if (_remaining == 0)
                 throw new InvalidOperationException("The argument list is empty.");
-            return _current->Type;
+            return _current.Value.Type;
         }
 
         public TypedReference GetNextArg()
@@ -1168,9 +1173,9 @@ namespace System
             if (_remaining == 0)
                 throw new InvalidOperationException("The argument list is empty.");
             TypedReference result = default;
-            result.Value = _current->Value;
-            result.Type = _current->Type;
-            _current++;
+            result.Value = _current.Value.Value;
+            result.Type = _current.Value.Type;
+            _current = new ByReference<VariableArgument>(ref _current.ElementAt(1));
             _remaining--;
             return result;
         }
@@ -1520,7 +1525,7 @@ namespace System.Runtime
         public int Marked;
     }
 
-    internal struct GCObjectHeader
+    internal unsafe struct GCObjectHeader
     {
         public Type Type;
     }
@@ -1857,7 +1862,7 @@ namespace System.Collections.Generic
 
     public interface ISet<T> : ICollection<T>
     {
-        bool Add(T item);
+        new bool Add(T item);
         void ExceptWith(IEnumerable<T> other);
         void IntersectWith(IEnumerable<T> other);
         bool IsProperSubsetOf(IEnumerable<T> other);
@@ -2981,8 +2986,8 @@ namespace System.Threading.Tasks
         public new ConfiguredTaskAwaitable<TResult> ConfigureAwait(bool continueOnCapturedContext)
             => new ConfiguredTaskAwaitable<TResult>(this);
         public TResult Result => GetResult();
-        public void SetResult(TResult result) { _result = result; base.SetResult(); }
-        internal bool TrySetResult(TResult result) { _result = result; return base.TrySetResult(); }
+        public void SetResult(TResult result) { _result = result; SetResult(); }
+        internal bool TrySetResult(TResult result) { _result = result; return TrySetResult(); }
         public new TResult GetResult() { base.GetResult(); return _result; }
         public static Task<TResult> FromResult(TResult result)
         {
