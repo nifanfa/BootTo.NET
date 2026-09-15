@@ -386,7 +386,21 @@ namespace System
             _value = ref value;
         }
 
+        internal unsafe ByReference(void* pointer)
+        {
+            _value = ref *(T*)pointer;
+        }
+
         public ref T Value => ref _value;
+
+        public ref T ElementAt(int index)
+        {
+            unsafe
+            {
+                fixed (T* value = &_value)
+                    return ref value[index];
+            }
+        }
 
         public static implicit operator ByReference<T>(T[] array)
         {
@@ -406,35 +420,47 @@ namespace System
         {
             if (span.Length == 0)
                 return default;
-            return new ByReference<T>(ref span[0]);
+            return span._pointer;
         }
     }
 
     public ref struct Span<T>
     {
-        private T[] _array;
-        private int _start;
+        private ByReference<T> _pointer;
         private int _length;
 
         public Span(T[] array)
             : this(array, 0, array == null ? 0 : array.Length) { }
 
-        public Span(T[] array, int start, int length)
+        public unsafe Span(T[] array, int start, int length)
         {
             if (array == null)
-                throw new ArgumentNullException("The array cannot be null.");
+            {
+                if (start != 0 || length != 0)
+                    throw new ArgumentException("The span range is invalid.");
+                _pointer = default;
+                _length = 0;
+                return;
+            }
             if (start < 0 || length < 0 || start > array.Length - length)
                 throw new ArgumentException("The span range is invalid.");
-            _array = array;
-            _start = start;
+            _pointer = length == 0 ? default : new ByReference<T>((void*)(array.m_pData + (nint)start * sizeof(T)));
             _length = length;
         }
 
         public unsafe Span(void* pointer, int length)
         {
-            _array = new T[length];
-            _array.m_pData = (byte*)pointer;
-            _start = 0;
+            if (length < 0)
+                throw new ArgumentException("The span length is invalid.");
+            _pointer = length == 0 ? default : new ByReference<T>(pointer);
+            _length = length;
+        }
+
+        internal Span(ref T reference, int length)
+        {
+            if (length < 0)
+                throw new ArgumentException("The span length is invalid.");
+            _pointer = length == 0 ? default : new ByReference<T>(ref reference);
             _length = length;
         }
 
@@ -447,58 +473,87 @@ namespace System
             {
                 if ((uint)index >= (uint)_length)
                     throw new IndexOutOfRangeException("The span index is outside the span.");
-                return ref _array[_start + index];
+                return ref _pointer.ElementAt(index);
             }
         }
 
         public Span<T> Slice(int start) => Slice(start, _length - start);
 
-        public Span<T> Slice(int start, int length) => new Span<T>(_array, _start + start, length);
+        public Span<T> Slice(int start, int length)
+        {
+            if (start < 0 || length < 0 || start > _length - length)
+                throw new ArgumentException("The span range is invalid.");
+            return length == 0 ? default : new Span<T>(ref _pointer.ElementAt(start), length);
+        }
 
         public static implicit operator Span<T>(T[] array) => new Span<T>(array);
         public static implicit operator ReadOnlySpan<T>(Span<T> span)
-            => new ReadOnlySpan<T>(span._array, span._start, span._length);
+            => new ReadOnlySpan<T>(ref span._pointer.Value, span._length);
     }
 
     public readonly ref partial struct ReadOnlySpan<T>
     {
-        private readonly T[] _array;
-        private readonly int _start;
+        internal readonly ByReference<T> _pointer;
         private readonly int _length;
 
         public ReadOnlySpan(T[] array)
             : this(array, 0, array == null ? 0 : array.Length) { }
 
-        public ReadOnlySpan(T[] array, int start, int length)
+        public unsafe ReadOnlySpan(T[] array, int start, int length)
         {
             if (array == null)
-                throw new ArgumentNullException("The array cannot be null.");
+            {
+                if (start != 0 || length != 0)
+                    throw new ArgumentException("The span range is invalid.");
+                _pointer = default;
+                _length = 0;
+                return;
+            }
             if (start < 0 || length < 0 || start > array.Length - length)
                 throw new ArgumentException("The span range is invalid.");
-            _array = array;
-            _start = start;
+            _pointer = length == 0 ? default : new ByReference<T>((void*)(array.m_pData + (nint)start * sizeof(T)));
+            _length = length;
+        }
+
+        internal ReadOnlySpan(ref T reference, int length)
+        {
+            if (length < 0)
+                throw new ArgumentException("The span length is invalid.");
+            _pointer = length == 0 ? default : new ByReference<T>(ref reference);
+            _length = length;
+        }
+
+        public unsafe ReadOnlySpan(void* pointer, int length)
+        {
+            if (length < 0)
+                throw new ArgumentException("The span length is invalid.");
+            _pointer = length == 0 ? default : new ByReference<T>(pointer);
             _length = length;
         }
 
         public int Length => _length;
         public bool IsEmpty => _length == 0;
 
-        public ref T this[int index]
+        public ref readonly T this[int index]
         {
             get
             {
                 if ((uint)index >= (uint)_length)
                     throw new IndexOutOfRangeException("The span index is outside the span.");
-                return ref _array[_start + index];
+                return ref _pointer.ElementAt(index);
             }
         }
 
         public ReadOnlySpan<T> Slice(int start) => Slice(start, _length - start);
 
         public ReadOnlySpan<T> Slice(int start, int length)
-            => new ReadOnlySpan<T>(_array, _start + start, length);
+        {
+            if (start < 0 || length < 0 || start > _length - length)
+                throw new ArgumentException("The span range is invalid.");
+            return length == 0 ? default : new ReadOnlySpan<T>(ref _pointer.ElementAt(start), length);
+        }
 
-        public ref T GetPinnableReference() => ref _array[_start];
+        public ref readonly T GetPinnableReference() => ref _pointer.Value;
 
         public static implicit operator ReadOnlySpan<T>(T[] array) => new ReadOnlySpan<T>(array);
     }
@@ -928,13 +983,18 @@ namespace System
         public InvalidProgramException(string message) : base(message) { }
     }
 
-    public class OverflowException : Exception
+    public class ArithmeticException : Exception
+    {
+        public ArithmeticException() : base("Overflow or underflow in the arithmetic operation.") { }
+        public ArithmeticException(string message) : base(message) { }
+    }
+    public class OverflowException : ArithmeticException
     {
         public OverflowException() : base("Arithmetic operation resulted in an overflow.") { }
         public OverflowException(string message) : base(message) { }
     }
 
-    public class DivideByZeroException : Exception
+    public class DivideByZeroException : ArithmeticException
     {
         public DivideByZeroException() : base("Attempted to divide by zero.") { }
         public DivideByZeroException(string message) : base(message) { }
@@ -1336,9 +1396,7 @@ namespace System.Runtime.CompilerServices
 
         public static ReadOnlySpan<T> CreateSpan<T>(RuntimeFieldHandle fieldHandle)
         {
-            T[] values = new T[fieldHandle.Length + 1];
-            InitializeArray(values, fieldHandle);
-            return new ReadOnlySpan<T>(values, 0, fieldHandle.Length);
+            return new ReadOnlySpan<T>(fieldHandle.Data, fieldHandle.Length / sizeof(T));
         }
     }
 

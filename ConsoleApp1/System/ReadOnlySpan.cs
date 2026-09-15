@@ -6,7 +6,7 @@ namespace System
         {
             T[] result = new T[_length];
             for (int index = 0; index < _length; index++)
-                result[index] = _array[_start + index];
+                result[index] = this[index];
             return result;
         }
 

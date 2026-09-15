@@ -16,6 +16,7 @@ public static class LanguageFeatureValidation
     private static volatile int s_expectedSum;
     private static volatile int s_runtimeBias = 1;
     private static int s_instructionStatic;
+    private static Coordinate s_coordinateCopySource;
     private static object s_objectPointerValue = new object();
     private static readonly bool s_boolean = true;
     private static readonly char s_character = 'L';
@@ -205,6 +206,12 @@ public static class LanguageFeatureValidation
         {
             Value = value;
         }
+    }
+
+    private sealed class ValueCopyHolder
+    {
+        public Coordinate Coordinate;
+        public NestedValue Nested;
     }
 
     private sealed class HiddenFeature : FeatureBase
@@ -1087,6 +1094,55 @@ public static class LanguageFeatureValidation
             !unsignedAddOverflow || !unsignedSubtractOverflow || !unsignedMultiplyOverflow)
             Fail("checked arithmetic overflow");
 
+        bool negativeToUnsignedOverflow = false;
+        bool unsignedToSignedOverflow = false;
+        bool narrowSignedOverflow = false;
+        bool narrowUnsignedOverflow = false;
+        try { _ = checked((uint)RuntimeValue(-1)); }
+        catch (OverflowException) { negativeToUnsignedOverflow = true; }
+        try { _ = checked((int)(ulong)(uint.MaxValue + (ulong)RuntimeValue(0))); }
+        catch (OverflowException) { unsignedToSignedOverflow = true; }
+        try { _ = checked((sbyte)(uint)(RuntimeValue(128))); }
+        catch (OverflowException) { narrowSignedOverflow = true; }
+        try { _ = checked((byte)RuntimeValue(256)); }
+        catch (OverflowException) { narrowUnsignedOverflow = true; }
+        if (!negativeToUnsignedOverflow || !unsignedToSignedOverflow ||
+            !narrowSignedOverflow || !narrowUnsignedOverflow)
+            Fail("checked conversion overflow");
+
+        float singleInt32Minimum = (float)(-2147483648.0 + ZeroForConversion());
+        float singleInt64Minimum = (float)(-9223372036854775808.0 + ZeroForConversion());
+        double doubleInt64Minimum = -9223372036854775808.0 + ZeroForConversion();
+        double negativeFraction = -0.5 + ZeroForConversion();
+        double positiveFraction = 127.75 + ZeroForConversion();
+        if (checked((int)singleInt32Minimum) != int.MinValue ||
+            checked((long)singleInt64Minimum) != long.MinValue ||
+            checked((long)doubleInt64Minimum) != long.MinValue ||
+            checked((uint)negativeFraction) != 0 ||
+            checked((sbyte)positiveFraction) != 127)
+            Fail("checked floating conversion boundaries");
+
+        double conversionZero = ZeroForConversion();
+        bool floatingNaNOverflow = false;
+        bool floatingPositiveInfinityOverflow = false;
+        bool floatingNegativeInfinityOverflow = false;
+        bool floatingUpperBoundOverflow = false;
+        bool floatingUnsignedLowerBoundOverflow = false;
+        try { _ = checked((int)(conversionZero / conversionZero)); }
+        catch (OverflowException) { floatingNaNOverflow = true; }
+        try { _ = checked((long)(1.0 / conversionZero)); }
+        catch (OverflowException) { floatingPositiveInfinityOverflow = true; }
+        try { _ = checked((ulong)(-1.0 / conversionZero)); }
+        catch (OverflowException) { floatingNegativeInfinityOverflow = true; }
+        try { _ = checked((int)(2147483648.0 + conversionZero)); }
+        catch (OverflowException) { floatingUpperBoundOverflow = true; }
+        try { _ = checked((uint)(-1.0 + conversionZero)); }
+        catch (OverflowException) { floatingUnsignedLowerBoundOverflow = true; }
+        if (!floatingNaNOverflow || !floatingPositiveInfinityOverflow ||
+            !floatingNegativeInfinityOverflow || !floatingUpperBoundOverflow ||
+            !floatingUnsignedLowerBoundOverflow)
+            Fail("checked floating conversion overflow");
+
         bool signedDivideByZero = false;
         bool unsignedDivideByZero = false;
         bool signedRemainderByZero = false;
@@ -1331,7 +1387,59 @@ public static class LanguageFeatureValidation
             value.Coordinate.X != RuntimeValue(1) || value.Wide != RuntimeValue(4))
             Fail("struct return value copy");
 
+        ValueCopyHolder holder = new ValueCopyHolder
+        {
+            Coordinate = new Coordinate(RuntimeValue(3), RuntimeValue(4)),
+            Nested = value,
+        };
+        Coordinate[] coordinateValues = [new Coordinate(RuntimeValue(3), RuntimeValue(4))];
+        s_coordinateCopySource = new Coordinate(RuntimeValue(3), RuntimeValue(4));
+        if (ReadLocalBeforeMutation() != RuntimeValue(8) ||
+            ReadArgumentBeforeMutation(new Coordinate(RuntimeValue(3), RuntimeValue(4))) != RuntimeValue(8) ||
+            ReadFieldBeforeMutation(holder) != RuntimeValue(8) ||
+            ReadLargeFieldBeforeMutation(holder) != RuntimeValue(16) ||
+            ReadStaticFieldBeforeMutation() != RuntimeValue(8) ||
+            ReadArrayElementBeforeMutation(coordinateValues) != RuntimeValue(8))
+            Fail("struct evaluation stack copy");
+
     }
+
+    private static int CombineCoordinate(Coordinate value, int sideEffect) => value.Sum() + sideEffect;
+
+    private static int CombineNestedValue(NestedValue value, int sideEffect) => value.Total + sideEffect;
+
+    private static int MutateCoordinate(ref Coordinate value)
+    {
+        value.X = RuntimeValue(20);
+        return RuntimeValue(1);
+    }
+
+    private static int MutateNestedValue(ref NestedValue value)
+    {
+        value.Coordinate.X = RuntimeValue(20);
+        return RuntimeValue(1);
+    }
+
+    private static int ReadLocalBeforeMutation()
+    {
+        Coordinate value = new Coordinate(RuntimeValue(3), RuntimeValue(4));
+        return CombineCoordinate(value, MutateCoordinate(ref value));
+    }
+
+    private static int ReadArgumentBeforeMutation(Coordinate value)
+        => CombineCoordinate(value, MutateCoordinate(ref value));
+
+    private static int ReadFieldBeforeMutation(ValueCopyHolder holder)
+        => CombineCoordinate(holder.Coordinate, MutateCoordinate(ref holder.Coordinate));
+
+    private static int ReadLargeFieldBeforeMutation(ValueCopyHolder holder)
+        => CombineNestedValue(holder.Nested, MutateNestedValue(ref holder.Nested));
+
+    private static int ReadStaticFieldBeforeMutation()
+        => CombineCoordinate(s_coordinateCopySource, MutateCoordinate(ref s_coordinateCopySource));
+
+    private static int ReadArrayElementBeforeMutation(Coordinate[] values)
+        => CombineCoordinate(values[0], MutateCoordinate(ref values[0]));
 
     private static void CreateNestedValue(out NestedValue value)
     {
