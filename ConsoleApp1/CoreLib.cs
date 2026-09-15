@@ -1691,17 +1691,11 @@ namespace System.Runtime
 
     internal static unsafe class MemoryRuntime
     {
-        public static void Copy(byte* destination, byte* source, nuint length)
-        {
-            for (nuint index = 0; index < length; index++)
-                destination[index] = source[index];
-        }
+        [DllImport("*", EntryPoint = "memcpy")]
+        public static extern void Copy(byte* destination, byte* source, nuint length);
 
-        public static void Fill(byte* destination, byte value, nuint length)
-        {
-            for (nuint index = 0; index < length; index++)
-                destination[index] = value;
-        }
+        [DllImport("*", EntryPoint = "memset")]
+        public static extern void Fill(byte* destination, byte value, nuint length);
     }
 
     internal struct StackPointer { }
