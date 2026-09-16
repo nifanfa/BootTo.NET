@@ -2826,23 +2826,17 @@ namespace System.Threading
 {
     public static class Monitor
     {
-        public static void Enter(object value)
-        {
-            bool lockTaken = false;
-            Enter(value, ref lockTaken);
-        }
-
         public static void Enter(object value, ref bool lockTaken)
         {
             if (lockTaken)
                 throw new InvalidOperationException("The lock is already held.");
 
-            EnterCore(value);
+            Enter(value);
             lockTaken = true;
         }
 
         [DllImport("*", EntryPoint = "Enter")]
-        private static extern void EnterCore(object value);
+        private static extern void Enter(object value);
 
         [DllImport("*", EntryPoint = "Exit")]
         public static extern void Exit(object value);
