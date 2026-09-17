@@ -17,6 +17,8 @@ public static class LanguageFeatureValidation
     private static volatile int s_runtimeBias = 1;
     private static int s_instructionStatic;
     private static Coordinate s_coordinateCopySource;
+    private static ExplicitFixedBuffer32 s_explicitFixedBuffer32;
+    private static ExplicitFixedBuffer128 s_explicitFixedBuffer128;
     private static object s_objectPointerValue = new object();
     private static readonly bool s_boolean = true;
     private static readonly char s_character = 'L';
@@ -2485,6 +2487,63 @@ public static class LanguageFeatureValidation
         public short Tail;
     }
 
+    [StructLayout(LayoutKind.Explicit)]
+    private unsafe struct ExplicitFixedBuffer8
+    {
+        [FieldOffset(0)] public bool Boolean;
+        [FieldOffset(0)] public sbyte Signed;
+        [FieldOffset(0)] public byte Unsigned;
+        [FieldOffset(0)] public fixed byte Bytes[1];
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    private unsafe struct ExplicitFixedBuffer16
+    {
+        [FieldOffset(0)] public char Character;
+        [FieldOffset(0)] public short Signed;
+        [FieldOffset(0)] public ushort Unsigned;
+        [FieldOffset(0)] public fixed byte Bytes[2];
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    private unsafe struct ExplicitFixedBuffer32
+    {
+        [FieldOffset(0)] public int Signed;
+        [FieldOffset(0)]
+        public uint Address;
+        [FieldOffset(0)] public float Single;
+        [FieldOffset(0)]
+        public fixed byte Bytes[4];
+
+        public override string ToString() => $"{Bytes[0]}.{Bytes[1]}.{Bytes[2]}.{Bytes[3]}";
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    private unsafe struct ExplicitFixedBuffer64
+    {
+        [FieldOffset(0)] public long Signed;
+        [FieldOffset(0)] public ulong Unsigned;
+        [FieldOffset(0)] public double Double;
+        [FieldOffset(0)] public nint NativeSigned;
+        [FieldOffset(0)] public nuint NativeUnsigned;
+        [FieldOffset(0)] public fixed byte Bytes[8];
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 16)]
+    private unsafe struct ExplicitFixedBuffer128
+    {
+        [FieldOffset(0)] public ulong Low;
+        [FieldOffset(8)] public ulong High;
+        [FieldOffset(0)] public fixed byte Bytes[16];
+    }
+
+    private sealed class ExplicitFixedBufferHolder
+    {
+        public required ExplicitFixedBuffer32 Value;
+        public required ExplicitFixedBuffer128 WideValue;
+        public required IntPtr Device;
+    }
+
     private unsafe struct FixedBufferFeature
     {
         public fixed byte Bytes[5];
@@ -2867,7 +2926,7 @@ public static class LanguageFeatureValidation
         }
     }
 
-    private static void VerifyStructureLayouts()
+    private static unsafe void VerifyStructureLayouts()
     {
         PackedFeature packed = new PackedFeature
         {
@@ -2885,7 +2944,234 @@ public static class LanguageFeatureValidation
         };
         if (explicitValue.Integer != unchecked((int)0x89abcdefu) || explicitValue.Tail != 0x1234)
             Fail("explicit layout overlapping fields");
+
+        ExplicitFixedBuffer8 explicit8 = default;
+        explicit8.Unsigned = 0x81;
+        if (sizeof(ExplicitFixedBuffer8) != 1 || explicit8.Bytes[0] != 0x81 ||
+            explicit8.Signed != -127 || !explicit8.Boolean)
+            Fail("explicit layout 8-bit fixed buffer overlap");
+
+        ExplicitFixedBuffer16 explicit16 = default;
+        explicit16.Unsigned = 0x1234;
+        if (sizeof(ExplicitFixedBuffer16) != 2 || explicit16.Bytes[0] != 0x34 ||
+            explicit16.Bytes[1] != 0x12 || explicit16.Signed != 0x1234 || explicit16.Character != '\u1234')
+            Fail("explicit layout 16-bit fixed buffer overlap");
+
+        ExplicitFixedBuffer32 explicitFixedBuffer = default;
+        explicitFixedBuffer.Address = 0x04030201u;
+        if (sizeof(ExplicitFixedBuffer32) != 4 || explicitFixedBuffer.Signed != 0x04030201 ||
+            explicitFixedBuffer.Bytes[0] != 1 || explicitFixedBuffer.Bytes[1] != 2 ||
+            explicitFixedBuffer.Bytes[2] != 3 || explicitFixedBuffer.Bytes[3] != 4)
+            Fail("explicit layout fixed buffer read overlap");
+
+        explicitFixedBuffer.Bytes[0] = 0x12;
+        explicitFixedBuffer.Bytes[1] = 0x34;
+        explicitFixedBuffer.Bytes[2] = 0x56;
+        explicitFixedBuffer.Bytes[3] = 0x78;
+        if (explicitFixedBuffer.Address != 0x78563412u)
+            Fail("explicit layout fixed buffer write overlap");
+
+        explicitFixedBuffer.Address = 0x83e8a8c0u;
+        ExplicitFixedBufferHolder holder = StoreExplicitFixedBuffer(explicitFixedBuffer, (IntPtr)1);
+        if (holder.Value.Address != 0x83e8a8c0u || holder.Value.ToString() != "192.168.232.131" ||
+            explicitFixedBuffer.ToString() != "192.168.232.131")
+            Fail("explicit layout fixed buffer argument, field, or formatting");
+
+        explicitFixedBuffer.Single = 1.0f;
+        if (explicitFixedBuffer.Address != 0x3f800000u)
+            Fail("explicit layout single overlap");
+
+        ExplicitFixedBuffer64 explicit64 = default;
+        explicit64.Double = 1.0;
+        if (sizeof(ExplicitFixedBuffer64) != 8 || explicit64.Unsigned != 0x3ff0000000000000UL)
+            Fail("explicit layout double overlap");
+        explicit64.Unsigned = 0x8877665544332211UL;
+        if (explicit64.Signed != unchecked((long)0x8877665544332211UL) ||
+            explicit64.NativeSigned != unchecked((nint)0x8877665544332211UL) ||
+            explicit64.NativeUnsigned != unchecked((nuint)0x8877665544332211UL) ||
+            explicit64.Bytes[0] != 0x11 || explicit64.Bytes[7] != 0x88)
+            Fail("explicit layout 64-bit fixed buffer overlap");
+
+        ExplicitFixedBuffer128 explicit128 = default;
+        explicit128.Low = 0x8877665544332211UL;
+        explicit128.High = 0xffeeddccbbaa0099UL;
+        if (sizeof(ExplicitFixedBuffer128) != 16 ||
+            explicit128.Bytes[0] != 0x11 || explicit128.Bytes[7] != 0x88 ||
+            explicit128.Bytes[8] != 0x99 || explicit128.Bytes[15] != 0xff)
+            Fail("explicit layout 128-bit fixed buffer overlap");
+
+        delegate* unmanaged<ExplicitFixedBuffer32, ExplicitFixedBuffer32> echoExplicit32 = &EchoExplicitFixedBuffer32;
+        delegate* unmanaged<ExplicitFixedBuffer64, ExplicitFixedBuffer64> echoExplicit64 = &EchoExplicitFixedBuffer64;
+        delegate* unmanaged<ExplicitFixedBuffer128, ExplicitFixedBuffer128> echoExplicit128 = &EchoExplicitFixedBuffer128;
+        var echoInteger32 = (delegate* unmanaged<uint, uint>)(void*)echoExplicit32;
+        var echoInteger64 = (delegate* unmanaged<ulong, ulong>)(void*)echoExplicit64;
+        if (echoInteger32(0x83e8a8c0u) != 0x83e8a8c0u ||
+            echoInteger64(0x8877665544332211UL) != 0x8877665544332211UL ||
+            EchoChecksum(echoExplicit128(explicit128)) != EchoChecksum(explicit128))
+            Fail("integer cdecl to explicit layout ABI");
+
+        delegate* unmanaged<uint, uint> echoUInt32 = &EchoUInt32;
+        delegate* unmanaged<ulong, ulong> echoUInt64 = &EchoUInt64;
+        var echoAsExplicit32 = (delegate* unmanaged<ExplicitFixedBuffer32, ExplicitFixedBuffer32>)(void*)echoUInt32;
+        var echoAsExplicit64 = (delegate* unmanaged<ExplicitFixedBuffer64, ExplicitFixedBuffer64>)(void*)echoUInt64;
+        explicitFixedBuffer.Address = 0x83e8a8c0u;
+        ExplicitFixedBuffer32 returned32 = echoAsExplicit32(explicitFixedBuffer);
+        ExplicitFixedBuffer64 returned64 = echoAsExplicit64(explicit64);
+        if (returned32.Address != explicitFixedBuffer.Address || returned64.Unsigned != explicit64.Unsigned)
+            Fail("explicit layout to integer cdecl ABI");
+
+        if (ReplaceExplicitArgument32(explicitFixedBuffer) != 0x76543210u ||
+            ReplaceExplicitArgument128(explicit128) != (0x0123456789abcdefUL ^ 0xfedcba9876543210UL))
+            Fail("explicit layout starg");
+
+        ExplicitFixedBuffer32[] array32 = new ExplicitFixedBuffer32[2];
+        ExplicitFixedBuffer128[] array128 = new ExplicitFixedBuffer128[2];
+        array32[0] = explicitFixedBuffer;
+        array128[0] = explicit128;
+        array32[1] = returned32;
+        array128[1] = echoExplicit128(explicit128);
+        ref ExplicitFixedBuffer32 arrayReference32 = ref array32[1];
+        ref ExplicitFixedBuffer128 arrayReference128 = ref array128[1];
+        arrayReference32.Address = 0x04030201u;
+        arrayReference128.High = 0x1020304050607080UL;
+        ExplicitFixedBuffer32 arrayCopy32 = array32[0];
+        ExplicitFixedBuffer128 arrayCopy128 = array128[0];
+        if (arrayCopy32.Address != 0x83e8a8c0u || array32[1].Bytes[3] != 4 ||
+            arrayCopy128.Low != explicit128.Low || array128[1].High != 0x1020304050607080UL)
+            Fail("explicit layout array element instructions");
+
+        s_explicitFixedBuffer32 = explicitFixedBuffer;
+        s_explicitFixedBuffer128 = explicit128;
+        holder.WideValue = explicit128;
+        ExplicitFixedBuffer32 staticCopy32 = s_explicitFixedBuffer32;
+        ExplicitFixedBuffer128 staticCopy128 = s_explicitFixedBuffer128;
+        ExplicitFixedBuffer32 fieldCopy32 = holder.Value;
+        ExplicitFixedBuffer128 fieldCopy128 = holder.WideValue;
+        if (staticCopy32.Address != explicitFixedBuffer.Address ||
+            EchoChecksum(staticCopy128) != EchoChecksum(explicit128) ||
+            fieldCopy32.Address != explicitFixedBuffer.Address ||
+            EchoChecksum(fieldCopy128) != EchoChecksum(explicit128))
+            Fail("explicit layout static or instance fields");
+
+        object boxed32 = explicitFixedBuffer;
+        object boxed128 = explicit128;
+        ExplicitFixedBuffer32 unboxed32 = (ExplicitFixedBuffer32)boxed32;
+        ExplicitFixedBuffer128 unboxed128 = (ExplicitFixedBuffer128)boxed128;
+        ExplicitFixedBuffer32 generic32 = IdentityGeneric(explicitFixedBuffer);
+        ExplicitFixedBuffer128 generic128 = IdentityGeneric(explicit128);
+        if (unboxed32.Address != explicitFixedBuffer.Address ||
+            EchoChecksum(unboxed128) != EchoChecksum(explicit128) ||
+            generic32.Address != explicitFixedBuffer.Address || EchoChecksum(generic128) != EchoChecksum(explicit128))
+            Fail("explicit layout boxing or generic round-trip");
+
+        ExplicitFixedBuffer32 indirect32 = default;
+        ExplicitFixedBuffer128 indirect128 = default;
+        WriteExplicitFixedBuffer32(&indirect32, explicitFixedBuffer);
+        WriteExplicitFixedBuffer128(&indirect128, explicit128);
+        ExplicitFixedBuffer32 loaded32 = ReadExplicitFixedBuffer32(&indirect32);
+        ExplicitFixedBuffer128 loaded128 = ReadExplicitFixedBuffer128(&indirect128);
+        if (loaded32.Address != explicitFixedBuffer.Address || EchoChecksum(loaded128) != EchoChecksum(explicit128))
+            Fail("explicit layout ldobj or stobj");
+
+        WriteExplicitFixedBuffer32(out indirect32, 0xa1b2c3d4u);
+        WriteExplicitFixedBuffer128(out indirect128, 0x1111222233334444UL, 0xaaaabbbbccccddddUL);
+        MutateExplicitFixedBuffer32(ref indirect32);
+        MutateExplicitFixedBuffer128(ref indirect128);
+        if (ReadExplicitFixedBuffer32(in indirect32) != 0xd4c3b2a1u ||
+            ReadExplicitFixedBuffer128(in indirect128) !=
+            (0x4444333322221111UL ^ 0xddddccccbbbbaaaaUL))
+            Fail("explicit layout ref, in, or out");
+
+        Func<ExplicitFixedBuffer32, ExplicitFixedBuffer32> delegate32 = EchoManagedExplicitFixedBuffer32;
+        Func<ExplicitFixedBuffer128, ExplicitFixedBuffer128> delegate128 = EchoManagedExplicitFixedBuffer128;
+        delegate* managed<ExplicitFixedBuffer32, ExplicitFixedBuffer32> function32 = &EchoManagedExplicitFixedBuffer32;
+        delegate* managed<ExplicitFixedBuffer128, ExplicitFixedBuffer128> function128 = &EchoManagedExplicitFixedBuffer128;
+        if (delegate32(explicitFixedBuffer).Address != explicitFixedBuffer.Address ||
+            EchoChecksum(delegate128(explicit128)) != EchoChecksum(explicit128) ||
+            function32(explicitFixedBuffer).Address != explicitFixedBuffer.Address ||
+            EchoChecksum(function128(explicit128)) != EchoChecksum(explicit128))
+            Fail("explicit layout delegate or managed function pointer");
     }
+
+    private static ExplicitFixedBufferHolder StoreExplicitFixedBuffer(
+        ExplicitFixedBuffer32 value, IntPtr device) => new() { Value = value, WideValue = default, Device = device };
+
+    private static ulong EchoChecksum(ExplicitFixedBuffer128 value) => value.Low ^ value.High;
+
+    private static ExplicitFixedBuffer32 CreateExplicitFixedBuffer32(uint value)
+    {
+        ExplicitFixedBuffer32 result = default;
+        result.Address = value;
+        return result;
+    }
+
+    private static ExplicitFixedBuffer128 CreateExplicitFixedBuffer128(ulong low, ulong high)
+    {
+        ExplicitFixedBuffer128 result = default;
+        result.Low = low;
+        result.High = high;
+        return result;
+    }
+
+    private static uint ReplaceExplicitArgument32(ExplicitFixedBuffer32 value)
+    {
+        value = CreateExplicitFixedBuffer32(0x76543210u);
+        return value.Address;
+    }
+
+    private static ulong ReplaceExplicitArgument128(ExplicitFixedBuffer128 value)
+    {
+        value = CreateExplicitFixedBuffer128(0x0123456789abcdefUL, 0xfedcba9876543210UL);
+        return EchoChecksum(value);
+    }
+
+    private static ExplicitFixedBuffer32 EchoManagedExplicitFixedBuffer32(ExplicitFixedBuffer32 value) => value;
+
+    private static ExplicitFixedBuffer128 EchoManagedExplicitFixedBuffer128(ExplicitFixedBuffer128 value) => value;
+
+    private static unsafe void WriteExplicitFixedBuffer32(
+        ExplicitFixedBuffer32* destination, ExplicitFixedBuffer32 value) => *destination = value;
+
+    private static unsafe void WriteExplicitFixedBuffer128(
+        ExplicitFixedBuffer128* destination, ExplicitFixedBuffer128 value) => *destination = value;
+
+    private static unsafe ExplicitFixedBuffer32 ReadExplicitFixedBuffer32(ExplicitFixedBuffer32* value) => *value;
+
+    private static unsafe ExplicitFixedBuffer128 ReadExplicitFixedBuffer128(ExplicitFixedBuffer128* value) => *value;
+
+    private static void WriteExplicitFixedBuffer32(out ExplicitFixedBuffer32 value, uint address)
+        => value = CreateExplicitFixedBuffer32(address);
+
+    private static void WriteExplicitFixedBuffer128(out ExplicitFixedBuffer128 value, ulong low, ulong high)
+        => value = CreateExplicitFixedBuffer128(low, high);
+
+    private static void MutateExplicitFixedBuffer32(ref ExplicitFixedBuffer32 value)
+        => value.Address = 0xd4c3b2a1u;
+
+    private static void MutateExplicitFixedBuffer128(ref ExplicitFixedBuffer128 value)
+    {
+        value.Low = 0x4444333322221111UL;
+        value.High = 0xddddccccbbbbaaaaUL;
+    }
+
+    private static uint ReadExplicitFixedBuffer32(in ExplicitFixedBuffer32 value) => value.Address;
+
+    private static ulong ReadExplicitFixedBuffer128(in ExplicitFixedBuffer128 value) => EchoChecksum(value);
+
+    [UnmanagedCallersOnly]
+    private static ExplicitFixedBuffer32 EchoExplicitFixedBuffer32(ExplicitFixedBuffer32 value) => value;
+
+    [UnmanagedCallersOnly]
+    private static ExplicitFixedBuffer64 EchoExplicitFixedBuffer64(ExplicitFixedBuffer64 value) => value;
+
+    [UnmanagedCallersOnly]
+    private static ExplicitFixedBuffer128 EchoExplicitFixedBuffer128(ExplicitFixedBuffer128 value) => value;
+
+    [UnmanagedCallersOnly]
+    private static uint EchoUInt32(uint value) => value;
+
+    [UnmanagedCallersOnly]
+    private static ulong EchoUInt64(ulong value) => value;
 
     private static unsafe void VerifyIndirectMemoryOperations()
     {
