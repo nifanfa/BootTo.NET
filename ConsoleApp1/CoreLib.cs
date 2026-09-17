@@ -18,18 +18,6 @@ namespace System
         public Type GetType() => m_pType;
     }
 
-    public unsafe struct GCDescReference
-    {
-        public GCDescReference* Next;
-        public ushort Offset;
-    }
-
-    public unsafe struct GCDesc
-    {
-        public GCDescReference* ObjectReferences;
-        public GCDescReference* ArrayElementReferences;
-    }
-
     public static class GC
     {
         public static int Collect() => Runtime.GCHeap.Collect();
@@ -1099,18 +1087,19 @@ namespace System
     }
     public class MulticastDelegate : Delegate { }
 
-    public sealed unsafe class Type
+    public sealed class Type
     {
         public string Name;
         public string Namespace;
         public string FullName;
         internal int RuntimeTypeId;
-        internal GCDesc* GCDescriptor;
+        internal int[] ObjectReferenceOffsets;
+        internal int[] ArrayElementReferenceOffsets;
         internal string[] EnumNames;
         internal ulong[] EnumValues;
         internal bool IsFlagsEnum;
         internal bool IsSignedEnum;
-        internal void* Factory;
+        internal Delegate Factory;
 
         public static Type GetTypeFromHandle(RuntimeTypeHandle handle) => handle.Type;
         public static bool operator ==(Type left, Type right) => ReferenceEquals(left, right);
@@ -1119,11 +1108,11 @@ namespace System
         public override int GetHashCode() => RuntimeTypeId;
     }
 
-    public static unsafe class Activator
+    public static class Activator
     {
         public static T CreateInstance<T>()
         {
-            delegate*<T> factory = (delegate*<T>)typeof(T).Factory;
+            Func<T> factory = (Func<T>)typeof(T).Factory;
             if (factory == null)
                 throw new InvalidOperationException("The type cannot be created.");
             return factory();
@@ -1508,7 +1497,7 @@ namespace System.Runtime
     internal unsafe struct GCRoot
     {
         public Object** Address;
-        public GCDesc* Descriptor;
+        public Type Type;
     }
 
     internal unsafe struct GCFrame
@@ -1534,7 +1523,7 @@ namespace System.Runtime
     {
         public GCStaticRoot* Next;
         public Object** Address;
-        public GCDesc* Descriptor;
+        public Type Type;
     }
 
     internal static unsafe class GCHeap
@@ -1587,15 +1576,10 @@ namespace System.Runtime
         public static int Collect()
         {
             for (GCStaticRoot* root = s_staticRoots; root != null; root = root->Next)
-            {
-                if (root->Descriptor == null)
-                    MarkRoot(root->Address, null);
-                else
-                    ScanValue((byte*)root->Address, root->Descriptor);
-            }
+                MarkRoot(root->Address, root->Type);
             for (GCFrame* frame = GetTopFrame(); frame != null; frame = frame->Previous)
                 for (int index = 0; index < frame->RootCount; index++)
-                    MarkRoot(frame->Roots[index].Address, frame->Roots[index].Descriptor);
+                    MarkRoot(frame->Roots[index].Address, frame->Roots[index].Type);
 
             GCAllocation* previous = null;
             GCAllocation* allocation = s_allocations;
@@ -1631,14 +1615,14 @@ namespace System.Runtime
             return collected;
         }
 
-        private static void MarkRoot(Object** address, GCDesc* descriptor)
+        private static void MarkRoot(Object** address, Type type)
         {
             if (address == null)
                 return;
-            if (descriptor == null)
+            if (type == null)
                 MarkObject(*address);
             else
-                ScanValue((byte*)address, descriptor);
+                ScanValue((byte*)address, type);
         }
 
         private static void MarkObject(Object* value)
@@ -1659,23 +1643,20 @@ namespace System.Runtime
                 return;
             allocation->Marked = 1;
             byte* objectAddress = (byte*)allocation + sizeof(GCAllocation);
-            GCDesc* descriptor = ((GCObjectHeader*)objectAddress)->Type.GCDescriptor;
-            if (descriptor != null)
-                ScanValue(objectAddress, descriptor);
+            Type type = ((GCObjectHeader*)objectAddress)->Type;
+            if (type != null)
+                ScanValue(objectAddress, type);
         }
 
-        private static void ScanValue(byte* value, GCDesc* descriptor)
+        private static void ScanValue(byte* value, Type type)
         {
             byte* data = value;
-            for (GCDescReference* reference = descriptor->ObjectReferences;
-                reference != null;
-                reference = reference->Next)
-            {
-                MarkObject(*(Object**)(data + reference->Offset));
-            }
+            int[] objectReferences = type.ObjectReferenceOffsets;
+            for (int index = 0; index < objectReferences.Length; index++)
+                MarkObject(*(Object**)(data + objectReferences[index]));
 
-            GCDescReference* elementReferences = descriptor->ArrayElementReferences;
-            if (elementReferences == null)
+            int[] elementReferences = type.ArrayElementReferenceOffsets;
+            if (elementReferences.Length == 0)
                 return;
 
             Array array = (Array)(*(Object*)&data);
@@ -1686,12 +1667,8 @@ namespace System.Runtime
             for (int elementIndex = 0; elementIndex < length; elementIndex++)
             {
                 byte* element = elements + (nint)elementIndex * elementSize;
-                for (GCDescReference* reference = elementReferences;
-                    reference != null;
-                    reference = reference->Next)
-                {
-                    MarkObject(*(Object**)(element + reference->Offset));
-                }
+                for (int index = 0; index < elementReferences.Length; index++)
+                    MarkObject(*(Object**)(element + elementReferences[index]));
             }
         }
 
