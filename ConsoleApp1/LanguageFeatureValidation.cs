@@ -478,6 +478,38 @@ public static class LanguageFeatureValidation
 
     private delegate int BinaryOperator(int left, int right);
 
+    private sealed class EnumerationValue
+    {
+        public int Value;
+    }
+
+    private static List<EnumerationValue> s_referenceEnumerationList;
+
+    private static string CollectDuringFormatting()
+    {
+        GC.Collect();
+        return "alive";
+    }
+
+    private static object BoxAcrossCollection<T>(T value)
+    {
+        return PreserveFirst(value, CollectDuringFormatting());
+    }
+
+    private static object PreserveFirst(object value, string ignored) => value;
+
+    private static object PreserveFirst(object value, object ignored, string alsoIgnored) => value;
+
+    private static BoxingValue CreateBoxingValueForCollection()
+    {
+        return new BoxingValue
+        {
+            Number = RuntimeValue(31),
+            Offset = (short)RuntimeValue(4),
+            Reference = new FeatureObject(RuntimeValue(37)),
+        };
+    }
+
     public static void Run()
     {
         s_expectedSum = RuntimeValue(ExpectedSum);
@@ -1342,6 +1374,52 @@ public static class LanguageFeatureValidation
         object boxedReference = feature;
         if ((FeatureObject)boxedReference != feature || ((IFeatureValue)boxedReference).Value != RuntimeValue(7))
             Fail("reference conversion");
+
+        if (!(bool)BoxAcrossCollection(true) || (char)BoxAcrossCollection('Q') != 'Q')
+            Fail("boolean or char box GC roots");
+        if ((sbyte)BoxAcrossCollection((sbyte)-12) != -12)
+            Fail("SByte box GC roots");
+        if ((byte)BoxAcrossCollection((byte)240) != 240)
+            Fail("Byte box GC roots");
+        if ((short)BoxAcrossCollection((short)-1234) != -1234)
+            Fail("Int16 box GC roots");
+        if ((ushort)BoxAcrossCollection((ushort)54321) != 54321)
+            Fail("UInt16 box GC roots");
+        if ((int)BoxAcrossCollection(RuntimeValue(-123456)) != RuntimeValue(-123456))
+            Fail("Int32 box GC roots");
+        if ((uint)BoxAcrossCollection((uint)RuntimeValue(123456)) != (uint)RuntimeValue(123456))
+            Fail("UInt32 box GC roots");
+        if ((long)BoxAcrossCollection(-1234567890123L) != -1234567890123L)
+            Fail("Int64 box GC roots");
+        if ((ulong)BoxAcrossCollection(1234567890123UL) != 1234567890123UL)
+            Fail("UInt64 box GC roots");
+        if ((float)BoxAcrossCollection(12.5f) != 12.5f ||
+            (double)BoxAcrossCollection(-25.25) != -25.25)
+            Fail("floating-point box GC roots");
+        if ((IntPtr)BoxAcrossCollection((IntPtr)RuntimeValue(41)) != (IntPtr)RuntimeValue(41) ||
+            ((UIntPtr)BoxAcrossCollection(UIntPtr.Zero)).ToString() != "0")
+            Fail("native integer box GC roots");
+        if ((FeatureKind)BoxAcrossCollection(FeatureKind.Value) != FeatureKind.Value)
+            Fail("enum box GC roots");
+
+        FeatureValue collectedFeature = (FeatureValue)BoxAcrossCollection(
+            new FeatureValue(RuntimeValue(47)));
+        int? collectedNullable = (int?)BoxAcrossCollection((int?)RuntimeValue(53));
+        object collectedNull = BoxAcrossCollection((int?)null);
+        if (collectedFeature.Value != RuntimeValue(47))
+            Fail("value type box GC roots");
+        if (collectedNullable != RuntimeValue(53))
+            Fail("nullable value box GC roots");
+        if (collectedNull != null)
+            Fail("nullable null box GC roots");
+
+        object collectedBox = PreserveFirst(CreateBoxingValueForCollection(), new object(),
+            CollectDuringFormatting());
+        BoxingValue collectedValue = (BoxingValue)collectedBox;
+        if (collectedValue.Number != RuntimeValue(31) || collectedValue.Offset != RuntimeValue(4) ||
+            collectedValue.Reference is not FeatureObject collectedReference ||
+            collectedReference.Value != RuntimeValue(38))
+            Fail("boxed value reference GC roots");
     }
 
     private static T RoundTripBox<T>(T value)
@@ -1732,6 +1810,25 @@ public static class LanguageFeatureValidation
         if (total != s_expectedSum || query.Count() != RuntimeValue(4) ||
             query.First() != RuntimeValue(4))
             Fail("LINQ operators");
+
+        List<EnumerationValue> referenceList = new List<EnumerationValue>
+        {
+            new EnumerationValue { Value = RuntimeValue(7) },
+            new EnumerationValue { Value = RuntimeValue(11) },
+        };
+        IEnumerator<EnumerationValue> listEnumerator =
+            ((IEnumerable<EnumerationValue>)referenceList).GetEnumerator();
+        s_referenceEnumerationList = referenceList;
+        EnumerationValue selected = s_referenceEnumerationList.FirstOrDefault(
+            value => value.Value == RuntimeValue(11));
+        if (!listEnumerator.MoveNext() || listEnumerator.Current.Value != RuntimeValue(7))
+            Fail("list interface enumeration dispatch");
+        if (selected == null || selected.Value != RuntimeValue(11))
+            Fail("LINQ list enumeration dispatch");
+
+        string rootedBox = $"{RuntimeValue(15)}:{CollectDuringFormatting()}";
+        if (rootedBox != "15:alive")
+            Fail("boxed evaluation-stack GC root");
     }
 
     private static void VerifyControlFlow(int[] values)

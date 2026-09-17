@@ -1514,11 +1514,6 @@ namespace System.Runtime
         public int Marked;
     }
 
-    internal unsafe struct GCObjectHeader
-    {
-        public Type Type;
-    }
-
     internal unsafe struct GCStaticRoot
     {
         public GCStaticRoot* Next;
@@ -1642,24 +1637,28 @@ namespace System.Runtime
             if (allocation->Marked != 0)
                 return;
             allocation->Marked = 1;
-            byte* objectAddress = (byte*)allocation + sizeof(GCAllocation);
-            Type type = ((GCObjectHeader*)objectAddress)->Type;
+            Object* objectAddress = (Object*)((byte*)allocation + sizeof(GCAllocation));
+            Type type = objectAddress->m_pType;
             if (type != null)
-                ScanValue(objectAddress, type);
+                ScanObject(objectAddress, type);
         }
 
         private static void ScanValue(byte* value, Type type)
         {
-            byte* data = value;
             int[] objectReferences = type.ObjectReferenceOffsets;
             for (int index = 0; index < objectReferences.Length; index++)
-                MarkObject(*(Object**)(data + objectReferences[index]));
+                MarkObject(*(Object**)(value + objectReferences[index]));
+        }
+
+        private static void ScanObject(Object* objectAddress, Type type)
+        {
+            ScanValue((byte*)objectAddress + sizeof(nuint), type);
 
             int[] elementReferences = type.ArrayElementReferenceOffsets;
             if (elementReferences.Length == 0)
                 return;
 
-            Array array = (Array)(*(Object*)&data);
+            Array array = (Array)(*(Object*)&objectAddress);
             int length = array.Length;
             int elementSize = array.m_elementSize;
 
