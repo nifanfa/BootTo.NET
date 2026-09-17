@@ -121,10 +121,12 @@ partial class Program
         new System.Media.SoundPlayer(@"\Nokia - Breath.wav").PlaySync();
 #endif
 
+#if true
 #if false
         doomgeneric.Run();
 #else
         quakegeneric.Run();
+#endif
 #endif
 
 #if false
