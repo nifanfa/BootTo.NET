@@ -29,7 +29,7 @@ partial class Program
         @"\EFI\Drivers\Original\UsbMouseDxe.efi"
     };
 
-    [RuntimeExport("ManagedEfiMain")]
+    [RuntimeExport("managed_EfiMain")]
     unsafe static EFI_STATUS EfiMain(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* systemTable)
     {
         InitializeLib(imageHandle, systemTable);

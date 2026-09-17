@@ -41,7 +41,7 @@ typedef struct efi_system_table
     efi_boot_services* boot_services;
 } efi_system_table;
 
-extern efi_status ManagedEfiMain(void* image_handle, efi_system_table* system_table);
+extern efi_status managed_EfiMain(void* image_handle, efi_system_table* system_table);
 
 static allocate_pool_fn allocate_pool;
 static free_pool_fn free_pool;
@@ -52,7 +52,7 @@ efi_status EfiMain(void* image_handle, efi_system_table* system_table)
         return ~(efi_status)0;
     allocate_pool = system_table->boot_services->allocate_pool;
     free_pool = system_table->boot_services->free_pool;
-    return ManagedEfiMain(image_handle, system_table);
+    return managed_EfiMain(image_handle, system_table);
 }
 
 void* malloc(runtime_size_t size)
