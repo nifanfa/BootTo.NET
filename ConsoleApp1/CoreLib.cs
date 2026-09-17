@@ -1542,8 +1542,8 @@ namespace System.Runtime
         private static GCAllocation* s_allocations;
         private static GCFrame* s_frames;
         private static GCStaticRoot* s_staticRoots;
-        private static int s_allocatedBytes;
-        private static int s_collectionThreshold = int.MaxValue;
+        private static nuint s_allocatedBytes;
+        private static nuint s_collectionThreshold;
 
         [DllImport("*", EntryPoint = "calloc")]
         private static extern byte* Calloc(nuint count, nuint size);
@@ -1553,7 +1553,8 @@ namespace System.Runtime
 
         public static Object* Allocate(nuint size)
         {
-            if (s_allocatedBytes >= s_collectionThreshold)
+            if (s_allocatedBytes >= s_collectionThreshold ||
+                size > s_collectionThreshold - s_allocatedBytes)
                 Collect();
 
             GCAllocation* allocation = (GCAllocation*)Calloc(1, size + (nuint)sizeof(GCAllocation));
@@ -1562,7 +1563,7 @@ namespace System.Runtime
             allocation->Next = s_allocations;
             allocation->Size = size;
             s_allocations = allocation;
-            s_allocatedBytes += (int)size;
+            s_allocatedBytes += size;
             return (Object*)((byte*)allocation + sizeof(GCAllocation));
         }
 
@@ -1598,12 +1599,14 @@ namespace System.Runtime
 
             GCAllocation* previous = null;
             GCAllocation* allocation = s_allocations;
+            nuint liveBytes = 0;
             int collected = 0;
             while (allocation != null)
             {
                 if (allocation->Marked != 0)
                 {
                     allocation->Marked = 0;
+                    liveBytes += allocation->Size;
                     previous = allocation;
                     allocation = allocation->Next;
                 }
@@ -1619,7 +1622,12 @@ namespace System.Runtime
                     allocation = next;
                 }
             }
-            s_allocatedBytes = 0;
+            s_allocatedBytes = liveBytes;
+            if (liveBytes > s_collectionThreshold)
+            {
+                nuint expandedThreshold = liveBytes * 2;
+                s_collectionThreshold = expandedThreshold > liveBytes ? expandedThreshold : liveBytes;
+            }
             return collected;
         }
 
