@@ -58,6 +58,7 @@ internal static class GarbageCollectionValidation
     {
         ValidateStringListInitializer();
         ValidateDynamicStrings();
+        ValidateDeepObjectGraph();
 
         s_staticReferenceRoot = new Value { Number = 8 };
         s_staticValueRoot = new ValueRoot { Value = new Value { Number = 12 } };
@@ -204,6 +205,28 @@ internal static class GarbageCollectionValidation
         Ensure(root.Self == root && root.Next.Next == root && root.Value.Link == root.Next.BaseValue,
             "cyclic object graph after repeated collection");
         Console.WriteLine("Garbage collection validation passed.");
+    }
+
+    private static void ValidateDeepObjectGraph()
+    {
+        Value root = new Value { Number = 0 };
+        Value current = root;
+        for (int index = 1; index <= 512; index++)
+        {
+            current.Link = new Value { Number = index };
+            current = current.Link;
+        }
+        current.Link = root;
+
+        GC.Collect();
+
+        current = root;
+        for (int index = 0; index <= 512; index++)
+        {
+            Ensure(current.Number == index, "deep cyclic object graph");
+            current = current.Link;
+        }
+        Ensure(current == root, "deep cyclic object graph closure");
     }
 
     private static void ValidateStringListInitializer()

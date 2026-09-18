@@ -1736,6 +1736,7 @@ namespace System.Runtime
     internal unsafe struct GCAllocation
     {
         public GCAllocation* Next;
+        public GCAllocation* MarkNext;
         public nuint Size;
         public int Marked;
     }
@@ -1750,6 +1751,7 @@ namespace System.Runtime
     internal static unsafe class GCHeap
     {
         private static GCAllocation* s_allocations;
+        private static GCAllocation* s_pendingMarks;
         private static GCFrame* s_frames;
         private static GCStaticRoot* s_staticRoots;
         private static nuint s_allocatedBytes;
@@ -1801,6 +1803,18 @@ namespace System.Runtime
             for (GCFrame* frame = GetTopFrame(); frame != null; frame = frame->Previous)
                 for (int index = 0; index < frame->RootCount; index++)
                     MarkRoot(frame->Roots[index].Address, frame->Roots[index].Type);
+
+            while (s_pendingMarks != null)
+            {
+                GCAllocation* pending = s_pendingMarks;
+                s_pendingMarks = pending->MarkNext;
+                pending->MarkNext = null;
+                Object* objectAddress = (Object*)((byte*)pending + sizeof(GCAllocation));
+                Object objectValue = *(Object*)&objectAddress;
+                Type type = objectValue.m_pType;
+                if (type != null)
+                    ScanObject(objectAddress, type);
+            }
 
             GCAllocation* previous = null;
             GCAllocation* allocation = s_allocations;
@@ -1863,11 +1877,8 @@ namespace System.Runtime
             if (allocation->Marked != 0)
                 return;
             allocation->Marked = 1;
-            Object* objectAddress = (Object*)((byte*)allocation + sizeof(GCAllocation));
-            Object objectValue = *(Object*)&objectAddress;
-            Type type = objectValue.m_pType;
-            if (type != null)
-                ScanObject(objectAddress, type);
+            allocation->MarkNext = s_pendingMarks;
+            s_pendingMarks = allocation;
         }
 
         private static void ScanValue(byte* value, Type type)
