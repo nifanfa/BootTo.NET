@@ -164,6 +164,230 @@ namespace System
         public static Index FromEnd(int value) => new Index(~value);
         public static implicit operator Index(int value) => FromStart(value);
     }
+
+    public readonly struct TimeSpan
+    {
+        public const long TicksPerMillisecond = 10_000;
+        public const long TicksPerSecond = TicksPerMillisecond * 1000;
+        public const long TicksPerMinute = TicksPerSecond * 60;
+        public const long TicksPerHour = TicksPerMinute * 60;
+        public const long TicksPerDay = TicksPerHour * 24;
+
+        public static readonly TimeSpan MinValue = new TimeSpan(long.MinValue);
+        public static readonly TimeSpan MaxValue = new TimeSpan(long.MaxValue);
+        public static readonly TimeSpan Zero = new TimeSpan(0);
+        private readonly long _ticks;
+
+        public TimeSpan(long ticks) => _ticks = ticks;
+        public TimeSpan(int hours, int minutes, int seconds)
+            : this(0, hours, minutes, seconds, 0) { }
+        public TimeSpan(int days, int hours, int minutes, int seconds)
+            : this(days, hours, minutes, seconds, 0) { }
+        public TimeSpan(int days, int hours, int minutes, int seconds, int milliseconds)
+            => _ticks = (long)days * TicksPerDay + (long)hours * TicksPerHour +
+                (long)minutes * TicksPerMinute + (long)seconds * TicksPerSecond +
+                (long)milliseconds * TicksPerMillisecond;
+
+        public long Ticks => _ticks;
+        public int Days => (int)(_ticks / TicksPerDay);
+        public int Hours => (int)((_ticks / TicksPerHour) % 24);
+        public int Minutes => (int)((_ticks / TicksPerMinute) % 60);
+        public int Seconds => (int)((_ticks / TicksPerSecond) % 60);
+        public int Milliseconds => (int)((_ticks / TicksPerMillisecond) % 1000);
+        public long TotalDays => _ticks / TicksPerDay;
+        public long TotalHours => _ticks / TicksPerHour;
+        public long TotalMinutes => _ticks / TicksPerMinute;
+        public long TotalSeconds => _ticks / TicksPerSecond;
+        public long TotalMilliseconds => _ticks / TicksPerMillisecond;
+
+        public static TimeSpan FromDays(long value) => new TimeSpan(value * TicksPerDay);
+        public static TimeSpan FromHours(long value) => new TimeSpan(value * TicksPerHour);
+        public static TimeSpan FromMinutes(long value) => new TimeSpan(value * TicksPerMinute);
+        public static TimeSpan FromSeconds(long value) => new TimeSpan(value * TicksPerSecond);
+        public static TimeSpan FromMilliseconds(long value) => new TimeSpan(value * TicksPerMillisecond);
+        public override string ToString() => string.Format("{0}:{1:D2}:{2:D2}", Hours, Minutes, Seconds);
+        public override bool Equals(object other) => other is TimeSpan value && value._ticks == _ticks;
+        public override int GetHashCode() => (int)(_ticks ^ (_ticks >> 32));
+        public static TimeSpan operator +(TimeSpan left, TimeSpan right) => new TimeSpan(left._ticks + right._ticks);
+        public static TimeSpan operator -(TimeSpan left, TimeSpan right) => new TimeSpan(left._ticks - right._ticks);
+        public static TimeSpan operator -(TimeSpan value) => new TimeSpan(-value._ticks);
+        public static bool operator ==(TimeSpan left, TimeSpan right) => left._ticks == right._ticks;
+        public static bool operator !=(TimeSpan left, TimeSpan right) => left._ticks != right._ticks;
+    }
+
+    public enum DateTimeKind
+    {
+        Unspecified,
+        Utc,
+        Local
+    }
+
+    public enum DayOfWeek
+    {
+        Sunday,
+        Monday,
+        Tuesday,
+        Wednesday,
+        Thursday,
+        Friday,
+        Saturday
+    }
+
+    public readonly struct DateTime
+    {
+        private const long TicksAtUnixEpoch = 621355968000000000;
+        private const long MaxTicks = 3155378975999999999;
+        private const ulong TicksMask = 0x3fffffffffffffff;
+        private const int KindShift = 62;
+        private readonly ulong _dateData;
+
+        public static readonly DateTime MinValue = new DateTime(0);
+        public static readonly DateTime MaxValue = new DateTime(MaxTicks);
+
+        [DllImport("*", EntryPoint = "GetCurrentTimeMilliseconds")]
+        private static extern long GetCurrentTimeMilliseconds();
+
+        public DateTime(int year, int month, int day)
+            : this(year, month, day, 0, 0, 0, 0) { }
+
+        public DateTime(int year, int month, int day, int hour, int minute, int second)
+            : this(year, month, day, hour, minute, second, 0) { }
+
+        public DateTime(int year, int month, int day, int hour, int minute, int second, DateTimeKind kind)
+            : this(year, month, day, hour, minute, second, 0, kind) { }
+
+        public DateTime(int year, int month, int day, int hour, int minute, int second, int millisecond)
+            : this(year, month, day, hour, minute, second, millisecond, DateTimeKind.Unspecified) { }
+
+        public DateTime(int year, int month, int day, int hour, int minute, int second, int millisecond,
+            DateTimeKind kind)
+        {
+            Validate(year, month, day, hour, minute, second, millisecond);
+            if (kind < DateTimeKind.Unspecified || kind > DateTimeKind.Local)
+                throw new ArgumentException();
+            _dateData = (ulong)(GetTicks(year, month, day) + (long)hour * TimeSpan.TicksPerHour +
+                (long)minute * TimeSpan.TicksPerMinute + (long)second * TimeSpan.TicksPerSecond +
+                (long)millisecond * TimeSpan.TicksPerMillisecond) | ((ulong)kind << KindShift);
+        }
+
+        public DateTime(long ticks)
+            : this(ticks, DateTimeKind.Unspecified) { }
+
+        public DateTime(long ticks, DateTimeKind kind)
+        {
+            if (ticks < 0 || ticks > MaxTicks)
+                throw new ArgumentOutOfRangeException();
+            if (kind < DateTimeKind.Unspecified || kind > DateTimeKind.Local)
+                throw new ArgumentException();
+            _dateData = (ulong)ticks | ((ulong)kind << KindShift);
+        }
+
+        public long Ticks => (long)(_dateData & TicksMask);
+        public int Year => GetDatePart(0);
+        public int Month => GetDatePart(1);
+        public int Day => GetDatePart(2);
+        public int Hour => (int)((Ticks / TimeSpan.TicksPerHour) % 24);
+        public int Minute => (int)((Ticks / TimeSpan.TicksPerMinute) % 60);
+        public int Second => (int)((Ticks / TimeSpan.TicksPerSecond) % 60);
+        public int Millisecond => (int)((Ticks / TimeSpan.TicksPerMillisecond) % 1000);
+        public DateTime Date => new DateTime(Ticks - Ticks % TimeSpan.TicksPerDay, Kind);
+        public TimeSpan TimeOfDay => new TimeSpan(Ticks % TimeSpan.TicksPerDay);
+        public DayOfWeek DayOfWeek => (DayOfWeek)((Ticks / TimeSpan.TicksPerDay + 1) % 7);
+        public DateTimeKind Kind => (DateTimeKind)(_dateData >> KindShift);
+
+        public static DateTime UtcNow => new DateTime(
+            TicksAtUnixEpoch + GetCurrentTimeMilliseconds() * TimeSpan.TicksPerMillisecond,
+            DateTimeKind.Utc);
+        public static DateTime Now => UtcNow;
+        public static DateTime Today => Now.Date;
+        public static DateTime FromFileTime(long fileTime) => new DateTime(fileTime + TicksAtUnixEpoch);
+        public long ToFileTime() => Ticks - TicksAtUnixEpoch;
+        public DateTime AddTicks(long value) => new DateTime(Ticks + value, Kind);
+        public DateTime Add(TimeSpan value) => AddTicks(value.Ticks);
+        public DateTime AddMilliseconds(long value) => Add(TimeSpan.FromMilliseconds(value));
+        public DateTime AddSeconds(long value) => Add(TimeSpan.FromSeconds(value));
+        public DateTime AddMinutes(long value) => Add(TimeSpan.FromMinutes(value));
+        public DateTime AddHours(long value) => Add(TimeSpan.FromHours(value));
+        public DateTime AddDays(long value) => Add(TimeSpan.FromDays(value));
+        public DateTime Subtract(TimeSpan value) => new DateTime(Ticks - value.Ticks, Kind);
+        public TimeSpan Subtract(DateTime value) => new TimeSpan(Ticks - value.Ticks);
+        public static int Compare(DateTime left, DateTime right)
+            => left.Ticks < right.Ticks ? -1 : left.Ticks > right.Ticks ? 1 : 0;
+        public int CompareTo(DateTime other) => Compare(this, other);
+        public static DateTime SpecifyKind(DateTime value, DateTimeKind kind) => new DateTime(value.Ticks, kind);
+        public DateTime ToUniversalTime() => SpecifyKind(this, DateTimeKind.Utc);
+        public DateTime ToLocalTime() => this;
+        public override bool Equals(object other) => other is DateTime value && value.Ticks == Ticks;
+        public override int GetHashCode() => (int)(Ticks ^ (Ticks >> 32));
+        public static DateTime operator +(DateTime value, TimeSpan span) => value.Add(span);
+        public static DateTime operator -(DateTime value, TimeSpan span) => value.Subtract(span);
+        public static TimeSpan operator -(DateTime left, DateTime right) => left.Subtract(right);
+        public static bool operator ==(DateTime left, DateTime right) => left.Ticks == right.Ticks;
+        public static bool operator !=(DateTime left, DateTime right) => left.Ticks != right.Ticks;
+        public static bool operator <(DateTime left, DateTime right) => left.Ticks < right.Ticks;
+        public static bool operator >(DateTime left, DateTime right) => left.Ticks > right.Ticks;
+        public static bool operator <=(DateTime left, DateTime right) => left.Ticks <= right.Ticks;
+        public static bool operator >=(DateTime left, DateTime right) => left.Ticks >= right.Ticks;
+        public override string ToString()
+            => string.Format("{0:D4}-{1:D2}-{2:D2} {3:D2}:{4:D2}:{5:D2}", Year, Month, Day, Hour, Minute, Second);
+
+        public static bool IsLeapYear(int year)
+        {
+            if (year < 1 || year > 9999)
+                throw new ArgumentOutOfRangeException();
+            return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+        }
+
+        public static int DaysInMonth(int year, int month)
+        {
+            if (year < 1 || year > 9999 || month < 1 || month > 12)
+                throw new ArgumentOutOfRangeException();
+            if (month == 2)
+                return IsLeapYear(year) ? 29 : 28;
+            return 30 + ((0xAD5 >> (month - 1)) & 1);
+        }
+
+        private int GetDatePart(int part)
+        {
+            long days = Ticks / TimeSpan.TicksPerDay;
+            int low = 1;
+            int high = 9999;
+            while (low < high)
+            {
+                int mid = (low + high + 1) / 2;
+                if (GetTicks(mid, 1, 1) / TimeSpan.TicksPerDay <= days) low = mid;
+                else high = mid - 1;
+            }
+            int year = low;
+            long dayOfYear = days - GetTicks(year, 1, 1) / TimeSpan.TicksPerDay;
+            if (part == 0) return year;
+            int month = 1;
+            while (month < 12 && dayOfYear >= DaysInMonth(year, month))
+            {
+                dayOfYear -= DaysInMonth(year, month++);
+            }
+            return part == 1 ? month : (int)dayOfYear + 1;
+        }
+
+        private static long GetTicks(int year, int month, int day)
+        {
+            long y = year - 1;
+            long days = y * 365 + y / 4 - y / 100 + y / 400;
+            days += (367 * month - 362) / 12;
+            if (month > 2)
+                days -= IsLeapYear(year) ? 1 : 2;
+            return (days + day - 1) * TimeSpan.TicksPerDay;
+        }
+
+        private static void Validate(int year, int month, int day, int hour, int minute, int second, int millisecond)
+        {
+            if (year < 1 || year > 9999 || month < 1 || month > 12 || day < 1 || day > DaysInMonth(year, month) ||
+                hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59 ||
+                millisecond < 0 || millisecond > 999)
+                throw new ArgumentOutOfRangeException();
+        }
+    }
+
     public partial struct Single
     {
         public const float MinValue = -3.4028234663852886E+38F;
