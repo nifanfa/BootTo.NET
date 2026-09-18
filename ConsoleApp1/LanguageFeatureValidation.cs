@@ -1643,7 +1643,7 @@ public static class LanguageFeatureValidation
             Fail("local function or function pointer");
     }
 
-    private static void VerifySpans()
+    private static unsafe void VerifySpans()
     {
         int[] values = [RuntimeValue(1), RuntimeValue(2), RuntimeValue(3), RuntimeValue(4), RuntimeValue(5)];
         Span<int> span = values;
@@ -1653,13 +1653,25 @@ public static class LanguageFeatureValidation
         ReadOnlySpan<int> converted = span;
         ReadOnlySpan<int> readOnlySlice = readOnly.Slice(RuntimeValue(2));
         ReadOnlySpan<byte> utf8 = "IL2LLVM"u8;
+        byte[] bytes = [(byte)RuntimeValue(0x15), (byte)RuntimeValue(0x2A), (byte)RuntimeValue(0x3F)];
+        Span<byte> writableBytes = bytes;
+        ReadOnlySpan<byte> readOnlyBytes = bytes;
+        fixed (byte* writablePointer = writableBytes)
+        fixed (byte* readOnlyPointer = readOnlyBytes)
+        {
+            writablePointer[1] = (byte)RuntimeValue(0x5A);
+            if (writablePointer[0] != (byte)RuntimeValue(0x15) ||
+                readOnlyPointer[2] != (byte)RuntimeValue(0x3F))
+                Fail("span pinnable reference");
+        }
 
         if (span.Length != RuntimeValue(5) || span.IsEmpty || values[1] != RuntimeValue(9) ||
             slice.Length != RuntimeValue(3) || slice[0] != RuntimeValue(9) || slice[2] != RuntimeValue(4) ||
             readOnly.Length != RuntimeValue(5) || readOnly[1] != RuntimeValue(9) ||
             converted[4] != RuntimeValue(5) || readOnlySlice.Length != RuntimeValue(3) ||
             readOnlySlice[0] != RuntimeValue(3) || utf8.Length != RuntimeValue(7) ||
-            utf8[0] != (byte)'I' || utf8[2] != (byte)'2' || utf8[6] != (byte)'M')
+            utf8[0] != (byte)'I' || utf8[2] != (byte)'2' || utf8[6] != (byte)'M' ||
+            bytes[1] != (byte)RuntimeValue(0x5A))
             Fail("span or UTF-8 string literal");
     }
 
