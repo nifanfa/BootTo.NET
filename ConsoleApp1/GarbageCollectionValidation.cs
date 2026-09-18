@@ -56,6 +56,9 @@ internal static class GarbageCollectionValidation
 
     public static void Run()
     {
+        ValidateStringListInitializer();
+        ValidateDynamicStrings();
+
         s_staticReferenceRoot = new Value { Number = 8 };
         s_staticValueRoot = new ValueRoot { Value = new Value { Number = 12 } };
         GenericHolder<Value>.StaticReference = new Value { Number = 23 };
@@ -201,6 +204,94 @@ internal static class GarbageCollectionValidation
         Ensure(root.Self == root && root.Next.Next == root && root.Value.Link == root.Next.BaseValue,
             "cyclic object graph after repeated collection");
         Console.WriteLine("Garbage collection validation passed.");
+    }
+
+    private static void ValidateStringListInitializer()
+    {
+        List<string> values = new()
+        {
+            "string-list-value-0",
+            "string-list-value-1-longer",
+            "string-list-value-2",
+            "string-list-value-3-longer",
+            "string-list-value-4",
+            "string-list-value-5-longer",
+            "string-list-value-6",
+            "string-list-value-7-longer",
+            "string-list-value-8",
+            "string-list-value-9-longer"
+        };
+
+        for (int pass = 0; pass < 8; pass++)
+        {
+            AllocateGarbageBatch(200 + pass, 256);
+            GC.Collect();
+        }
+
+        Ensure(values.Count == 10, "string list count");
+        Ensure(object.ReferenceEquals("string-list-value-4", "string-list-value-4"), "interned string literal");
+        Ensure(values[0] == "string-list-value-0", "string list item 0");
+        Ensure(values[1] == "string-list-value-1-longer", "string list item 1");
+        Ensure(values[2] == "string-list-value-2", "string list item 2");
+        Ensure(values[3] == "string-list-value-3-longer", "string list item 3");
+        Ensure(values[4] == "string-list-value-4", "string list item 4");
+        Ensure(values[5] == "string-list-value-5-longer", "string list item 5");
+        Ensure(values[6] == "string-list-value-6", "string list item 6");
+        Ensure(values[7] == "string-list-value-7-longer", "string list item 7");
+        Ensure(values[8] == "string-list-value-8", "string list item 8");
+        Ensure(values[9] == "string-list-value-9-longer", "string list item 9");
+    }
+
+    private static void ValidateDynamicStrings()
+    {
+        string single = CreateDynamicString(0);
+        GC.Collect();
+        ValidateDynamicString(single, 0, "dynamic string local");
+
+        string[] array = new string[10];
+        for (int index = 0; index < array.Length; index++)
+            array[index] = CreateDynamicString(index);
+
+        for (int pass = 0; pass < 8; pass++)
+        {
+            AllocateGarbageBatch(300 + pass, 256);
+            GC.Collect();
+        }
+
+        for (int index = 0; index < array.Length; index++)
+            ValidateDynamicString(array[index], index, "dynamic string array");
+
+        List<string> values = new();
+        for (int index = 0; index < 10; index++)
+            values.Add(CreateDynamicString(index));
+
+        for (int pass = 0; pass < 8; pass++)
+        {
+            AllocateGarbageBatch(400 + pass, 256);
+            GC.Collect();
+        }
+
+        Ensure(values.Count == 10, "dynamic string list count");
+        Ensure(!object.ReferenceEquals(values[0], "dynamic-0"), "dynamic string allocation");
+        for (int index = 0; index < values.Count; index++)
+            ValidateDynamicString(values[index], index, "dynamic string list");
+    }
+
+    private static string CreateDynamicString(int index)
+    {
+        char[] characters =
+        [
+            'd', 'y', 'n', 'a', 'm', 'i', 'c', '-', (char)('0' + index)
+        ];
+        return new string(characters);
+    }
+
+    private static void ValidateDynamicString(string value, int index, string name)
+    {
+        Ensure(value.Length == 9, name + " length");
+        Ensure(value[0] == 'd', name + " first character");
+        Ensure(value[7] == '-', name + " separator");
+        Ensure(value[8] == (char)('0' + index), name + " final character");
     }
 
     private static void Ensure(bool condition, string name)

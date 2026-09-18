@@ -1638,7 +1638,8 @@ namespace System.Runtime
                 return;
             allocation->Marked = 1;
             Object* objectAddress = (Object*)((byte*)allocation + sizeof(GCAllocation));
-            Type type = objectAddress->m_pType;
+            Object objectValue = *(Object*)&objectAddress;
+            Type type = objectValue.m_pType;
             if (type != null)
                 ScanObject(objectAddress, type);
         }
