@@ -701,6 +701,8 @@ namespace System
             return length == 0 ? default : new Span<T>(ref _pointer.ElementAt(start), length);
         }
 
+        public ref readonly T GetPinnableReference() => ref _pointer.Value;
+
         public static implicit operator Span<T>(T[] array) => new Span<T>(array);
         public static implicit operator ReadOnlySpan<T>(Span<T> span)
             => new ReadOnlySpan<T>(ref span._pointer.Value, span._length);
