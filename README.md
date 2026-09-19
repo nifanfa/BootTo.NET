@@ -2,7 +2,9 @@
 
 ## Building
 
-Open `BootTo.NET.slnx` in Visual Studio and build the `x64` configuration. The managed project is compiled to IL, IL2LLVM produces `ConsoleApp1.obj`, and `EfiApplication` links it with the native libraries into `Drive/EFI/BOOT/BOOTX64.efi`.
+Open `BootTo.NET.slnx` in Visual Studio and build the `x64` configuration. The managed project is compiled to IL, IL2LLVM produces `ConsoleApp1.obj`, and `EfiApplication` links it with the native libraries into `Drive/EFI/BOOT/BOOTX64.efi`.  
+  
+You can simply start ConsoleApp1 or press F5. msbuild will handle the rest.
 <p align="center">
   <img alt="QQ_1787932865567" src="https://github.com/user-attachments/assets/aedd8930-933e-41c8-90c0-48376e5329e0" />
 </p>
