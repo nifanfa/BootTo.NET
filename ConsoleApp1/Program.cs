@@ -26,6 +26,7 @@ unsafe
 
 LanguageFeatureValidation.Run();
 GarbageCollectionValidation.Run();
+DateTimeValidation.Run();
 
 #if false
 // Open ftp://admin:12345@127.0.0.1 in explorer

@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Collections.Generic;
 
 namespace System
 {
@@ -2819,8 +2820,6 @@ namespace System.Collections.Generic
 
 namespace System.Linq
 {
-    using System.Collections.Generic;
-
     public static partial class Enumerable
     {
         public static IEnumerable<TResult> Select<TSource, TResult>(this IEnumerable<TSource> source, Func<TSource, TResult> selector)
