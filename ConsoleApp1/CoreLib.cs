@@ -1465,6 +1465,10 @@ namespace System
 
 namespace System.Runtime.InteropServices
 {
+    /// <summary>
+    /// Imports a native function. By default, the native function name is the C# method name.
+    /// Same-name overloads imported from "*" use their full method names. Set <see cref="EntryPoint"/> to choose another name.
+    /// </summary>
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class DllImportAttribute : Attribute
     {
