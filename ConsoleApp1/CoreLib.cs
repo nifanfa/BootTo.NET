@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Collections.Generic;
+using System.Runtime;
 
 namespace System
 {
@@ -21,7 +22,7 @@ namespace System
 
     public static class GC
     {
-        public static int Collect() => Runtime.GCHeap.Collect();
+        public static int Collect() => GCHeap.Collect();
     }
 
     public struct Void { }
@@ -544,7 +545,7 @@ namespace System
         {
             ValidateRange(array, startIndex, count);
             for (int i = 0; i < count; i++)
-                if (Object.Equals(array[startIndex + i], value))
+                if (Equals(array[startIndex + i], value))
                     return startIndex + i;
             return -1;
         }
@@ -565,10 +566,10 @@ namespace System
         }
 
         public static void Sort<T>(T[] array) => Sort(array, 0, array == null ? 0 : array.Length, null);
-        public static void Sort<T>(T[] array, Collections.Generic.IComparer<T> comparer)
+        public static void Sort<T>(T[] array, IComparer<T> comparer)
             => Sort(array, 0, array == null ? 0 : array.Length, comparer);
 
-        public static void Sort<T>(T[] array, int index, int length, Collections.Generic.IComparer<T> comparer)
+        public static void Sort<T>(T[] array, int index, int length, IComparer<T> comparer)
         {
             ValidateRange(array, index, length);
             for (int i = index + 1; i < index + length; i++)
@@ -776,7 +777,7 @@ namespace System
         public static implicit operator ReadOnlySpan<T>(T[] array) => new ReadOnlySpan<T>(array);
     }
 
-    public sealed class ArrayEnumerator<T> : Collections.Generic.IEnumerator<T>
+    public sealed class ArrayEnumerator<T> : IEnumerator<T>
     {
         private T[] _array;
         private int _index = -1;
@@ -1580,18 +1581,6 @@ namespace System.Runtime.CompilerServices
     public sealed class IsReadOnlyAttribute : Attribute { }
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class PreserveBaseOverridesAttribute : Attribute { }
-    public sealed class MethodImplAttribute : Attribute
-    {
-        public MethodImplAttribute(MethodImplOptions options) { }
-    }
-    public enum MethodImplOptions
-    {
-        NoInlining = 8,
-        AggressiveInlining = 256,
-        AggressiveOptimization = 512,
-        InternalCall = 4096
-    }
-
     public static class RuntimeFeature
     {
         public const string ByRefFields = nameof(ByRefFields);
@@ -1808,7 +1797,6 @@ namespace System.Runtime
             for (GCFrame* frame = GetTopFrame(); frame != null; frame = frame->Previous)
                 for (int index = 0; index < frame->RootCount; index++)
                     MarkRoot(frame->Roots[index].Address, frame->Roots[index].Type);
-
             while (s_pendingMarks != null)
             {
                 GCAllocation* pending = s_pendingMarks;
@@ -1964,6 +1952,12 @@ namespace System.Runtime
         public static Exception GetCurrent() => _current;
 
         public static void SetCurrent(Exception exception) => _current = exception;
+
+        public static void Restore(ExceptionFrame* top, Exception current)
+        {
+            _top = top;
+            _current = current;
+        }
 
         [DllImport("*", EntryPoint = "setjmp")]
         public static extern int SetJump(JumpBuffer* buffer, StackPointer* stackPointer);
@@ -2525,7 +2519,7 @@ namespace System.Collections.Generic
         public bool ContainsValue(TValue value)
         {
             for (int index = 0; index < _count; index++)
-                if (Object.Equals(_items[index].Value, value))
+                if (Equals(_items[index].Value, value))
                     return true;
             return false;
         }
@@ -2543,7 +2537,7 @@ namespace System.Collections.Generic
         }
 
         public bool Contains(KeyValuePair<TKey, TValue> item)
-            => TryGetValue(item.Key, out TValue value) && Object.Equals(value, item.Value);
+            => TryGetValue(item.Key, out TValue value) && Equals(value, item.Value);
 
         public bool Remove(KeyValuePair<TKey, TValue> item) => Contains(item) && Remove(item.Key);
 
@@ -2910,7 +2904,7 @@ namespace System.Linq
             try
             {
                 while (iterator.MoveNext())
-                    if (Object.Equals(iterator.Current, value))
+                    if (Equals(iterator.Current, value))
                         return true;
                 return false;
             }
@@ -3049,6 +3043,385 @@ namespace System.Linq
 
 namespace System.Threading
 {
+    public delegate void ThreadStart();
+
+    public sealed unsafe class Thread
+    {
+        private const int AutomaticYieldInterval = 65536;
+        private const int StackRestoreSafetyMargin = 256;
+        private const nuint StackRootRangeSlack = 65536;
+
+        private static Thread _current;
+        private static int _initialCriticalRegionCount;
+        private static int _automaticYieldCounter;
+        private static byte* _stackTop;
+
+        private ThreadStart _start;
+        private Thread _next;
+        private JumpBuffer* _context;
+        private byte* _stackCopy;
+        private nuint _stackSize;
+        private nuint _stackCapacity;
+        private GCFrame* _gcFrame;
+        private Object[] _rootSnapshot;
+        private int _rootCount;
+        private ExceptionFrame* _exceptionFrame;
+        private Exception _currentException;
+        private long _sleepUntil;
+        private int _criticalRegionCount;
+
+        public Thread(ThreadStart start)
+        {
+            if (start == null)
+                throw new ArgumentNullException("The thread start delegate cannot be null.");
+            _start = start;
+        }
+
+        private Thread() { }
+
+        public static Thread CurrentThread
+        {
+            get
+            {
+                EnsureInitialized();
+                return _current;
+            }
+        }
+
+        public bool IsAlive => _context != null;
+
+        public void Start()
+        {
+            if (_next != null)
+                throw new InvalidOperationException("The thread has already been started.");
+            EnsureInitialized();
+
+            _context = (JumpBuffer*)AllocateNative(1, (nuint)sizeof(JumpBuffer));
+            if (_context == null)
+                ExceptionRuntime.Abort();
+            _next = _current._next;
+            _current._next = this;
+        }
+
+        public void Join()
+        {
+            if (_next == null)
+                throw new InvalidOperationException("The thread has not been started.");
+            if (this == _current)
+                throw new InvalidOperationException("A thread cannot join itself.");
+            while (_context != null)
+                Yield();
+        }
+
+        public static bool Yield()
+        {
+            Thread current = _current;
+            if (current == null || current._next == current || current._criticalRegionCount != 0)
+                return false;
+
+            Thread next = FindRunnable(current._next, false);
+            if (next == current)
+                return false;
+            byte* stackTopMarker = stackalloc byte[1];
+            SwitchTo(next, stackTopMarker + 1);
+            return true;
+        }
+
+        internal static void AutomaticYield()
+        {
+            if (++_automaticYieldCounter < AutomaticYieldInterval)
+                return;
+
+            _automaticYieldCounter = 0;
+            Yield();
+        }
+
+        internal static void EnterCriticalRegion()
+        {
+            if (_current == null)
+                _initialCriticalRegionCount++;
+            else
+                _current._criticalRegionCount++;
+        }
+
+        internal static void ExitCriticalRegion()
+        {
+            if (_current == null)
+                _initialCriticalRegionCount--;
+            else
+                _current._criticalRegionCount--;
+        }
+
+        public static void Sleep(int millisecondsTimeout)
+        {
+            if (millisecondsTimeout < -1)
+                throw new ArgumentOutOfRangeException();
+            EnsureInitialized();
+            if (millisecondsTimeout == 0)
+            {
+                Yield();
+                return;
+            }
+
+            _current._sleepUntil = millisecondsTimeout == -1
+                ? long.MaxValue
+                : GetCurrentTimeMilliseconds() + millisecondsTimeout;
+            Thread next = FindRunnable(_current._next, true);
+            if (next != _current)
+            {
+                byte* stackTopMarker = stackalloc byte[1];
+                SwitchTo(next, stackTopMarker + 1);
+            }
+            _current._sleepUntil = 0;
+        }
+
+        private static void EnsureInitialized()
+        {
+            if (_current != null)
+                return;
+
+            Thread main = new Thread();
+            main._criticalRegionCount = _initialCriticalRegionCount;
+            _initialCriticalRegionCount = 0;
+            main._context = (JumpBuffer*)AllocateNative(1, (nuint)sizeof(JumpBuffer));
+            if (main._context == null)
+                ExceptionRuntime.Abort();
+            main._next = main;
+            _current = main;
+        }
+
+        private static Thread FindRunnable(Thread first, bool wait)
+        {
+            while (true)
+            {
+                long now = 0;
+                bool hasCurrentTime = false;
+                Thread candidate = first;
+                do
+                {
+                    if (candidate._sleepUntil == 0)
+                        return candidate;
+                    if (!hasCurrentTime)
+                    {
+                        now = GetCurrentTimeMilliseconds();
+                        hasCurrentTime = true;
+                    }
+                    if (candidate._sleepUntil <= now)
+                        return candidate;
+                    candidate = candidate._next;
+                }
+                while (candidate != first);
+
+                if (!wait)
+                    return _current;
+            }
+        }
+
+        private static void SwitchTo(Thread next, byte* stackTopHint)
+        {
+            Thread current = _current;
+            int resumed = ExceptionRuntime.SetJump(current._context, null);
+            if (resumed != 0)
+                return;
+
+            GCFrame* gcFrame = GCHeap.GetTopFrame();
+            byte* stackBottom = (byte*)((nuint)GetStackPointer() & ~(nuint)(sizeof(nuint) - 1));
+            if (_stackTop == null)
+                _stackTop = FindStackTop(stackBottom, stackTopHint, gcFrame,
+                    ExceptionRuntime.GetTop());
+            if (stackBottom >= _stackTop)
+                ExceptionRuntime.Abort();
+
+            nuint stackSize = (nuint)(_stackTop - stackBottom);
+            CaptureRoots(current, gcFrame);
+            EnsureStackCapacity(current, stackSize);
+            MemoryRuntime.Copy(current._stackCopy, stackBottom, stackSize);
+            current._stackSize = stackSize;
+            current._gcFrame = gcFrame;
+            current._exceptionFrame = ExceptionRuntime.GetTop();
+            current._currentException = ExceptionRuntime.GetCurrent();
+
+            Activate(next);
+        }
+
+        private static byte* FindStackTop(byte* stackBottom, byte* hint,
+            GCFrame* gcFrame, ExceptionFrame* exceptionFrame)
+        {
+            byte* top = hint;
+            for (GCFrame* frame = gcFrame; frame != null; frame = frame->Previous)
+            {
+                top = Max(top, (byte*)(frame + 1));
+                top = Max(top, (byte*)(frame->Roots + frame->RootCount));
+            }
+            for (ExceptionFrame* frame = exceptionFrame; frame != null; frame = frame->Previous)
+            {
+                top = Max(top, (byte*)(frame + 1));
+                top = Max(top, (byte*)(frame->Buffer + 1));
+            }
+
+            byte* rootLimit = top + StackRootRangeSlack;
+            for (GCFrame* frame = gcFrame; frame != null; frame = frame->Previous)
+            {
+                for (int index = 0; index < frame->RootCount; index++)
+                {
+                    GCRoot* root = frame->Roots + index;
+                    byte* address = (byte*)root->Address;
+                    if (address >= stackBottom && address < rootLimit)
+                        top = Max(top, address + GetRootValueSize(root));
+                }
+            }
+            return top;
+        }
+
+        private static byte* Max(byte* left, byte* right) => left >= right ? left : right;
+
+        private static nuint GetRootValueSize(GCRoot* root)
+        {
+            if (root->Type == null)
+                return (nuint)sizeof(Object*);
+            int[] offsets = root->Type.ObjectReferenceOffsets;
+            nuint size = 0;
+            for (int index = 0; index < offsets.Length; index++)
+            {
+                nuint end = (nuint)offsets[index] + (nuint)sizeof(Object*);
+                if (end > size)
+                    size = end;
+            }
+            return size;
+        }
+
+        private static void CaptureRoots(Thread thread, GCFrame* frame)
+        {
+            thread._rootCount = 0;
+            while (frame != null)
+            {
+                for (int index = 0; index < frame->RootCount; index++)
+                {
+                    GCRoot* root = frame->Roots + index;
+                    if (root->Address == null)
+                        continue;
+
+                    Type type = root->Type;
+                    if (type == null)
+                    {
+                        Object* value = *root->Address;
+                        if (value != null)
+                            AppendRoot(thread, *(Object*)&value);
+                        continue;
+                    }
+
+                    int[] offsets = type.ObjectReferenceOffsets;
+                    for (int offsetIndex = 0; offsetIndex < offsets.Length; offsetIndex++)
+                    {
+                        Object* value = *(Object**)((byte*)root->Address + offsets[offsetIndex]);
+                        if (value != null)
+                            AppendRoot(thread, *(Object*)&value);
+                    }
+                }
+                frame = frame->Previous;
+            }
+
+            if (thread._rootSnapshot != null)
+                for (int index = thread._rootCount; index < thread._rootSnapshot.Length; index++)
+                    thread._rootSnapshot[index] = null;
+        }
+
+        private static void AppendRoot(Thread thread, Object value)
+        {
+            if (thread._rootSnapshot == null)
+                thread._rootSnapshot = new Object[16];
+            else if (thread._rootCount == thread._rootSnapshot.Length)
+            {
+                Object[] roots = new Object[thread._rootSnapshot.Length * 2];
+                for (int index = 0; index < thread._rootCount; index++)
+                    roots[index] = thread._rootSnapshot[index];
+                thread._rootSnapshot = roots;
+            }
+            thread._rootSnapshot[thread._rootCount++] = value;
+        }
+
+        private static void EnsureStackCapacity(Thread thread, nuint size)
+        {
+            if (size <= thread._stackCapacity)
+                return;
+            byte* stackCopy = AllocateNative(1, size);
+            if (stackCopy == null)
+                ExceptionRuntime.Abort();
+            if (thread._stackCopy != null)
+                FreeNative(thread._stackCopy);
+            thread._stackCopy = stackCopy;
+            thread._stackCapacity = size;
+        }
+
+        private static void Activate(Thread thread)
+        {
+            _current = thread;
+            thread._sleepUntil = 0;
+            GCHeap.UnwindTo(null);
+            ThreadStart start = thread._start;
+            if (start != null)
+            {
+                thread._start = null;
+                ExceptionRuntime.Restore(null, null);
+                start();
+                CompleteCurrent();
+            }
+
+            RestoreStack(thread);
+        }
+
+        private static void CompleteCurrent()
+        {
+            Thread completed = _current;
+
+            Thread previous = completed._next;
+            while (previous._next != completed)
+                previous = previous._next;
+            previous._next = completed._next;
+
+            Thread next = FindRunnable(completed._next, true);
+            if (completed._stackCopy != null)
+                FreeNative(completed._stackCopy);
+            FreeNative((byte*)completed._context);
+            completed._context = null;
+            completed._rootSnapshot = null;
+
+            Activate(next);
+            ExceptionRuntime.Abort();
+        }
+
+        private static void RestoreStack(Thread thread)
+        {
+            byte* stackPointer = stackalloc byte[1];
+            byte* stackBottom = _stackTop - thread._stackSize;
+            if (stackPointer + StackRestoreSafetyMargin >= stackBottom)
+            {
+                RestoreStack(thread);
+                ExceptionRuntime.Abort();
+            }
+
+            MemoryRuntime.Copy(stackBottom, thread._stackCopy, thread._stackSize);
+            ExceptionRuntime.Restore(thread._exceptionFrame, thread._currentException);
+            GCHeap.UnwindTo(thread._gcFrame);
+            ExceptionRuntime.LongJump(thread._context, 1);
+        }
+
+        private static byte* GetStackPointer()
+        {
+            byte* marker = stackalloc byte[1];
+            return marker;
+        }
+
+        [DllImport("*", EntryPoint = "calloc")]
+        private static extern byte* AllocateNative(nuint count, nuint size);
+
+        [DllImport("*", EntryPoint = "free")]
+        private static extern void FreeNative(byte* value);
+
+        [DllImport("*", EntryPoint = "GetCurrentTimeMilliseconds")]
+        private static extern long GetCurrentTimeMilliseconds();
+    }
+
     public static class Monitor
     {
         public static void Enter(object value, ref bool lockTaken)
@@ -3056,15 +3429,22 @@ namespace System.Threading
             if (lockTaken)
                 throw new InvalidOperationException("The lock is already held.");
 
-            Enter(value);
+            EnterCore(value);
+            Thread.EnterCriticalRegion();
             lockTaken = true;
         }
 
         [DllImport("*", EntryPoint = "Enter")]
-        private static extern void Enter(object value);
+        private static extern void EnterCore(object value);
 
         [DllImport("*", EntryPoint = "Exit")]
-        public static extern void Exit(object value);
+        private static extern void ExitCore(object value);
+
+        public static void Exit(object value)
+        {
+            ExitCore(value);
+            Thread.ExitCriticalRegion();
+        }
     }
 }
 

@@ -1745,7 +1745,6 @@ public static class LanguageFeatureValidation
             Fail("array exceptions");
     }
 
-    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private static int EvaluateBase(FeatureBase feature) => feature.Evaluate();
 
     private static int ReadGenericValue<T>(T value)
@@ -2210,7 +2209,6 @@ public static class LanguageFeatureValidation
         }
     }
 
-    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private static void RethrowException(Exception exception)
     {
         try
@@ -2223,7 +2221,6 @@ public static class LanguageFeatureValidation
         }
     }
 
-    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private static Exception CatchSameFrameRethrow(Exception exception)
     {
         Exception caught = null;
@@ -2245,7 +2242,6 @@ public static class LanguageFeatureValidation
         return caught;
     }
 
-    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private static void RethrowAfterNestedCatch(Exception outer, Exception inner)
     {
         try
@@ -2335,7 +2331,6 @@ public static class LanguageFeatureValidation
         return result;
     }
 
-    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private static int RuntimeValue(int value)
     {
         return value + s_runtimeBias - 1;
@@ -2349,7 +2344,6 @@ public static class LanguageFeatureValidation
 
     private static T IdentityGeneric<T>(T value) => value;
 
-    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private static object HideObject(object value) => value;
 
     private static T DefaultGeneric<T>() => default;
