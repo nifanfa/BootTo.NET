@@ -3055,6 +3055,7 @@ namespace System.Threading
         private static int _initialCriticalRegionCount;
         private static int _automaticYieldCounter;
         private static byte* _stackTop;
+        private static JumpBuffer* _spillContext;
 
         private ThreadStart _start;
         private Thread _next;
@@ -3186,6 +3187,9 @@ namespace System.Threading
             main._context = (JumpBuffer*)AllocateNative(1, (nuint)sizeof(JumpBuffer));
             if (main._context == null)
                 ExceptionRuntime.Abort();
+            _spillContext = (JumpBuffer*)AllocateNative(1, (nuint)sizeof(JumpBuffer));
+            if (_spillContext == null)
+                ExceptionRuntime.Abort();
             main._next = main;
             _current = main;
         }
@@ -3225,7 +3229,7 @@ namespace System.Threading
                 return;
 
             GCFrame* gcFrame = GCHeap.GetTopFrame();
-            byte* stackBottom = (byte*)((nuint)GetStackPointer() & ~(nuint)(sizeof(nuint) - 1));
+            byte* stackBottom = stackalloc byte[1];
             if (_stackTop == null)
                 _stackTop = FindStackTop(stackBottom, stackTopHint, gcFrame,
                     ExceptionRuntime.GetTop());
@@ -3400,16 +3404,13 @@ namespace System.Threading
                 ExceptionRuntime.Abort();
             }
 
+            // Some ABIs keep caller frames in register windows. Materialize them before
+            // the active stack is overwritten; setjmp already performs that ABI work.
+            ExceptionRuntime.SetJump(_spillContext, null);
             MemoryRuntime.Copy(stackBottom, thread._stackCopy, thread._stackSize);
             ExceptionRuntime.Restore(thread._exceptionFrame, thread._currentException);
             GCHeap.UnwindTo(thread._gcFrame);
             ExceptionRuntime.LongJump(thread._context, 1);
-        }
-
-        private static byte* GetStackPointer()
-        {
-            byte* marker = stackalloc byte[1];
-            return marker;
         }
 
         [DllImport("*", EntryPoint = "calloc")]

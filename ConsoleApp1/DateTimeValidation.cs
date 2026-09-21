@@ -35,7 +35,7 @@ internal static unsafe class DateTimeValidation
             "days in month");
 
         DateTime now = DateTime.UtcNow;
-        Ensure(now.Year >= 2020 && now.Year <= 9999, "current year");
+        Ensure(now.Year >= 1970 && now.Year <= 9999, "current year");
         Ensure(now.Kind == DateTimeKind.Utc, "current UTC kind");
         Ensure(now.AddMilliseconds(1).Ticks - now.Ticks == TimeSpan.TicksPerMillisecond,
             "millisecond precision");
