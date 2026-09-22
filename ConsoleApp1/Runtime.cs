@@ -32,27 +32,6 @@ public static unsafe class RuntimeExports
 
 }
 
-internal static unsafe class EfiNativeMemory
-{
-    [DllImport("*", EntryPoint = "malloc")]
-    private static extern void* Malloc(nuint size);
-
-    [DllImport("*", EntryPoint = "free")]
-    private static extern void FreeCore(void* allocation);
-
-    internal static void* Allocate(ulong size) => Malloc((nuint)size);
-
-    internal static void Free(void* allocation) => FreeCore(allocation);
-
-    internal static void Copy(void* destination, void* source, ulong length)
-    {
-        byte* destinationBytes = (byte*)destination;
-        byte* sourceBytes = (byte*)source;
-        for (ulong index = 0; index < length; index++)
-            destinationBytes[index] = sourceBytes[index];
-    }
-}
-
 internal static class RuntimeObjectHandle
 {
     private static object[] handles = new object[4];

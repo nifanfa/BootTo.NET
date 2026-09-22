@@ -46,7 +46,7 @@ namespace System.Drawing
 
             if (error != 0)
             {
-                EfiNativeMemory.Free(output);
+                Marshal.FreeHGlobal((IntPtr)output);
                 throw new ArgumentException("The PNG data could not be decoded. LodePNG error " + error + ".");
             }
 
@@ -65,7 +65,7 @@ namespace System.Drawing
             }
             finally
             {
-                EfiNativeMemory.Free(output);
+                Marshal.FreeHGlobal((IntPtr)output);
             }
         }
 

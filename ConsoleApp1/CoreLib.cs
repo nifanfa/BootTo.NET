@@ -1451,6 +1451,22 @@ namespace System
 
     [AttributeUsage(AttributeTargets.Parameter)]
     public sealed class ParamArrayAttribute : Attribute { }
+    [AttributeUsage(AttributeTargets.All, Inherited = false)]
+    public sealed class ObsoleteAttribute : Attribute
+    {
+        public ObsoleteAttribute() { }
+        public ObsoleteAttribute(string message) { Message = message; }
+        public ObsoleteAttribute(string message, bool error)
+        {
+            Message = message;
+            IsError = error;
+        }
+
+        public string Message { get; }
+        public bool IsError { get; }
+        public string DiagnosticId { get; set; }
+        public string UrlFormat { get; set; }
+    }
     public static partial class Console
     {
         [DllImport("*")]
@@ -1554,6 +1570,15 @@ namespace System.Runtime.InteropServices
         HString = 47,
         LPUTF8Str = 48,
     }
+
+    public static unsafe class Marshal
+    {
+        [DllImport("*", EntryPoint = "malloc")]
+        public static extern IntPtr AllocHGlobal(nint byteCount);
+
+        [DllImport("*", EntryPoint = "free")]
+        public static extern void FreeHGlobal(IntPtr value);
+    }
 }
 
 namespace System.Runtime
@@ -1602,16 +1627,22 @@ namespace System.Runtime.CompilerServices
         {
             if (array == null || fieldHandle.Data == null || fieldHandle.Length == 0)
                 return;
-            byte* source = fieldHandle.Data;
-            byte* destination = array.m_pData;
-            for (int index = 0; index < fieldHandle.Length; index++)
-                destination[index] = source[index];
+            Unsafe.CopyBlock(array.m_pData, fieldHandle.Data, (uint)fieldHandle.Length);
         }
 
         public static ReadOnlySpan<T> CreateSpan<T>(RuntimeFieldHandle fieldHandle)
         {
             return new ReadOnlySpan<T>(fieldHandle.Data, fieldHandle.Length / sizeof(T));
         }
+    }
+
+    public static unsafe class Unsafe
+    {
+        [DllImport("*", EntryPoint = "memcpy")]
+        public static extern void CopyBlock(void* destination, void* source, uint byteCount);
+
+        [DllImport("*", EntryPoint = "memset")]
+        public static extern void InitBlock(void* startAddress, byte value, uint byteCount);
     }
 
     public sealed class ExtensionAttribute : Attribute { }
@@ -1751,21 +1782,28 @@ namespace System.Runtime
         private static nuint s_allocatedBytes;
         private static nuint s_collectionThreshold;
 
-        [DllImport("*", EntryPoint = "calloc")]
-        private static extern byte* Calloc(nuint count, nuint size);
-
-        [DllImport("*", EntryPoint = "free")]
-        private static extern void Free(GCAllocation* value);
-
         public static Object* Allocate(nuint size)
         {
             if (s_allocatedBytes >= s_collectionThreshold ||
                 size > s_collectionThreshold - s_allocatedBytes)
                 Collect();
 
-            GCAllocation* allocation = (GCAllocation*)Calloc(1, size + (nuint)sizeof(GCAllocation));
+            nuint headerSize = (nuint)sizeof(GCAllocation);
+            if (size > ~(nuint)0 - headerSize)
+                ExceptionRuntime.Abort();
+            nuint allocationSize = size + headerSize;
+            GCAllocation* allocation = (GCAllocation*)(void*)Marshal.AllocHGlobal((nint)allocationSize);
             if (allocation == null)
                 ExceptionRuntime.Abort();
+            byte* clearAddress = (byte*)allocation;
+            nuint clearRemaining = allocationSize;
+            while (clearRemaining != 0)
+            {
+                uint clearLength = clearRemaining > uint.MaxValue ? uint.MaxValue : (uint)clearRemaining;
+                Unsafe.InitBlock(clearAddress, 0, clearLength);
+                clearAddress += clearLength;
+                clearRemaining -= clearLength;
+            }
             allocation->Next = s_allocations;
             allocation->Size = size;
             s_allocations = allocation;
@@ -1829,7 +1867,7 @@ namespace System.Runtime
                         s_allocations = next;
                     else
                         previous->Next = next;
-                    Free(allocation);
+                    Marshal.FreeHGlobal((IntPtr)allocation);
                     collected++;
                     allocation = next;
                 }
@@ -1902,15 +1940,6 @@ namespace System.Runtime
             }
         }
 
-    }
-
-    internal static unsafe class MemoryRuntime
-    {
-        [DllImport("*", EntryPoint = "memcpy")]
-        public static extern void Copy(byte* destination, byte* source, nuint length);
-
-        [DllImport("*", EntryPoint = "memset")]
-        public static extern void Fill(byte* destination, byte value, nuint length);
     }
 
     internal struct StackPointer { }
@@ -3045,6 +3074,7 @@ namespace System.Threading
 {
     public delegate void ThreadStart();
 
+    [Obsolete("Use Task-based APIs instead. Thread is a cooperative green-thread implementation.")]
     public sealed unsafe class Thread
     {
         private const int AutomaticYieldInterval = 65536;
@@ -3097,7 +3127,7 @@ namespace System.Threading
                 throw new InvalidOperationException("The thread has already been started.");
             EnsureInitialized();
 
-            _context = (JumpBuffer*)AllocateNative(1, (nuint)sizeof(JumpBuffer));
+            _context = (JumpBuffer*)(void*)Marshal.AllocHGlobal((nint)sizeof(JumpBuffer));
             if (_context == null)
                 ExceptionRuntime.Abort();
             _next = _current._next;
@@ -3114,27 +3144,30 @@ namespace System.Threading
                 Yield();
         }
 
-        public static bool Yield()
+        public static bool Yield(bool generated = false)
         {
-            Thread current = _current;
-            if (current == null || current._next == current || current._criticalRegionCount != 0)
-                return false;
+            if (generated)
+            {
+                if (++_automaticYieldCounter < AutomaticYieldInterval)
+                    return false;
+                _automaticYieldCounter = 0;
+            }
 
-            Thread next = FindRunnable(current._next, false);
-            if (next == current)
-                return false;
-            byte* stackTopMarker = stackalloc byte[1];
-            SwitchTo(next, stackTopMarker + 1);
-            return true;
-        }
+            return YieldCore();
 
-        internal static void AutomaticYield()
-        {
-            if (++_automaticYieldCounter < AutomaticYieldInterval)
-                return;
+            static bool YieldCore()
+            {
+                Thread current = _current;
+                if (current == null || current._next == current || current._criticalRegionCount != 0)
+                    return false;
 
-            _automaticYieldCounter = 0;
-            Yield();
+                Thread next = FindRunnable(current._next, false);
+                if (next == current)
+                    return false;
+                byte* stackTopMarker = stackalloc byte[1];
+                SwitchTo(next, stackTopMarker + 1);
+                return true;
+            }
         }
 
         internal static void EnterCriticalRegion()
@@ -3184,10 +3217,10 @@ namespace System.Threading
             Thread main = new Thread();
             main._criticalRegionCount = _initialCriticalRegionCount;
             _initialCriticalRegionCount = 0;
-            main._context = (JumpBuffer*)AllocateNative(1, (nuint)sizeof(JumpBuffer));
+            main._context = (JumpBuffer*)(void*)Marshal.AllocHGlobal((nint)sizeof(JumpBuffer));
             if (main._context == null)
                 ExceptionRuntime.Abort();
-            _spillContext = (JumpBuffer*)AllocateNative(1, (nuint)sizeof(JumpBuffer));
+            _spillContext = (JumpBuffer*)(void*)Marshal.AllocHGlobal((nint)sizeof(JumpBuffer));
             if (_spillContext == null)
                 ExceptionRuntime.Abort();
             main._next = main;
@@ -3239,7 +3272,7 @@ namespace System.Threading
             nuint stackSize = (nuint)(_stackTop - stackBottom);
             CaptureRoots(current, gcFrame);
             EnsureStackCapacity(current, stackSize);
-            MemoryRuntime.Copy(current._stackCopy, stackBottom, stackSize);
+            Unsafe.CopyBlock(current._stackCopy, stackBottom, (uint)stackSize);
             current._stackSize = stackSize;
             current._gcFrame = gcFrame;
             current._exceptionFrame = ExceptionRuntime.GetTop();
@@ -3348,11 +3381,11 @@ namespace System.Threading
         {
             if (size <= thread._stackCapacity)
                 return;
-            byte* stackCopy = AllocateNative(1, size);
+            byte* stackCopy = (byte*)(void*)Marshal.AllocHGlobal((nint)size);
             if (stackCopy == null)
                 ExceptionRuntime.Abort();
             if (thread._stackCopy != null)
-                FreeNative(thread._stackCopy);
+                Marshal.FreeHGlobal((IntPtr)thread._stackCopy);
             thread._stackCopy = stackCopy;
             thread._stackCapacity = size;
         }
@@ -3385,8 +3418,8 @@ namespace System.Threading
 
             Thread next = FindRunnable(completed._next, true);
             if (completed._stackCopy != null)
-                FreeNative(completed._stackCopy);
-            FreeNative((byte*)completed._context);
+                Marshal.FreeHGlobal((IntPtr)completed._stackCopy);
+            Marshal.FreeHGlobal((IntPtr)completed._context);
             completed._context = null;
             completed._rootSnapshot = null;
 
@@ -3407,17 +3440,11 @@ namespace System.Threading
             // Some ABIs keep caller frames in register windows. Materialize them before
             // the active stack is overwritten; setjmp already performs that ABI work.
             ExceptionRuntime.SetJump(_spillContext, null);
-            MemoryRuntime.Copy(stackBottom, thread._stackCopy, thread._stackSize);
+            Unsafe.CopyBlock(stackBottom, thread._stackCopy, (uint)thread._stackSize);
             ExceptionRuntime.Restore(thread._exceptionFrame, thread._currentException);
             GCHeap.UnwindTo(thread._gcFrame);
             ExceptionRuntime.LongJump(thread._context, 1);
         }
-
-        [DllImport("*", EntryPoint = "calloc")]
-        private static extern byte* AllocateNative(nuint count, nuint size);
-
-        [DllImport("*", EntryPoint = "free")]
-        private static extern void FreeNative(byte* value);
 
         [DllImport("*", EntryPoint = "GetCurrentTimeMilliseconds")]
         private static extern long GetCurrentTimeMilliseconds();
@@ -3425,27 +3452,107 @@ namespace System.Threading
 
     public static class Monitor
     {
+        private sealed class MonitorEntry
+        {
+            internal object Value;
+            internal Thread Owner;
+            internal int RecursionCount;
+            internal MonitorEntry Next;
+        }
+
+        private static MonitorEntry s_entries;
+
+        public static void Enter(object value)
+        {
+            bool lockTaken = false;
+            Enter(value, ref lockTaken);
+        }
+
         public static void Enter(object value, ref bool lockTaken)
         {
             if (lockTaken)
                 throw new InvalidOperationException("The lock is already held.");
+            if (value == null)
+                throw new ArgumentNullException("The lock object cannot be null.");
 
-            EnterCore(value);
-            Thread.EnterCriticalRegion();
-            lockTaken = true;
+            Thread owner = Thread.CurrentThread;
+            while (true)
+            {
+                Thread.EnterCriticalRegion();
+                MonitorEntry entry = FindEntry(value, out _);
+                if (entry == null)
+                {
+                    s_entries = new MonitorEntry
+                    {
+                        Value = value,
+                        Owner = owner,
+                        RecursionCount = 1,
+                        Next = s_entries
+                    };
+                    Thread.ExitCriticalRegion();
+                    lockTaken = true;
+                    return;
+                }
+
+                if (entry.Owner == owner)
+                {
+                    entry.RecursionCount++;
+                    Thread.ExitCriticalRegion();
+                    lockTaken = true;
+                    return;
+                }
+
+                Thread.ExitCriticalRegion();
+                Thread.Yield();
+            }
         }
-
-        [DllImport("*", EntryPoint = "Enter")]
-        private static extern void EnterCore(object value);
-
-        [DllImport("*", EntryPoint = "Exit")]
-        private static extern void ExitCore(object value);
 
         public static void Exit(object value)
         {
-            ExitCore(value);
+            if (value == null)
+                throw new ArgumentNullException("The lock object cannot be null.");
+
+            Thread owner = Thread.CurrentThread;
+            Thread.EnterCriticalRegion();
+            MonitorEntry previous;
+            MonitorEntry entry = FindEntry(value, out previous);
+            if (entry == null || entry.Owner != owner)
+            {
+                Thread.ExitCriticalRegion();
+                throw new SynchronizationLockException();
+            }
+
+            if (--entry.RecursionCount == 0)
+            {
+                if (previous == null)
+                    s_entries = entry.Next;
+                else
+                    previous.Next = entry.Next;
+            }
             Thread.ExitCriticalRegion();
         }
+
+        private static MonitorEntry FindEntry(object value, out MonitorEntry previous)
+        {
+            previous = null;
+            MonitorEntry entry = s_entries;
+            while (entry != null)
+            {
+                if (entry.Value == value)
+                    return entry;
+                previous = entry;
+                entry = entry.Next;
+            }
+            return null;
+        }
+    }
+
+    public class SynchronizationLockException : Exception
+    {
+        public SynchronizationLockException()
+            : base("Object synchronization method was called from an unsynchronized block of code.") { }
+
+        public SynchronizationLockException(string message) : base(message) { }
     }
 }
 
