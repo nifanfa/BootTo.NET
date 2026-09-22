@@ -66,7 +66,7 @@ internal static class TaskScheduler
         {
             for (; ; )
             {
-                Yield();
+                TaskScheduler.Yield();
                 Thread.Yield();
             }
         });
