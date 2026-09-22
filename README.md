@@ -6,7 +6,7 @@ Open `BootTo.NET.slnx` in Visual Studio and build the `x64` configuration. The m
   
 You can simply start ConsoleApp1 or press F5. msbuild will handle the rest.
 <p align="center">
-  <img alt="QQ_1787932865567" src="https://github.com/user-attachments/assets/aedd8930-933e-41c8-90c0-48376e5329e0" />
+  <img alt="QQ_1790065570809" src="https://github.com/user-attachments/assets/328eb422-4b0e-40bf-b9fa-3f66b9573486" />
 </p>
 
 ## Synopsis
