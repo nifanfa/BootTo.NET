@@ -24,6 +24,7 @@ unsafe
     printf("Hello world from printf, Time:%s\n"u8, __arglist((ByReference<byte>)time));
 }
 
+ThreadValidation.Run();
 LanguageFeatureValidation.Run();
 GarbageCollectionValidation.Run();
 DateTimeValidation.Run();
