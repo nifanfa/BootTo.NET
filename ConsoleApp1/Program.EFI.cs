@@ -121,7 +121,7 @@ partial class Program
         new System.Media.SoundPlayer(@"\Nokia - Breath.wav").PlaySync();
 #endif
 
-#if true
+#if false
 #if false
         doomgeneric.Run();
 #else
@@ -129,7 +129,7 @@ partial class Program
 #endif
 #endif
 
-#if false
+#if true
         Console.WriteLine("+++++++++++++++++++++++++++");
         string[] files = Directory.GetFiles(@"\");
         for (int i = 0; i < files.Length; i++)

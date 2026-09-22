@@ -1,8 +1,8 @@
+using System.Collections.Generic;
+using System.Runtime;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Collections.Generic;
-using System.Runtime;
 
 namespace System
 {
@@ -479,7 +479,8 @@ namespace System
     }
     public abstract unsafe class Array
     {
-        public int Length;
+        internal int _length;
+        public int Length => _length;
         private int[] _lengths;
         internal int m_elementSize;
         internal byte* m_pData;
@@ -3075,7 +3076,7 @@ namespace System.Threading
     public delegate void ThreadStart();
 
     [Obsolete("Use Task-based APIs instead. Thread is a cooperative green-thread implementation.")]
-    public sealed unsafe class Thread
+    public sealed unsafe partial class Thread
     {
         private const int AutomaticYieldInterval = 65536;
         private const int StackRestoreSafetyMargin = 256;
@@ -3085,7 +3086,6 @@ namespace System.Threading
         private static int _initialCriticalRegionCount;
         private static int _automaticYieldCounter;
         private static byte* _stackTop;
-        private static JumpBuffer* _spillContext;
 
         private ThreadStart _start;
         private Thread _next;
@@ -3219,9 +3219,6 @@ namespace System.Threading
             _initialCriticalRegionCount = 0;
             main._context = (JumpBuffer*)(void*)Marshal.AllocHGlobal((nint)sizeof(JumpBuffer));
             if (main._context == null)
-                ExceptionRuntime.Abort();
-            _spillContext = (JumpBuffer*)(void*)Marshal.AllocHGlobal((nint)sizeof(JumpBuffer));
-            if (_spillContext == null)
                 ExceptionRuntime.Abort();
             main._next = main;
             _current = main;
@@ -3437,14 +3434,21 @@ namespace System.Threading
                 ExceptionRuntime.Abort();
             }
 
-            // Some ABIs keep caller frames in register windows. Materialize them before
-            // the active stack is overwritten; setjmp already performs that ABI work.
-            ExceptionRuntime.SetJump(_spillContext, null);
+            SpillRegisterWindows();
             Unsafe.CopyBlock(stackBottom, thread._stackCopy, (uint)thread._stackSize);
             ExceptionRuntime.Restore(thread._exceptionFrame, thread._currentException);
             GCHeap.UnwindTo(thread._gcFrame);
             ExceptionRuntime.LongJump(thread._context, 1);
         }
+
+        /// <summary>
+        /// Spills live register windows to the stack before the active stack is overwritten.
+        /// Platforms that use register windows, such as the Xtensa windowed ABI, must provide
+        /// an implementation. This is an optional C# partial method so platform-specific projects
+        /// can supply the implementation without adding platform dependencies to CoreLib. If a
+        /// platform does not implement it, the C# compiler removes the declaration and its calls.
+        /// </summary>
+        static partial void SpillRegisterWindows();
 
         [DllImport("*", EntryPoint = "GetCurrentTimeMilliseconds")]
         private static extern long GetCurrentTimeMilliseconds();
