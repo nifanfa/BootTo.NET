@@ -74,7 +74,7 @@
     <ClCompile Include="EfiApplication.c" />
   </ItemGroup>
   <ItemGroup Condition="'$(Platform)'=='x64'">
-    <Link Include="$(SolutionDir)ConsoleApp1\obj\$(Configuration)\ConsoleApp1.obj" />
+    <Link Include="$(SolutionDir)ConsoleApp1\bin\$(Configuration)\net10.0\ConsoleApp1.obj" />
   </ItemGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <TargetName>BOOTX64</TargetName>

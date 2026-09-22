@@ -19,7 +19,7 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <IL2LLVMTool>$(MSBuildThisFileDirectory)IL2LLVM\IL2LLVM.exe</IL2LLVMTool>
     <IL2LLVMTarget>x86_64-pc-windows-msvc</IL2LLVMTarget>
-    <IL2LLVMObject>$(ProjectDir)obj\$(Configuration)\$(TargetName).obj</IL2LLVMObject>
+    <IL2LLVMObject>$(OutDir)$(TargetName).obj</IL2LLVMObject>
     <EfiApplicationProject>$(MSBuildThisFileDirectory)EfiApplication\EfiApplication.vcxproj</EfiApplicationProject>
     <DisableFastUpToDateCheck Condition="'$(BuildingInsideVisualStudio)' == 'true'">true</DisableFastUpToDateCheck>
     <Nullable>disable</Nullable>
