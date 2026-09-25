@@ -31,39 +31,3 @@ public static unsafe class RuntimeExports
     public static void Exit(object value) => TaskScheduler.Exit(value);
 
 }
-
-internal static class RuntimeObjectHandle
-{
-    private static object[] handles = new object[4];
-
-    internal static IntPtr Allocate(object value)
-    {
-        for (int index = 0; index < handles.Length; index++)
-        {
-            if (handles[index] != null)
-                continue;
-            handles[index] = value;
-            return new IntPtr(index + 1);
-        }
-
-        int oldLength = handles.Length;
-        Array.Resize(ref handles, oldLength * 2);
-        handles[oldLength] = value;
-        return new IntPtr(oldLength + 1);
-    }
-
-    internal static T Get<T>(IntPtr handle) where T : class
-    {
-        int index = (int)handle - 1;
-        if ((uint)index >= (uint)handles.Length)
-            return null;
-        return handles[index] as T;
-    }
-
-    internal static void Free(IntPtr handle)
-    {
-        int index = (int)handle - 1;
-        if ((uint)index < (uint)handles.Length)
-            handles[index] = null;
-    }
-}
