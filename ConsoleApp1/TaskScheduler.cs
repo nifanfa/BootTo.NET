@@ -1,5 +1,5 @@
 using System;
-using System.Threading;
+using System.Timers;
 
 internal abstract class TaskPoller
 {
@@ -14,7 +14,7 @@ internal static class TaskScheduler
     private static TaskPoller s_pollers;
     private static bool s_yielding;
     private static bool s_yieldAgain;
-    private static Thread s_schedulerThread;
+    private static Timer s_schedulerTimer;
 
     private static EFI_TPL s_previousTpl;
     private static int s_lockDepth;
@@ -59,20 +59,16 @@ internal static class TaskScheduler
 
     private static void EnsureSchedulerTimer()
     {
-        if (s_schedulerThread != null)
+        if (s_schedulerTimer != null)
             return;
 
-        Thread thread = new Thread(() =>
-        {
-            for (; ; )
-            {
-                TaskScheduler.Yield();
-                Thread.Yield();
-            }
-        });
-        thread.Start();
-        s_schedulerThread = thread;
+        Timer timer = new Timer(1);
+        timer.Elapsed += SchedulerTimerElapsed;
+        timer.Start();
+        s_schedulerTimer = timer;
     }
+
+    private static void SchedulerTimerElapsed(object sender, EventArgs args) => Yield();
 
     internal static void Unregister(TaskPoller poller)
     {
