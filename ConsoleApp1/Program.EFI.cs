@@ -121,7 +121,7 @@ partial class Program
         new System.Media.SoundPlayer(@"\Nokia - Breath.wav").PlaySync();
 #endif
 
-#if false
+#if true
 #if false
         doomgeneric.Run();
 #else
@@ -129,7 +129,7 @@ partial class Program
 #endif
 #endif
 
-#if true
+#if false
         Console.WriteLine("+++++++++++++++++++++++++++");
         string[] files = Directory.GetFiles(@"\");
         for (int i = 0; i < files.Length; i++)
@@ -313,7 +313,6 @@ partial class Program
                     Console.Write('#');
                 else Console.Write(' ');
             }
-            Console.WriteLine();
         }
         Console.Write(Convert.ToBoolean(IsTcg()) ? "Slow QEMU TCG detected. Enable Windows Hypervisor Platform." : string.Empty);
     }

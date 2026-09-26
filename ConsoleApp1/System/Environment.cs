@@ -1,11 +1,10 @@
 namespace System
 {
-    public static class Environment
+    public static partial class Environment
     {
         private static string _currentDirectory = "\\";
         private static int _exitCode;
 
-        public static string NewLine => "\r\n";
         public static string CommandLine => string.Empty;
         public static int ExitCode { get => _exitCode; set => _exitCode = value; }
         public static int TickCount => unchecked((int)TickCount64);

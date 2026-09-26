@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Runtime;
 using System.Runtime.InteropServices;
 namespace System
 {
@@ -330,12 +331,7 @@ namespace System
             }
         }
 
-        public static void Write(char c)
-        {
-            lock (s_syncRoot)
-                WriteImpl(c);
-        }
-
+        [RuntimeExport("System_Console_Write_Char")]
         private static void WriteImpl(char c)
         {
             SIMPLE_TEXT_OUTPUT_INTERFACE* consoleOut = GetConsoleOutput();
@@ -350,21 +346,6 @@ namespace System
                 consoleOut->Mode->CursorColumn == 0;
         }
 
-        public static void Write(string s)
-        {
-            lock (s_syncRoot)
-                WriteStringImpl(s);
-        }
-
-        public static void WriteLine(string s)
-        {
-            lock (s_syncRoot)
-            {
-                WriteStringImpl(s);
-                WriteLineImpl();
-            }
-        }
-
         public static void Write(bool value) => Write(value ? "True" : "False");
         public static void Write(byte value) => Write(value.ToString());
         public static void Write(sbyte value) => Write(value.ToString());
@@ -376,7 +357,6 @@ namespace System
         public static void Write(ulong value) => Write(value.ToString());
         public static void Write(float value) => Write(value.ToString());
         public static void Write(double value) => Write(value.ToString());
-        public static void Write(object value) => Write(value?.ToString() ?? string.Empty);
 
         public static void Write(char[] buffer)
         {
@@ -411,21 +391,6 @@ namespace System
         public static void Write(string format, params object[] args)
             => Write(String.Format(format, args));
 
-        public static void WriteLine()
-        {
-            lock (s_syncRoot)
-                WriteLineImpl();
-        }
-
-        public static void WriteLine(char c)
-        {
-            lock (s_syncRoot)
-            {
-                WriteImpl(c);
-                WriteLineImpl();
-            }
-        }
-
         public static void WriteLine(bool value) => WriteLine(value ? "True" : "False");
         public static void WriteLine(byte value) => WriteLine(value.ToString());
         public static void WriteLine(sbyte value) => WriteLine(value.ToString());
@@ -437,7 +402,6 @@ namespace System
         public static void WriteLine(ulong value) => WriteLine(value.ToString());
         public static void WriteLine(float value) => WriteLine(value.ToString());
         public static void WriteLine(double value) => WriteLine(value.ToString());
-        public static void WriteLine(object value) => WriteLine(value?.ToString() ?? string.Empty);
 
         public static void WriteLine(char[] buffer)
         {

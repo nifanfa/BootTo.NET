@@ -1129,6 +1129,8 @@ namespace System
             }
             return result;
         }
+
+        public static implicit operator string(ReadOnlySpan<byte> readOnlySpan) => new string(Encoding.UTF8.GetChars(readOnlySpan));
     }
 
     public class Exception
@@ -1468,16 +1470,53 @@ namespace System
         public string DiagnosticId { get; set; }
         public string UrlFormat { get; set; }
     }
+    public static partial class Environment
+    {
+        public static string NewLine => "\r\n";
+    }
+
     public static partial class Console
     {
-        [DllImport("*")]
-        public static extern void Write(ByReference<char> value);
-        [DllImport("*")]
-        public static extern void WriteLine(ByReference<char> value);
-        [DllImport("*")]
-        public static extern void Write(ByReference<byte> value);
-        [DllImport("*")]
-        public static extern void WriteLine(ByReference<byte> value);
+        [DllImport("*", EntryPoint = "System_Console_Write_Char")]
+        public static extern void Write(char value);
+
+        public static void Write(string value)
+        {
+            if (value == null)
+                return;
+            for (int index = 0; index < value.Length; index++)
+                Write(value[index]);
+        }
+
+        public static void Write(ReadOnlySpan<byte> value) => Write(Encoding.UTF8.GetString(value));
+
+        public static void Write(object value) => Write(value == null ? null : value.ToString());
+
+        public static void WriteLine() => Write(Environment.NewLine);
+
+        public static void WriteLine(char value)
+        {
+            Write(value);
+            WriteLine();
+        }
+
+        public static void WriteLine(string value)
+        {
+            Write(value);
+            WriteLine();
+        }
+
+        public static void WriteLine(ReadOnlySpan<byte> value)
+        {
+            Write(value);
+            WriteLine();
+        }
+
+        public static void WriteLine(object value)
+        {
+            Write(value);
+            WriteLine();
+        }
     }
 }
 
@@ -3304,6 +3343,170 @@ namespace System.Threading.Tasks
 
 namespace System.Text
 {
+    public abstract class Encoding
+    {
+        public static Encoding UTF8 { get; } = new UTF8Encoding();
+
+        protected Encoding() { }
+
+        public abstract int GetByteCount(string value);
+        public abstract byte[] GetBytes(string value);
+        public abstract int GetCharCount(ReadOnlySpan<byte> bytes);
+        public abstract char[] GetChars(ReadOnlySpan<byte> bytes);
+
+        public int GetCharCount(byte[] bytes)
+        {
+            if (bytes == null)
+                throw new ArgumentNullException("The byte array cannot be null.");
+            return GetCharCount(new ReadOnlySpan<byte>(bytes));
+        }
+
+        public char[] GetChars(byte[] bytes)
+        {
+            if (bytes == null)
+                throw new ArgumentNullException("The byte array cannot be null.");
+            return GetChars(new ReadOnlySpan<byte>(bytes));
+        }
+
+        public string GetString(byte[] bytes)
+        {
+            if (bytes == null)
+                throw new ArgumentNullException("The byte array cannot be null.");
+            return GetString(new ReadOnlySpan<byte>(bytes));
+        }
+
+        public string GetString(byte[] bytes, int index, int count)
+        {
+            if (bytes == null)
+                throw new ArgumentNullException("The byte array cannot be null.");
+            return GetString(new ReadOnlySpan<byte>(bytes, index, count));
+        }
+
+        public string GetString(ReadOnlySpan<byte> bytes) => new string(GetChars(bytes));
+    }
+
+    public class UTF8Encoding : Encoding
+    {
+        public UTF8Encoding() { }
+
+        public override int GetByteCount(string value)
+        {
+            if (value == null)
+                throw new ArgumentNullException("The string cannot be null.");
+
+            int count = 0;
+            for (int index = 0; index < value.Length; index++)
+            {
+                int scalar = GetScalar(value, ref index);
+                count += scalar < 0x80 ? 1 : scalar < 0x800 ? 2 : scalar < 0x10000 ? 3 : 4;
+            }
+            return count;
+        }
+
+        public override byte[] GetBytes(string value)
+        {
+            byte[] bytes = new byte[GetByteCount(value)];
+            int position = 0;
+            for (int index = 0; index < value.Length; index++)
+            {
+                int scalar = GetScalar(value, ref index);
+                if (scalar < 0x80)
+                    bytes[position++] = (byte)scalar;
+                else if (scalar < 0x800)
+                {
+                    bytes[position++] = (byte)(0xC0 | (scalar >> 6));
+                    bytes[position++] = (byte)(0x80 | (scalar & 0x3F));
+                }
+                else if (scalar < 0x10000)
+                {
+                    bytes[position++] = (byte)(0xE0 | (scalar >> 12));
+                    bytes[position++] = (byte)(0x80 | ((scalar >> 6) & 0x3F));
+                    bytes[position++] = (byte)(0x80 | (scalar & 0x3F));
+                }
+                else
+                {
+                    bytes[position++] = (byte)(0xF0 | (scalar >> 18));
+                    bytes[position++] = (byte)(0x80 | ((scalar >> 12) & 0x3F));
+                    bytes[position++] = (byte)(0x80 | ((scalar >> 6) & 0x3F));
+                    bytes[position++] = (byte)(0x80 | (scalar & 0x3F));
+                }
+            }
+            return bytes;
+        }
+
+        public override int GetCharCount(ReadOnlySpan<byte> bytes)
+        {
+            int count = 0;
+            for (int index = 0; index < bytes.Length;)
+                count += DecodeScalar(bytes, ref index) < 0x10000 ? 1 : 2;
+            return count;
+        }
+
+        public override char[] GetChars(ReadOnlySpan<byte> bytes)
+        {
+            char[] characters = new char[GetCharCount(bytes)];
+            int position = 0;
+            for (int index = 0; index < bytes.Length;)
+            {
+                int scalar = DecodeScalar(bytes, ref index);
+                if (scalar < 0x10000)
+                    characters[position++] = (char)scalar;
+                else
+                {
+                    scalar -= 0x10000;
+                    characters[position++] = (char)(0xD800 | (scalar >> 10));
+                    characters[position++] = (char)(0xDC00 | (scalar & 0x3FF));
+                }
+            }
+            return characters;
+        }
+
+        private static int GetScalar(string value, ref int index)
+        {
+            int character = value[index];
+            if (character >= 0xD800 && character <= 0xDBFF && index + 1 < value.Length)
+            {
+                int next = value[index + 1];
+                if (next >= 0xDC00 && next <= 0xDFFF)
+                {
+                    index++;
+                    return 0x10000 + ((character - 0xD800) << 10) + next - 0xDC00;
+                }
+            }
+            return character >= 0xD800 && character <= 0xDFFF ? 0xFFFD : character;
+        }
+
+        private static int DecodeScalar(ReadOnlySpan<byte> bytes, ref int index)
+        {
+            int first = bytes[index++];
+            if (first < 0x80)
+                return first;
+
+            int length = first >= 0xC2 && first <= 0xDF ? 2
+                : first >= 0xE0 && first <= 0xEF ? 3
+                : first >= 0xF0 && first <= 0xF4 ? 4 : 0;
+            if (length == 0)
+                return 0xFFFD;
+
+            int scalar = first & (0x7F >> length);
+            for (int offset = 1; offset < length; offset++)
+            {
+                if (index >= bytes.Length)
+                    return 0xFFFD;
+
+                int next = bytes[index];
+                if ((next & 0xC0) != 0x80 || offset == 1 &&
+                    (first == 0xE0 && next < 0xA0 || first == 0xED && next >= 0xA0 ||
+                     first == 0xF0 && next < 0x90 || first == 0xF4 && next >= 0x90))
+                    return 0xFFFD;
+
+                index++;
+                scalar = (scalar << 6) | (next & 0x3F);
+            }
+            return scalar;
+        }
+    }
+
     public sealed class StringBuilder
     {
         private char[] _buffer;
