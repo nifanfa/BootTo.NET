@@ -1,5 +1,8 @@
 # BootTo.NET Project
 
+## IL2LLVM
+This project is based on: https://github.com/nifanfa/IL2LLVM
+
 ## Building
 
 Open `BootTo.NET.slnx` in Visual Studio and build the `x64` configuration. The managed project is compiled to IL, IL2LLVM produces `ConsoleApp1.obj`, and `EfiApplication` links it with the native libraries into `Drive/EFI/BOOT/BOOTX64.efi`.  
