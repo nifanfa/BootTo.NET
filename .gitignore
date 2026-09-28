@@ -365,6 +365,7 @@ FodyWeavers.xsd
 Drive/NvVars
 Drive/EFI/BOOT/BOOTX64.efi
 /Drive.img
+/Drive/Grand Theft Auto 3/
 *.scoreboard
 *.vmem
 *.lck

@@ -141,7 +141,7 @@
       <MapFileName>$(IntDir)$(TargetName).map</MapFileName>
       <EntryPointSymbol>EfiMain</EntryPointSymbol>
       <IgnoreAllDefaultLibraries>true</IgnoreAllDefaultLibraries>
-      <AdditionalDependencies>$(SolutionDir)x64\$(Configuration)\NativeLib.lib;$(SolutionDir)x64\$(Configuration)\doomgeneric.lib;$(SolutionDir)x64\$(Configuration)\quakegeneric.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(SolutionDir)x64\$(Configuration)\StdLib.lib;$(SolutionDir)x64\$(Configuration)\NativeLib.lib;$(SolutionDir)x64\$(Configuration)\doomgeneric.lib;$(SolutionDir)x64\$(Configuration)\quakegeneric.lib</AdditionalDependencies>
       <OptimizeReferences>true</OptimizeReferences>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <DataExecutionPrevention>false</DataExecutionPrevention>
@@ -155,6 +155,7 @@
       <WarningLevel>Level3</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>Default</ConformanceMode>
@@ -169,7 +170,7 @@
       <MapFileName>$(IntDir)$(TargetName).map</MapFileName>
       <EntryPointSymbol>EfiMain</EntryPointSymbol>
       <IgnoreAllDefaultLibraries>true</IgnoreAllDefaultLibraries>
-      <AdditionalDependencies>$(SolutionDir)x64\$(Configuration)\NativeLib.lib;$(SolutionDir)x64\$(Configuration)\doomgeneric.lib;$(SolutionDir)x64\$(Configuration)\quakegeneric.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(SolutionDir)x64\$(Configuration)\StdLib.lib;$(SolutionDir)x64\$(Configuration)\NativeLib.lib;$(SolutionDir)x64\$(Configuration)\doomgeneric.lib;$(SolutionDir)x64\$(Configuration)\quakegeneric.lib</AdditionalDependencies>
       <OptimizeReferences>true</OptimizeReferences>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <DataExecutionPrevention>false</DataExecutionPrevention>
@@ -177,6 +178,11 @@
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>
     </Manifest>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Platform)' == 'x64'">
+    <Link>
+      <AdditionalDependencies>$(SolutionDir)re3generic\x64\$(Configuration)\re3generic.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

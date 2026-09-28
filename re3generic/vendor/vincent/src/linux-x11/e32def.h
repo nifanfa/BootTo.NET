@@ -1,0 +1,1 @@
+/* Stub file to circumvent compiler warnings */

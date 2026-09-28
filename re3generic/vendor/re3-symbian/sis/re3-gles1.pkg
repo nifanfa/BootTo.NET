@@ -1,0 +1,26 @@
+#{"GTA III"},(0xe0d67647),1,0,3
+
+[0x101F7961], 0, 0, 0, {"S60ProductID"} ; S60v3
+[0x1028315F], 0, 0, 0, {"S60ProductID"} ; ^1
+[0x20022E6D], 0, 0, 0, {"S60ProductID"} ; ^3
+
+%{"nnproject"}
+:"nnproject"
+
+"$(EPOCROOT)epoc32\release\$(PLATFORM)\$(TARGET)\re3_gles1.exe"-"!:\sys\bin\re3.exe"
+"$(EPOCROOT)\epoc32\data\z\private\10003a3f\import\apps\re3_reg.rsc" - "!:\private\10003a3f\import\apps\re3_reg.rsc"
+"$(EPOCROOT)\epoc32\data\z\resource\apps\re3.rsc" - "!:\resource\apps\re3.rsc"
+"$(EPOCROOT)\epoc32\data\z\resource\apps\re3_icon.mif" - "!:\resource\apps\re3_icon.mif"
+
+"..\gamefiles\data\PARTICLE.CFG" - "E:\data\gta3\data\PARTICLE.CFG"
+"..\gamefiles\models\fonts_j.txd" - "E:\data\gta3\models\fonts_j.txd"
+"..\gamefiles\models\fonts_p.txd" - "E:\data\gta3\models\fonts_p.txd"
+"..\gamefiles\models\fonts_r.txd" - "E:\data\gta3\models\fonts_r.txd"
+"..\gamefiles\TEXT\american.gxt" - "E:\data\gta3\TEXT\american.gxt"
+"..\gamefiles\TEXT\english.gxt" - "E:\data\gta3\TEXT\english.gxt"
+"..\gamefiles\TEXT\french.gxt" - "E:\data\gta3\TEXT\french.gxt"
+"..\gamefiles\TEXT\german.gxt" - "E:\data\gta3\TEXT\german.gxt"
+"..\gamefiles\TEXT\italian.gxt" - "E:\data\gta3\TEXT\italian.gxt"
+"..\gamefiles\TEXT\JAPANESE.gxt" - "E:\data\gta3\TEXT\JAPANESE.gxt"
+"..\gamefiles\TEXT\polish.gxt" - "E:\data\gta3\TEXT\polish.gxt"
+"..\gamefiles\TEXT\spanish.gxt" - "E:\data\gta3\TEXT\spanish.gxt"

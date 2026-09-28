@@ -1,0 +1,110 @@
+#include "common.mmh"
+
+TARGETTYPE	  exe
+UID			 0 0xe0d67647
+
+LIBRARY	euser.lib
+LIBRARY libc.lib
+LIBRARY libm.lib
+LIBRARY libpthread.lib
+LIBRARY apparc.lib
+LIBRARY cone.lib
+LIBRARY eikcore.lib
+LIBRARY avkon.lib
+LIBRARY ws32.lib
+LIBRARY hal.lib
+LIBRARY featdiscovery.lib
+LIBRARY mediaclientaudiostream.lib
+LIBRARY mediaclientaudio.lib
+
+EPOCSTACKSIZE 0x14000
+EPOCHEAPSIZE 0x80000 0x4000000
+
+SYSTEMINCLUDE ../vendor/librw
+
+SOURCEPATH .
+START RESOURCE re3.rss
+HEADER
+TARGETPATH \resource\apps
+LANG SC
+END
+
+START RESOURCE re3_reg.rss
+TARGETPATH \private\10003a3f\import\apps
+END
+
+CAPABILITY NetworkServices ReadUserData WriteUserData
+
+USERINCLUDE ../src
+USERINCLUDE ../src/animation
+USERINCLUDE ../src/audio
+USERINCLUDE ../src/buildings
+USERINCLUDE ../src/collision
+USERINCLUDE ../src/control
+USERINCLUDE ../src/core
+USERINCLUDE ../src/entities
+USERINCLUDE ../src/extras
+USERINCLUDE ../src/fakerw
+USERINCLUDE ../src/math
+USERINCLUDE ../src/modelinfo
+USERINCLUDE ../src/objects
+USERINCLUDE ../src/peds
+USERINCLUDE ../src/renderer
+USERINCLUDE ../src/rw
+USERINCLUDE ../src/save
+USERINCLUDE ../src/skel
+USERINCLUDE ../src/text
+USERINCLUDE ../src/vehicles
+USERINCLUDE ../src/weapons
+
+SOURCEPATH ../src/animation
+SOURCE AnimBlendAssocGroup.cpp AnimBlendAssociation.cpp AnimBlendClumpData.cpp AnimBlendHierarchy.cpp AnimBlendNode.cpp AnimBlendSequence.cpp AnimManager.cpp Bones.cpp CutsceneMgr.cpp FrameUpdate.cpp RpAnimBlend.cpp
+SOURCEPATH ../src/audio
+SOURCE AudioCollision.cpp AudioLogic.cpp AudioManager.cpp AudioScriptObject.cpp DMAudio.cpp MusicManager.cpp PolRadio.cpp
+SOURCEPATH ../src/audio/oal
+SOURCE aldlist.cpp channel.cpp oal_utils.cpp stream.cpp
+SOURCEPATH ../src/audio
+SOURCE sampman_miles.cpp sampman_null.cpp sampman_oal.cpp sampman_symbian.cpp
+SOURCEPATH ../src/buildings
+SOURCE Building.cpp Treadable.cpp
+SOURCEPATH ../src/collision
+SOURCE ColBox.cpp ColLine.cpp ColModel.cpp ColPoint.cpp ColSphere.cpp ColTriangle.cpp Collision.cpp TempColModels.cpp VuCollision.cpp
+SOURCEPATH ../src/control
+SOURCE AutoPilot.cpp Bridge.cpp CarAI.cpp CarCtrl.cpp Curves.cpp Darkel.cpp GameLogic.cpp Garages.cpp NameGrid.cpp OnscreenTimer.cpp PathFind.cpp Phones.cpp Pickups.cpp PowerPoints.cpp Record.cpp Remote.cpp Replay.cpp Restart.cpp RoadBlocks.cpp SceneEdit.cpp Script.cpp Script2.cpp Script3.cpp Script4.cpp Script5.cpp Script6.cpp ScriptDebug.cpp TrafficLights.cpp
+SOURCEPATH ../src/core
+SOURCE Accident.cpp AnimViewer.cpp Cam.cpp Camera.cpp CdStream.cpp CdStreamPosix.cpp Clock.cpp ControllerConfig.cpp Debug.cpp Directory.cpp EventList.cpp FileLoader.cpp FileMgr.cpp Fire.cpp FrontEndControls.cpp Frontend.cpp Frontend_PS2.cpp Game.cpp IniFile.cpp Lists.cpp MenuScreens.cpp MenuScreensCustom.cpp Pad.cpp Placeable.cpp PlayerInfo.cpp Pools.cpp Profile.cpp Radar.cpp Range2D.cpp Range3D.cpp References.cpp Stats.cpp Streaming.cpp SurfaceTable.cpp TimeStep.cpp Timer.cpp User.cpp Wanted.cpp World.cpp ZoneCull.cpp Zones.cpp main.cpp obrstr.cpp re3.cpp timebars.cpp
+SOURCEPATH ../src/entities
+SOURCE Dummy.cpp Entity.cpp Physical.cpp
+SOURCEPATH ../src/extras
+SOURCE custompipes.cpp custompipes_d3d9.cpp custompipes_gl.cpp debugmenu.cpp frontendoption.cpp postfx.cpp screendroplets.cpp
+SOURCEPATH ../src/fakerw
+SOURCE fake.cpp
+SOURCEPATH ../src/math
+SOURCE Matrix.cpp Quaternion.cpp Rect.cpp Vector.cpp math.cpp
+SOURCEPATH ../src/modelinfo
+SOURCE BaseModelInfo.cpp ClumpModelInfo.cpp MloModelInfo.cpp ModelIndices.cpp ModelInfo.cpp PedModelInfo.cpp SimpleModelInfo.cpp TimeModelInfo.cpp VehicleModelInfo.cpp
+SOURCEPATH ../src/objects
+SOURCE CutsceneHead.cpp CutsceneObject.cpp DummyObject.cpp Object.cpp ObjectData.cpp ParticleObject.cpp Projectile.cpp
+SOURCEPATH ../src/peds
+SOURCE CivilianPed.cpp CopPed.cpp EmergencyPed.cpp Gangs.cpp Ped.cpp PedAI.cpp PedChat.cpp PedDebug.cpp PedFight.cpp PedIK.cpp PedPlacement.cpp PedRoutes.cpp PedType.cpp PlayerPed.cpp Population.cpp
+SOURCEPATH ../src/renderer
+SOURCE Antennas.cpp Clouds.cpp Console.cpp Coronas.cpp Credits.cpp Draw.cpp Fluff.cpp Font.cpp Glass.cpp Hud.cpp Instance.cpp Lines.cpp MBlur.cpp Particle.cpp ParticleMgr.cpp PlayerSkin.cpp PointLights.cpp RenderBuffer.cpp Renderer.cpp Rubbish.cpp Shadows.cpp Skidmarks.cpp SpecialFX.cpp Sprite.cpp Sprite2d.cpp TexList.cpp Timecycle.cpp WaterCannon.cpp WaterLevel.cpp Weather.cpp
+SOURCEPATH ../src/rw
+SOURCE ClumpRead.cpp Lights.cpp MemoryHeap.cpp MemoryMgr.cpp NodeName.cpp RwHelper.cpp RwMatFX.cpp RwPS2AlphaTest.cpp TexRead.cpp TexturePools.cpp TxdStore.cpp VisibilityPlugins.cpp
+SOURCEPATH ../src/save
+SOURCE Date.cpp GenericGameStorage.cpp MemoryCard.cpp PCSave.cpp
+SOURCEPATH ../src/skel
+SOURCE crossplatform.cpp events.cpp
+SOURCEPATH ../src/skel
+SOURCE skeleton.cpp
+SOURCEPATH ../src/skel/symbian
+SOURCE symbian.cpp
+SOURCEPATH ../src/text
+SOURCE Messages.cpp Pager.cpp Text.cpp
+SOURCEPATH ../src/vehicles
+SOURCE Automobile.cpp Boat.cpp CarGen.cpp Cranes.cpp DamageManager.cpp Door.cpp Floater.cpp HandlingMgr.cpp Heli.cpp Plane.cpp Train.cpp Transmission.cpp Vehicle.cpp
+SOURCEPATH ../src/weapons
+SOURCE BulletInfo.cpp Explosion.cpp ProjectileInfo.cpp ShotInfo.cpp Weapon.cpp WeaponEffects.cpp WeaponInfo.cpp
+
+SOURCEPATH ../vendor/librw/src
+SOURCE assert.cpp

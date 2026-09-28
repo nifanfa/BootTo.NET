@@ -4,8 +4,8 @@
 
   <PropertyGroup Condition="'$(BuildingInsideVisualStudio)' == 'true' and '$(MSBuildProjectExtension)' == '.csproj'">
     <StartAction>Program</StartAction>
-    <StartProgram>cmd.exe</StartProgram>
-    <StartArguments>/d /s /c &quot;&quot;$(QemuExecutable)&quot; $(QemuArguments)&quot;</StartArguments>
+    <StartProgram>$(MSBuildToolsPath)\MSBuild.exe</StartProgram>
+    <StartArguments>&quot;$(MSBuildProjectFullPath)&quot; -target:RunQemu -nologo -verbosity:quiet</StartArguments>
     <StartWorkingDirectory>$(MSBuildThisFileDirectory)</StartWorkingDirectory>
   </PropertyGroup>
 

@@ -1,0 +1,3 @@
+#undef SYMBIAN3
+TARGET librw_gles1.lib
+#include "librw.mmh"

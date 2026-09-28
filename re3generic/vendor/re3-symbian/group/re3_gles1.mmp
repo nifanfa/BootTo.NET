@@ -1,0 +1,8 @@
+#undef SYMBIAN_3
+//TARGET re3_gles1.exe
+TARGET re3_gles1.exe
+LIBRARY libstdcpp.lib
+LIBRARY libgles_cm.lib
+STATICLIBRARY librw_gles1.lib
+ARMFPU softvfp
+#include "re3.mmh"

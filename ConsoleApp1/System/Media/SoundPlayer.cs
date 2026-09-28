@@ -126,6 +126,9 @@ namespace System.Media
         // Appends signed 16-bit PCM. AudioDxe owns the streaming cache; this
         // call applies backpressure when producers outrun playback.
         public int Play(byte[] buffer, int offset, int count)
+            => Play(buffer, offset, count, true);
+
+        internal int Play(byte[] buffer, int offset, int count, bool waitForCapacity)
         {
             if (_pcmChannels == 0)
                 throw new InvalidOperationException("This SoundPlayer was not configured for PCM playback.");
@@ -136,7 +139,7 @@ namespace System.Media
             if (count % frameBytes != 0)
                 return 0;
 
-            return AppendPcm(buffer, offset, count, _pcmChannels, _pcmSampleRate);
+            return AppendPcm(buffer, offset, count, _pcmChannels, _pcmSampleRate, waitForCapacity);
         }
 
         internal ulong GetBufferedInputFrameCount(int inputSampleRate)
@@ -572,7 +575,7 @@ namespace System.Media
             }
             gBS->RestoreTPL(oldTpl);
 
-            gBS->FreePool(rawBuffer);
+            Marshal.FreeHGlobal((IntPtr)rawBuffer);
             if ((ulong)status == EFI_SUCCESS)
             {
                 s_streamingPlaybackActive = true;
@@ -608,7 +611,8 @@ namespace System.Media
             int offset,
             int count,
             int channels,
-            int sampleRate)
+            int sampleRate,
+            bool waitForCapacity)
         {
             if (buffer == null || offset < 0 || count <= 0 ||
                 offset > buffer.Length - count || channels <= 0 || channels > 2 ||
@@ -618,6 +622,22 @@ namespace System.Media
             int frameBytes = channels * 2;
             if (count % frameBytes != 0)
                 return 0;
+
+            if (!waitForCapacity && IsAvailable)
+            {
+                ulong inputFrames = (ulong)(count / frameBytes);
+                ulong maxOutputFrames = (inputFrames * OutputSampleRate + (ulong)sampleRate - 1) /
+                    (ulong)sampleRate + 1;
+                ulong maxOutputBytes = maxOutputFrames * OutputChannels * sizeof(short);
+                if (maxOutputBytes > MinimumStreamingBufferBytes)
+                    return 0;
+
+                EFI_TPL capacityTpl = gBS->RaiseTPL(TPL_NOTIFY);
+                bool hasCapacity = s_remainingBytes <= MinimumStreamingBufferBytes - maxOutputBytes;
+                gBS->RestoreTPL(capacityTpl);
+                if (!hasCapacity)
+                    return 0;
+            }
 
             byte[] output = ConvertStreamingPcm(
                 buffer,
@@ -636,7 +656,7 @@ namespace System.Media
                 return count;
             }
 
-            if (!ReserveStreamingCapacity(outputLength))
+            if (!ReserveStreamingCapacity(outputLength, waitForCapacity))
                 return 0;
 
             void* rawBuffer = (void*)Marshal.AllocHGlobal((nint)outputLength);
@@ -670,7 +690,7 @@ namespace System.Media
             }
             gBS->RestoreTPL(oldTpl);
 
-            gBS->FreePool(rawBuffer);
+            Marshal.FreeHGlobal((IntPtr)rawBuffer);
             if ((ulong)status == EFI_SUCCESS)
             {
                 s_streamingPlaybackActive = true;
@@ -819,6 +839,9 @@ namespace System.Media
         }
 
         private static bool ReserveStreamingCapacity(ulong byteCount)
+            => ReserveStreamingCapacity(byteCount, true);
+
+        private static bool ReserveStreamingCapacity(ulong byteCount, bool waitForCapacity)
         {
             if (byteCount == 0)
                 return false;
@@ -840,6 +863,9 @@ namespace System.Media
 
                 if (hasCapacity)
                     return true;
+
+                if (!waitForCapacity)
+                    return false;
 
                 gBS->Stall(1000);
             }

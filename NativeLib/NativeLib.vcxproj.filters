@@ -18,9 +18,6 @@
     <ClCompile Include="printf.c">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="string.c">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="MathHelpers.c">
       <Filter>源文件</Filter>
     </ClCompile>

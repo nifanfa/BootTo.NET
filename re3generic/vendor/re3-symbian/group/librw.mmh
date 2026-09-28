@@ -1,0 +1,28 @@
+#include "common.mmh"
+
+TARGETTYPE lib
+
+USERINCLUDE ../vendor/librw
+USERINCLUDE ../vendor/librw/src
+
+SOURCEPATH ../vendor/librw/src
+SOURCE anim.cpp base.cpp bmp.cpp camera.cpp charset.cpp clump.cpp
+SOURCEPATH ../vendor/librw/src/d3d
+SOURCE d3d.cpp d3d8.cpp d3d8matfx.cpp d3d8render.cpp d3d8skin.cpp d3d9.cpp d3d9matfx.cpp d3d9render.cpp d3d9skin.cpp d3ddevice.cpp d3dimmed.cpp d3drender.cpp xbox.cpp xboxmatfx.cpp xboxskin.cpp xboxvfmt.cpp
+SOURCEPATH ../vendor/librw/src
+SOURCE engine.cpp error.cpp frame.cpp geometry.cpp geoplg.cpp
+SOURCEPATH ../vendor/librw/src/gl
+SOURCE gl3.cpp gl3device.cpp gl3immed.cpp gl3matfx.cpp gl3pipe.cpp gl3raster.cpp gl3render.cpp gl3shader.cpp gl3skin.cpp wdgl.cpp
+SOURCEPATH ../vendor/librw/src/gles1
+SOURCE gl1.cpp gl1device.cpp gl1immed.cpp gl1matfx.cpp gl1pipe.cpp gl1raster.cpp gl1render.cpp gl1skin.cpp
+SOURCEPATH ../vendor/librw/src
+SOURCE hanim.cpp image.cpp light.cpp
+SOURCEPATH ../vendor/librw/src/lodepng
+SOURCE lodepng.cpp
+SOURCEPATH ../vendor/librw/src
+SOURCE matfx.cpp pipeline.cpp plg.cpp png.cpp prim.cpp
+SOURCEPATH ../vendor/librw/src/ps2
+SOURCE pds.cpp ps2.cpp ps2device.cpp ps2matfx.cpp ps2raster.cpp ps2skin.cpp
+SOURCEPATH ../vendor/librw/src
+SOURCE raster.cpp render.cpp skin.cpp texture.cpp tga.cpp tristrip.cpp userdata.cpp uvanim.cpp world.cpp
+SOURCE assert.cpp printf_stub.c

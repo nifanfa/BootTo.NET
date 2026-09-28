@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Runtime;
 
@@ -8,54 +9,82 @@ internal static unsafe class NativeFileIO
 {
     private const int MaximumOpenFiles = 64;
     private static readonly OpenFile[] s_openFiles = new OpenFile[MaximumOpenFiles];
+    private static readonly string[][] s_findFiles = new string[MaximumOpenFiles][];
+    private static readonly int[] s_findPositions = new int[MaximumOpenFiles];
+
+    [RuntimeExport("BTDN_FindFirst")]
+    public static int FindFirst(byte* pattern, byte* name, ulong* modified)
+    {
+        int slot = 0;
+        while (slot < MaximumOpenFiles && s_findFiles[slot] != null)
+            slot++;
+        if (slot == MaximumOpenFiles || name == null || modified == null)
+            return 0;
+        try
+        {
+            string path = NormalizePath(DecodeAscii(pattern));
+            if (path[0] != '\\')
+                path = Path.Combine(@"\Grand Theft Auto 3", path);
+            string directory = Path.GetDirectoryName(path);
+            string mask = Path.GetFileName(path);
+            string[] files = Directory.GetFiles(string.IsNullOrEmpty(directory) ? @"\" : directory, mask);
+            if (files.Length == 0)
+                return 0;
+            s_findFiles[slot] = files;
+            s_findPositions[slot] = 0;
+            CopyFindResult(files[0], name, modified);
+            return slot + 1;
+        }
+        catch
+        {
+            s_findFiles[slot] = null;
+            return 0;
+        }
+    }
+
+    [RuntimeExport("BTDN_FindNext")]
+    public static int FindNext(int handle, byte* name, ulong* modified)
+    {
+        int slot = handle - 1;
+        if ((uint)slot >= MaximumOpenFiles || s_findFiles[slot] == null || name == null || modified == null)
+            return 0;
+        int position = s_findPositions[slot] + 1;
+        if (position >= s_findFiles[slot].Length)
+            return 0;
+        s_findPositions[slot] = position;
+        CopyFindResult(s_findFiles[slot][position], name, modified);
+        return 1;
+    }
+
+    [RuntimeExport("BTDN_FindClose")]
+    public static void FindClose(int handle)
+    {
+        int slot = handle - 1;
+        if ((uint)slot < MaximumOpenFiles)
+            s_findFiles[slot] = null;
+    }
+
+    private static void CopyFindResult(string path, byte* name, ulong* modified)
+    {
+        string filename = Path.GetFileName(path);
+        int length = filename.Length < 259 ? filename.Length : 259;
+        for (int index = 0; index < length; index++)
+            name[index] = (byte)filename[index];
+        name[length] = 0;
+        *modified = (ulong)(File.GetLastWriteTime(path).Ticks - 504911232000000000L);
+    }
 
     private sealed class OpenFile
     {
-        internal readonly string Path;
-        internal byte[] Buffer;
-        internal int Length;
-        internal int Position;
+        internal readonly FileStream Stream;
         internal readonly bool CanRead;
         internal readonly bool CanWrite;
-        internal bool Dirty;
 
-        internal OpenFile(string path, byte[] buffer, bool canRead, bool canWrite, bool append, bool dirty)
+        internal OpenFile(FileStream stream, bool canRead, bool canWrite)
         {
-            Path = path;
-            Buffer = buffer;
-            Length = buffer.Length;
-            Position = append ? Length : 0;
+            Stream = stream;
             CanRead = canRead;
             CanWrite = canWrite;
-            Dirty = dirty;
-        }
-
-        internal void EnsureCapacity(int required)
-        {
-            if (required <= Buffer.Length)
-                return;
-
-            int capacity = Buffer.Length == 0 ? 4096 : Buffer.Length;
-            while (capacity < required)
-            {
-                int next = capacity <= int.MaxValue / 2 ? capacity * 2 : int.MaxValue;
-                if (next == capacity)
-                    throw new IOException("The file is too large.");
-                capacity = next;
-            }
-
-            byte[] resized = new byte[capacity];
-            for (int i = 0; i < Length; i++)
-                resized[i] = Buffer[i];
-            Buffer = resized;
-        }
-
-        internal byte[] GetContents()
-        {
-            byte[] contents = new byte[Length];
-            for (int i = 0; i < Length; i++)
-                contents[i] = Buffer[i];
-            return contents;
         }
     }
 
@@ -78,26 +107,18 @@ internal static unsafe class NativeFileIO
                 return 0;
 
             bool update = Contains(openMode, '+');
-            bool exists = File.Exists(filePath);
-            if (operation == 'r' && !exists)
-                return 0;
-
             bool canRead = operation == 'r' || update;
             bool canWrite = operation != 'r' || update;
-            bool append = operation == 'a';
-            bool truncate = operation == 'w';
-            byte[] contents = !truncate && exists ? File.ReadAllBytes(filePath) : new byte[0];
-
             if (canWrite)
                 EnsureParentDirectory(filePath);
-
-            s_openFiles[slot] = new OpenFile(
-                filePath,
-                contents,
-                canRead,
-                canWrite,
-                append,
-                truncate || (append && !exists));
+            FileMode fileMode = operation == 'r' ? FileMode.Open :
+                operation == 'w' ? FileMode.Create : FileMode.OpenOrCreate;
+            FileAccess access = canRead && canWrite ? FileAccess.ReadWrite :
+                canRead ? FileAccess.Read : FileAccess.Write;
+            FileStream stream = new FileStream(filePath, fileMode, access, FileShare.Read);
+            if (operation == 'a')
+                stream.Position = stream.Length;
+            s_openFiles[slot] = new OpenFile(stream, canRead, canWrite);
             return slot + 1;
         }
         catch
@@ -112,16 +133,21 @@ internal static unsafe class NativeFileIO
         OpenFile file = GetFile(handle);
         if (file == null || !file.CanRead || length < 0 || (destination == null && length != 0))
             return -1;
-        if (length == 0 || file.Position >= file.Length)
+        if (length == 0)
             return 0;
-
-        int count = file.Length - file.Position;
-        if (count > length)
-            count = length;
-        for (int i = 0; i < count; i++)
-            destination[i] = file.Buffer[file.Position + i];
-        file.Position += count;
-        return count;
+        try
+        {
+            int total = 0;
+            while (total < length)
+            {
+                int count = file.Stream.Read(destination + total, Math.Min(length - total, 65536));
+                total += count;
+                if (count == 0)
+                    break;
+            }
+            return total;
+        }
+        catch { return -1; }
     }
 
     [RuntimeExport("BTDN_FileWrite")]
@@ -135,17 +161,16 @@ internal static unsafe class NativeFileIO
 
         try
         {
-            int required = checked(file.Position + length);
-            file.EnsureCapacity(required);
-            for (int i = file.Length; i < file.Position; i++)
-                file.Buffer[i] = 0;
-            for (int i = 0; i < length; i++)
-                file.Buffer[file.Position + i] = source[i];
-
-            file.Position = required;
-            if (file.Length < required)
-                file.Length = required;
-            file.Dirty = true;
+            byte[] buffer = new byte[length < 65536 ? length : 65536];
+            int total = 0;
+            while (total < length)
+            {
+                int count = length - total < buffer.Length ? length - total : buffer.Length;
+                for (int i = 0; i < count; i++)
+                    buffer[i] = source[total + i];
+                file.Stream.Write(buffer, 0, count);
+                total += count;
+            }
             return length;
         }
         catch
@@ -161,28 +186,23 @@ internal static unsafe class NativeFileIO
         if (file == null)
             return -1;
 
-        long basis;
-        if (origin == 0)
-            basis = 0;
-        else if (origin == 1)
-            basis = file.Position;
-        else if (origin == 2)
-            basis = file.Length;
-        else
-            return -1;
-
-        long position = basis + offset;
-        if (position < 0 || position > int.MaxValue)
-            return -1;
-        file.Position = (int)position;
-        return (int)position;
+        try
+        {
+            if (origin < 0 || origin > 2)
+                return -1;
+            long position = file.Stream.Seek(offset, (SeekOrigin)origin);
+            return position <= int.MaxValue ? (int)position : -1;
+        }
+        catch { return -1; }
     }
 
     [RuntimeExport("BTDN_FileTell")]
     public static int FileTell(int handle)
     {
         OpenFile file = GetFile(handle);
-        return file == null ? -1 : file.Position;
+        if (file == null) return -1;
+        try { return file.Stream.Position <= int.MaxValue ? (int)file.Stream.Position : -1; }
+        catch { return -1; }
     }
 
     [RuntimeExport("BTDN_FileClose")]
@@ -196,8 +216,7 @@ internal static unsafe class NativeFileIO
         s_openFiles[index] = null;
         try
         {
-            if (file.CanWrite && file.Dirty)
-                File.WriteAllBytes(file.Path, file.GetContents());
+            file.Stream.Dispose();
             return 0;
         }
         catch
@@ -209,9 +228,10 @@ internal static unsafe class NativeFileIO
     [RuntimeExport("BTDN_FileFlush")]
     public static int FileFlush(int handle)
     {
-        // Data is already present in the shared memory buffer. It is committed
-        // once on close so Quake's per-edict fflush calls do not rewrite a file.
-        return GetFile(handle) == null ? -1 : 0;
+        OpenFile file = GetFile(handle);
+        if (file == null) return -1;
+        try { if (file.CanWrite) file.Stream.Flush(); return 0; }
+        catch { return -1; }
     }
 
     [RuntimeExport("BTDN_FileExists")]
@@ -235,6 +255,13 @@ internal static unsafe class NativeFileIO
         {
             return -1;
         }
+    }
+
+    [RuntimeExport("BTDN_DirectoryExists")]
+    public static int DirectoryExists(byte* path)
+    {
+        string directory = NormalizePath(DecodeAscii(path));
+        return !string.IsNullOrEmpty(directory) && Directory.Exists(directory) ? 1 : 0;
     }
 
     [RuntimeExport("BTDN_FileRemove")]

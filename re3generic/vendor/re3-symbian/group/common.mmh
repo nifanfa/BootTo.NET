@@ -1,0 +1,37 @@
+SYSTEMINCLUDE /epoc32/include
+SYSTEMINCLUDE /epoc32/include/app
+SYSTEMINCLUDE /epoc32/include/mw
+SYSTEMINCLUDE /epoc32/include/platform
+SYSTEMINCLUDE /epoc32/include/platform/mw
+SYSTEMINCLUDE /epoc32/include/stdapis
+
+USERINCLUDE	.
+
+MACRO LIBRW
+MACRO MASTER
+
+DEBUGGABLE
+#ifdef _DEBUG
+SRCDBG
+#endif
+
+OPTION ARMCC --gnu -Otime --diag_suppress 1,68,111,174,381,1293
+OPTION_REPLACE ARMCC --cpu 6
+OPTION_REPLACE ARMCC --fpu vfpv2 --fpmode fast
+// too dangerous!
+OPTION_REPLACE ARMCC -O2 -O3
+#ifdef ARMCC
+ALWAYS_BUILD_AS_ARM
+#endif
+
+#ifdef SYMBIAN_3
+SYSTEMINCLUDE /epoc32/include/stdapis/stlportv5
+STDCPP
+MACRO RW_GL3
+MACRO RW_OPENGL
+#else
+SYSTEMINCLUDE /epoc32/include/stdapis/stlport
+SYSTEMINCLUDE /epoc32/include/stdapis/stlport/stl
+MACRO RW_GLES1
+MACRO S60V3
+#endif

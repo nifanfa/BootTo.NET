@@ -212,6 +212,20 @@ namespace System.IO
         public override int Read(byte[] buffer)
             => ReadAsync(buffer).GetAwaiter().GetResult();
 
+        public int Read(byte* buffer, int count)
+        {
+            EnsureOpen();
+            if (!_canRead || _readCompletion != null || count < 0 || (buffer == null && count != 0))
+                throw new IOException("The file cannot be read into the requested buffer.");
+            if (count == 0)
+                return 0;
+
+            ulong size = (ulong)count;
+            if (File->Read(File, &size, buffer) != EFI_SUCCESS)
+                throw new IOException("The synchronous file read failed.");
+            return (int)size;
+        }
+
         public override int Read(byte[] buffer, int offset, int count)
         {
             ValidateRange(buffer, offset, count);

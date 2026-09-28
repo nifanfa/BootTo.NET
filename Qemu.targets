@@ -3,7 +3,7 @@
   <PropertyGroup>
     <QemuDirectory Condition="'$(QemuDirectory)' == ''">$(MSBuildThisFileDirectory)qemu</QemuDirectory>
     <QemuExecutable>$(QemuDirectory)\qemu-system-x86_64.exe</QemuExecutable>
-    <QemuImgExecutable>$(QemuDirectory)\qemu-img.exe</QemuImgExecutable>
+    <QemuFilesystemTool>$(QemuDirectory)\fstool.exe</QemuFilesystemTool>
     <SevenZipExecutable>$(QemuDirectory)\7z.exe</SevenZipExecutable>
     <QemuFirmwareDirectory>$(QemuDirectory)\firmware</QemuFirmwareDirectory>
     <QemuFirmware>$(QemuFirmwareDirectory)\edk2-x86_64-code.fd</QemuFirmware>
@@ -15,9 +15,10 @@
   </PropertyGroup>
 
   <Target Name="CreateQemuDiskImage">
-    <Error Text="Bundled qemu-img was not found at $(QemuImgExecutable)." Condition="!Exists('$(QemuImgExecutable)')" />
+    <Error Text="Bundled fstool was not found at $(QemuFilesystemTool)." Condition="!Exists('$(QemuFilesystemTool)')" />
     <Delete Files="$(QemuDiskImage)" Condition="Exists('$(QemuDiskImage)')" />
-    <Exec Command="&quot;$(QemuImgExecutable)&quot; convert -f raw -O raw &quot;fat:$(QemuDriveDirectory)&quot; &quot;$(QemuDiskImage)&quot;" />
+    <Exec Command="&quot;$(QemuFilesystemTool)&quot; create -t fat32 -o &quot;$(QemuDiskImage)&quot; &quot;$(QemuDriveDirectory)&quot;" />
+    <Exec Command="powershell.exe -NoProfile -NonInteractive -Command &quot;$image = [IO.File]::OpenWrite('$(QemuDiskImage)'); try { $image.SetLength(($image.Length + 4095) -band -4096) } finally { $image.Dispose() }&quot;" />
   </Target>
 
   <Target Name="DetectQemuAcceleration">

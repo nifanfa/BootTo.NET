@@ -26,10 +26,6 @@
   <ItemGroup>
     <ClCompile Include="MathHelpers.c" />
     <ClCompile Include="CpuHelpers.c" />
-    <ClCompile Include="string.c">
-      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(AdditionalOptions) /Oi-</AdditionalOptions>
-      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(AdditionalOptions) /Oi-</AdditionalOptions>
-    </ClCompile>
     <ClCompile Include="printf.c" />
     <ClCompile Include="lodepng.c" />
   </ItemGroup>

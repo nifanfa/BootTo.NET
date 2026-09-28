@@ -1,0 +1,9 @@
+inc_path = ['../include','../ug']
+lib_path = ['../bin']
+libs     = ['EGL','GLES_CM','ug','m','pthread','stdc++','X11','Xext']
+cxxflags = ['-fpermissive','-xc++']
+
+Program(target = 't1',source = 't1.c' ,CPPPATH=inc_path,LIBPATH=lib_path,LIBS=libs,CCFLAGS=cxxflags)
+Program(target = 't2',source = 't2.c' ,CPPPATH=inc_path,LIBPATH=lib_path,LIBS=libs,CCFLAGS=cxxflags)
+Program(target = 't3',source = 't3.c' ,CPPPATH=inc_path,LIBPATH=lib_path,LIBS=libs,CCFLAGS=cxxflags)
+ 

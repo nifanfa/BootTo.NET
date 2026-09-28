@@ -121,6 +121,11 @@ partial class Program
         new System.Media.SoundPlayer(@"\Nokia - Breath.wav").PlaySync();
 #endif
 
+#if false
+        // Copy your legal GTA 3 files to the Drive\Grand Theft Auto 3 folder, then run the game.
+        re3generic.Run();
+#endif
+
 #if true
 #if false
         doomgeneric.Run();

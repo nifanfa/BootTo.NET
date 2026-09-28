@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>18.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{e3e22b98-6c81-4404-84ca-6e4f7bd484c3}</ProjectGuid>
+    <RootNamespace>re3generic</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <Re3GameIncludes>$(ProjectDir)vendor\re3-symbian\src;$(ProjectDir)vendor\re3-symbian\src\animation;$(ProjectDir)vendor\re3-symbian\src\audio;$(ProjectDir)vendor\re3-symbian\src\buildings;$(ProjectDir)vendor\re3-symbian\src\collision;$(ProjectDir)vendor\re3-symbian\src\control;$(ProjectDir)vendor\re3-symbian\src\core;$(ProjectDir)vendor\re3-symbian\src\entities;$(ProjectDir)vendor\re3-symbian\src\extras;$(ProjectDir)vendor\re3-symbian\src\fakerw;$(ProjectDir)vendor\re3-symbian\src\math;$(ProjectDir)vendor\re3-symbian\src\modelinfo;$(ProjectDir)vendor\re3-symbian\src\objects;$(ProjectDir)vendor\re3-symbian\src\peds;$(ProjectDir)vendor\re3-symbian\src\renderer;$(ProjectDir)vendor\re3-symbian\src\rw;$(ProjectDir)vendor\re3-symbian\src\save;$(ProjectDir)vendor\re3-symbian\src\skel;$(ProjectDir)vendor\re3-symbian\src\text;$(ProjectDir)vendor\re3-symbian\src\vehicles;$(ProjectDir)vendor\re3-symbian\src\weapons;$(ProjectDir)vendor\re3-symbian\vendor\librw;$(ProjectDir)vendor\re3-symbian\vendor\librw\src;$(ProjectDir)vendor\vincent\include;$(ProjectDir)include</Re3GameIncludes>
+    <Re3LibrwIncludes>$(ProjectDir)vendor\re3-symbian\vendor\librw;$(ProjectDir)vendor\re3-symbian\vendor\librw\src;$(ProjectDir)vendor\vincent\include;$(ProjectDir)include</Re3LibrwIncludes>
+  </PropertyGroup>
+  <PropertyGroup>
+    <OutDir>$(ProjectDir)$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)obj\$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)software;$(ProjectDir)vendor\vincent\src;$(ProjectDir)vendor\vincent\include;$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;STATIC_GLES;RE3_GENERIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+    <Manifest>
+      <EnableSegmentHeap>true</EnableSegmentHeap>
+    </Manifest>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+    <Manifest>
+      <EnableSegmentHeap>true</EnableSegmentHeap>
+    </Manifest>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+    <Manifest>
+      <EnableSegmentHeap>true</EnableSegmentHeap>
+    </Manifest>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+    <Manifest>
+      <EnableSegmentHeap>true</EnableSegmentHeap>
+    </Manifest>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Platform)' == 'x64'">
+    <ClCompile>
+      <RuntimeLibrary Condition="'$(Configuration)' == 'Release'">MultiThreaded</RuntimeLibrary>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <AdditionalOptions>/GR- /Zc:threadSafeInit- /EHs- /EHc- %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="src\platform.c" />
+    <ClCompile Include="src\stream.c" />
+    <ClCompile Include="src\Re3Port.c" />
+    <ClCompile Include="src\WinCompat.c">
+      <WholeProgramOptimization>false</WholeProgramOptimization>
+    </ClCompile>
+    <ClCompile Include="software\*.cpp">
+      <PreprocessorDefinitions>EGL_NO_COMPILE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)software_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="vendor\re3-symbian\src\**\*.cpp" Exclude="vendor\re3-symbian\src\core\CdStream.cpp;vendor\re3-symbian\src\core\CdStreamPosix.cpp;vendor\re3-symbian\src\skel\win\**;vendor\re3-symbian\src\skel\symbian\**;vendor\re3-symbian\src\skel\glfw\**;vendor\re3-symbian\src\audio\oal\**;vendor\re3-symbian\src\audio\eax\**;vendor\re3-symbian\src\audio\sampman_miles.cpp;vendor\re3-symbian\src\audio\sampman_oal.cpp;vendor\re3-symbian\src\audio\sampman_symbian.cpp">
+      <AdditionalIncludeDirectories>$(Re3GameIncludes);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NOMINMAX;LIBRW;RW_GLES1;MASTER;NO_AUDIO;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>false</ConformanceMode>
+      <LanguageStandard>stdcpp14</LanguageStandard>
+      <AdditionalOptions>/Zc:strictStrings- %(AdditionalOptions)</AdditionalOptions>
+      <ObjectFileName>$(IntDir)game_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="integration\*.cpp">
+      <AdditionalIncludeDirectories>$(Re3GameIncludes);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NOMINMAX;LIBRW;RW_GLES1;MASTER;NO_AUDIO;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>false</ConformanceMode>
+      <LanguageStandard>stdcpp14</LanguageStandard>
+      <AdditionalOptions>/Zc:strictStrings- %(AdditionalOptions)</AdditionalOptions>
+      <ObjectFileName>$(IntDir)game_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="vendor\re3-symbian\vendor\librw\src\**\*.cpp" Exclude="vendor\re3-symbian\vendor\librw\src\assert.cpp">
+      <AdditionalIncludeDirectories>$(Re3LibrwIncludes);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>LIBRW;RW_GLES1;_CRT_SECURE_NO_WARNINGS;LODEPNG_NO_COMPILE_CPP;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>false</ConformanceMode>
+      <LanguageStandard>stdcpp14</LanguageStandard>
+      <ObjectFileName>$(IntDir)librw_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="vendor\re3-symbian\vendor\librw\src\**\*.c" Exclude="vendor\re3-symbian\vendor\librw\src\printf_stub.c">
+      <AdditionalIncludeDirectories>$(Re3LibrwIncludes);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>LIBRW;RW_GLES1;_CRT_SECURE_NO_WARNINGS;LODEPNG_NO_COMPILE_CPP;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)librw_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="vendor\vincent\src\Config.cpp" />
+    <ClCompile Include="vendor\vincent\src\Context.cpp" />
+    <ClCompile Include="vendor\vincent\src\ContextBuffer.cpp" />
+    <ClCompile Include="vendor\vincent\src\ContextFloat.cpp" />
+    <ClCompile Include="vendor\vincent\src\ContextLight.cpp" />
+    <ClCompile Include="vendor\vincent\src\ContextLines.cpp" />
+    <ClCompile Include="vendor\vincent\src\ContextMaterial.cpp" />
+    <ClCompile Include="vendor\vincent\src\ContextMatrix.cpp" />
+    <ClCompile Include="vendor\vincent\src\ContextMesh.cpp" />
+    <ClCompile Include="vendor\vincent\src\ContextPoints.cpp" />
+    <ClCompile Include="vendor\vincent\src\ContextRaster.cpp" />
+    <ClCompile Include="vendor\vincent\src\ContextRender.cpp" />
+    <ClCompile Include="vendor\vincent\src\ContextTexture.cpp" />
+    <ClCompile Include="vendor\vincent\src\ContextTriangles.cpp" />
+    <ClCompile Include="vendor\vincent\src\ContextViewport.cpp" />
+    <ClCompile Include="vendor\vincent\src\Display.cpp" />
+    <ClCompile Include="vendor\vincent\src\fixed.cpp" />
+    <ClCompile Include="vendor\vincent\src\gl.cpp" />
+    <ClCompile Include="vendor\vincent\src\Light.cpp" />
+    <ClCompile Include="vendor\vincent\src\linalg.cpp" />
+    <ClCompile Include="vendor\vincent\src\Material.cpp" />
+    <ClCompile Include="vendor\vincent\src\MatrixStack.cpp" />
+    <ClCompile Include="vendor\vincent\src\Rasterizer.cpp" />
+    <ClCompile Include="vendor\vincent\src\RasterizerState.cpp" />
+    <ClCompile Include="vendor\vincent\src\RasterizerTriangles.cpp" />
+    <ClCompile Include="vendor\vincent\src\Texture.cpp" />
+    <ClCompile Include="vendor\vincent\src\Utils.cpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

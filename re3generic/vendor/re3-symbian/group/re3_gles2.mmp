@@ -1,0 +1,10 @@
+#define SYMBIAN_3
+TARGET re3.exe
+LIBRARY libstdcppv5.lib
+LIBRARY libglesv2.lib
+LIBRARY libegl.lib
+LIBRARY platformver.lib
+STATICLIBRARY librw_gles2.lib
+ARMFPU vfpv2
+SMPSAFE
+#include "re3.mmh"

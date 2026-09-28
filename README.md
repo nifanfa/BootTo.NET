@@ -15,7 +15,7 @@ You can simply start ConsoleApp1 or press F5. msbuild will handle the rest.
 ## Synopsis
 *When will hobby OS developers realize that we don't need to implement everything from scratch? With a clean environment providing basic network, graphics, filesystem, and USB support, there's no need to build it yourself—just load a DXE driver and go ahead with your 'OS'.*  
 
-The repository includes QEMU, its Windows runtime dependencies, and EDK2 firmware; no system QEMU installation is required. After building the solution, run the `RunQemu` target from `ConsoleApp1.csproj` to create `Drive.img` and boot it.
+The repository includes QEMU, its Windows runtime dependencies, EDK2 firmware, and fstool; no system QEMU, WSL, or separate FAT32 utilities are required. The build creates a FAT32 `Drive.img` directly from `Drive`, sized to its contents for Doom, Quake, or GTA III. Keep GTA III assets under `Drive/Grand Theft Auto 3/`. The old image is replaced only after a new one has been built successfully.
 
 QEMU mounts the bundled UEFI variable template through a temporary snapshot. Variable changes are discarded when QEMU exits, so stale physical-network settings cannot override the `-netdev user` DHCP configuration and no per-build `.vars.fd` file is created.
 
@@ -31,7 +31,11 @@ QEMU mounts the bundled UEFI variable template through a temporary snapshot. Var
   <img alt="image" src="https://github.com/user-attachments/assets/ab65cd9b-521a-4177-af3e-3ef58b57ca76" />
 </p>
 
-# Quake generic (True 3D)
+# GTA III
+> **You should be familiar with the key mapping...**
+<img alt="QQ_1790653245465" src="https://github.com/user-attachments/assets/940b72a8-574a-4405-a9e3-08f3267ef4ac" />
+
+# Quake generic
 > **Key Mapping:** `W` / `S` -> Move Forward / Backward | `A` / `D` -> Strafe Left / Right | `Space` -> Jump / Swim Up | `Left Shift` -> Sprint | `Mouse Left Click` -> Attack | `Mouse Movement` -> Look / Camera | `Esc` -> Menu / Back | `Enter` -> Confirm | `1–8` -> Switch Weapon | `` ` `` / `~` -> Toggle Console
 <p align="center">
   <img alt="QQ_1787901663795" src="https://github.com/user-attachments/assets/a4b9f0c2-99da-469f-bd60-3342b0a4359d" />

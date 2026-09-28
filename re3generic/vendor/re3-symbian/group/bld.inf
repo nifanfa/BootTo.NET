@@ -1,0 +1,10 @@
+PRJ_PLATFORMS
+DEFAULT ARMV6
+
+PRJ_MMPFILES
+gnumakefile Icons_scalable_dc.mk
+gnumakefile shaders.mk
+librw_gles2.mmp
+re3_gles2.mmp
+librw_gles1.mmp
+re3_gles1.mmp

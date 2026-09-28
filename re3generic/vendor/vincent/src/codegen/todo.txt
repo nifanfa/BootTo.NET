@@ -1,0 +1,44 @@
+Ideas on how to improve JIT:
+----------------------------
+
+
+- Register targeting: 
+
+Mainly for function calls: If next use of a register is for
+a function call, calcualte value directly into target register. 
+	
+Issue: Can this lead to premature and unnecessary stores?
+	
+- Increase cache performance:
+
+Allocate actual storage offsets for registers only after we
+have identified, which different values actually need to be persisted.
+	
+- Read only parameters are copy onto stack:
+
+Alternatives: Move all parameters onto stack, so we can use
+direct frame pointer access
+Or: Convert function to a method, and have a second pointer
+(this->ptr) available for
+direct adressing of parameter values.
+Or: Implement reference variables (could lead to cascaded
+load instructions in inner loops)
+	
+- Remove stalls in execution pipeline:
+
+Register loads: Have cg_codegen_emit_simple_inst look for
+register values that need to/could be
+preloaded for following instruction. If those exist, and
+registers are available, emit
+pre-load instruction before actual instruction to be
+scheduled at this point. This will
+ensure that data will be available (given it resides in
+on-chip cache).
+	
+Multiplications: Rewrite fixed point multiplies as
+instructions that can be scheduled individually
+	
+Have general instruction scheduling on intermediate code: 
+Assuming all data is available, just take instuction
+execution cycles and next use into consideration.
+	
