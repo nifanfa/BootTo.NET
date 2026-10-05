@@ -17,9 +17,9 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
     <ImplicitUsings>disable</ImplicitUsings>
-    <IL2LLVMTool>$(MSBuildThisFileDirectory)IL2LLVM\IL2LLVM.exe</IL2LLVMTool>
-    <IL2LLVMTarget>x86_64-pc-windows-msvc</IL2LLVMTarget>
-    <IL2LLVMObject>$(OutDir)$(TargetName).obj</IL2LLVMObject>
+    <I3LTool>$(MSBuildThisFileDirectory)I3L\I3L.exe</I3LTool>
+    <I3LTarget>x86_64-pc-windows-msvc</I3LTarget>
+    <I3LObject>$(OutDir)$(TargetName).obj</I3LObject>
     <EfiApplicationProject>$(MSBuildThisFileDirectory)EfiApplication\EfiApplication.vcxproj</EfiApplicationProject>
     <DisableFastUpToDateCheck Condition="'$(BuildingInsideVisualStudio)' == 'true'">true</DisableFastUpToDateCheck>
     <Nullable>disable</Nullable>
@@ -33,18 +33,18 @@
     </ItemGroup>
   </Target>
 
-  <Target Name="CompileWithIL2LLVM"
+  <Target Name="CompileWithI3L"
           AfterTargets="Build"
-          Inputs="$(TargetPath);$(IL2LLVMTool)"
-          Outputs="$(IL2LLVMObject)"
+          Inputs="$(TargetPath);$(I3LTool)"
+          Outputs="$(I3LObject)"
           Condition="'$(MSBuildProjectExtension)' == '.csproj'">
-    <Error Condition="!Exists('$(IL2LLVMTool)')" Text="IL2LLVM was not found at $(IL2LLVMTool)." />
-    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(IL2LLVMObject)'))" />
-    <Exec Command="&quot;$(IL2LLVMTool)&quot; &quot;$(TargetPath)&quot; &quot;$(IL2LLVMObject)&quot; &quot;$(IL2LLVMTarget)&quot;" />
+    <Error Condition="!Exists('$(I3LTool)')" Text="I3L was not found at $(I3LTool)." />
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(I3LObject)'))" />
+    <Exec Command="&quot;$(I3LTool)&quot; &quot;$(TargetPath)&quot; &quot;$(I3LObject)&quot; &quot;$(I3LTarget)&quot;" />
   </Target>
 
   <Target Name="BuildEfiApplication"
-          AfterTargets="CompileWithIL2LLVM"
+          AfterTargets="CompileWithI3L"
           Condition="'$(BuildingInsideVisualStudio)' == 'true' and '$(MSBuildProjectExtension)' == '.csproj'">
     <MSBuild Projects="$(EfiApplicationProject)"
              Targets="Build"
