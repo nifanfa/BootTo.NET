@@ -142,17 +142,20 @@ namespace System.Media
             return AppendPcm(buffer, offset, count, _pcmChannels, _pcmSampleRate, waitForCapacity);
         }
 
-        internal ulong GetBufferedInputFrameCount(int inputSampleRate)
+        internal ulong BufferedFrameCount
         {
-            if (inputSampleRate <= 0 || (void*)s_playbackEvent == null)
-                return 0;
+            get
+            {
+                if (_pcmSampleRate <= 0 || (void*)s_playbackEvent == null)
+                    return 0;
 
-            EFI_TPL oldTpl = gBS->RaiseTPL(TPL_NOTIFY);
-            ulong outputFrames = s_remainingBytes / (OutputChannels * sizeof(short));
-            gBS->RestoreTPL(oldTpl);
+                EFI_TPL oldTpl = gBS->RaiseTPL(TPL_NOTIFY);
+                ulong outputFrames = s_remainingBytes / (OutputChannels * sizeof(short));
+                gBS->RestoreTPL(oldTpl);
 
-            return (outputFrames * (ulong)inputSampleRate + OutputSampleRate - 1) /
-                OutputSampleRate;
+                return (outputFrames * (ulong)_pcmSampleRate + OutputSampleRate - 1) /
+                    OutputSampleRate;
+            }
         }
 
         private static int ReadFully(Stream stream, byte[] buffer, int count)

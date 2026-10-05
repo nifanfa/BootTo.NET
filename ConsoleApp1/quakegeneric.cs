@@ -170,7 +170,7 @@ internal static unsafe class quakegeneric
 
     [RuntimeExport("QG_AudioGetBufferedFrames")]
     public static ulong AudioGetBufferedFrames()
-        => SoundOutput.GetBufferedInputFrameCount(QuakeAudioRate);
+        => SoundOutput.BufferedFrameCount;
 
     [RuntimeExport("BTDN_GetMilliseconds")]
     public static uint GetMilliseconds()
