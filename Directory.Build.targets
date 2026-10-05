@@ -17,9 +17,9 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
     <ImplicitUsings>disable</ImplicitUsings>
-    <IL2LLVMTool>$(MSBuildThisFileDirectory)IL2LLVM\IL2LLVM.exe</IL2LLVMTool>
-    <IL2LLVMTarget>x86_64-pc-windows-msvc</IL2LLVMTarget>
-    <IL2LLVMObject>$(OutDir)$(TargetName).obj</IL2LLVMObject>
+    <MSIL2LLVMTool>$(MSBuildThisFileDirectory)MSIL2LLVM\MSIL2LLVM.exe</MSIL2LLVMTool>
+    <MSIL2LLVMTarget>x86_64-pc-windows-msvc</MSIL2LLVMTarget>
+    <MSIL2LLVMObject>$(OutDir)$(TargetName).obj</MSIL2LLVMObject>
     <EfiApplicationProject>$(MSBuildThisFileDirectory)EfiApplication\EfiApplication.vcxproj</EfiApplicationProject>
     <DisableFastUpToDateCheck Condition="'$(BuildingInsideVisualStudio)' == 'true'">true</DisableFastUpToDateCheck>
     <Nullable>disable</Nullable>
@@ -33,18 +33,18 @@
     </ItemGroup>
   </Target>
 
-  <Target Name="CompileWithIL2LLVM"
+  <Target Name="CompileWithMSIL2LLVM"
           AfterTargets="Build"
-          Inputs="$(TargetPath);$(IL2LLVMTool)"
-          Outputs="$(IL2LLVMObject)"
+          Inputs="$(TargetPath);$(MSIL2LLVMTool)"
+          Outputs="$(MSIL2LLVMObject)"
           Condition="'$(MSBuildProjectExtension)' == '.csproj'">
-    <Error Condition="!Exists('$(IL2LLVMTool)')" Text="IL2LLVM was not found at $(IL2LLVMTool)." />
-    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(IL2LLVMObject)'))" />
-    <Exec Command="&quot;$(IL2LLVMTool)&quot; &quot;$(TargetPath)&quot; &quot;$(IL2LLVMObject)&quot; &quot;$(IL2LLVMTarget)&quot;" />
+    <Error Condition="!Exists('$(MSIL2LLVMTool)')" Text="MSIL2LLVM was not found at $(MSIL2LLVMTool)." />
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(MSIL2LLVMObject)'))" />
+    <Exec Command="&quot;$(MSIL2LLVMTool)&quot; &quot;$(TargetPath)&quot; &quot;$(MSIL2LLVMObject)&quot; &quot;$(MSIL2LLVMTarget)&quot;" />
   </Target>
 
   <Target Name="BuildEfiApplication"
-          AfterTargets="CompileWithIL2LLVM"
+          AfterTargets="CompileWithMSIL2LLVM"
           Condition="'$(BuildingInsideVisualStudio)' == 'true' and '$(MSBuildProjectExtension)' == '.csproj'">
     <MSBuild Projects="$(EfiApplicationProject)"
              Targets="Build"

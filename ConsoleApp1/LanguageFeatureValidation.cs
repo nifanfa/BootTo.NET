@@ -1652,7 +1652,7 @@ public static class LanguageFeatureValidation
         ReadOnlySpan<int> readOnly = values;
         ReadOnlySpan<int> converted = span;
         ReadOnlySpan<int> readOnlySlice = readOnly.Slice(RuntimeValue(2));
-        ReadOnlySpan<byte> utf8 = "IL2LLVM"u8;
+        ReadOnlySpan<byte> utf8 = "MSIL2LLVM"u8;
         byte[] bytes = [(byte)RuntimeValue(0x15), (byte)RuntimeValue(0x2A), (byte)RuntimeValue(0x3F)];
         Span<byte> writableBytes = bytes;
         ReadOnlySpan<byte> readOnlyBytes = bytes;
@@ -1669,8 +1669,8 @@ public static class LanguageFeatureValidation
             slice.Length != RuntimeValue(3) || slice[0] != RuntimeValue(9) || slice[2] != RuntimeValue(4) ||
             readOnly.Length != RuntimeValue(5) || readOnly[1] != RuntimeValue(9) ||
             converted[4] != RuntimeValue(5) || readOnlySlice.Length != RuntimeValue(3) ||
-            readOnlySlice[0] != RuntimeValue(3) || utf8.Length != RuntimeValue(7) ||
-            utf8[0] != (byte)'I' || utf8[2] != (byte)'2' || utf8[6] != (byte)'M' ||
+            readOnlySlice[0] != RuntimeValue(3) || utf8.Length != RuntimeValue(9) ||
+            utf8[0] != (byte)'M' || utf8[2] != (byte)'I' || utf8[8] != (byte)'M' ||
             bytes[1] != (byte)RuntimeValue(0x5A))
             Fail("span or UTF-8 string literal");
     }
