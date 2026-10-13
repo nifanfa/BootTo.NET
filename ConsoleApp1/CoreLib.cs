@@ -1788,7 +1788,7 @@ namespace System.Runtime
     internal unsafe struct GCRoot
     {
         public Object** Address;
-        public Type Type;
+        public Type StructScanType;
     }
 
     internal unsafe struct GCFrame
@@ -1810,7 +1810,7 @@ namespace System.Runtime
     {
         public GCStaticRoot* Next;
         public Object** Address;
-        public Type Type;
+        public Type StructScanType;
     }
 
     internal static unsafe class GCHeap
@@ -1871,10 +1871,10 @@ namespace System.Runtime
         public static int Collect()
         {
             for (GCStaticRoot* root = s_staticRoots; root != null; root = root->Next)
-                MarkRoot(root->Address, root->Type);
+                MarkRoot(root->Address, root->StructScanType);
             for (GCFrame* frame = GetTopFrame(); frame != null; frame = frame->Previous)
                 for (int index = 0; index < frame->RootCount; index++)
-                    MarkRoot(frame->Roots[index].Address, frame->Roots[index].Type);
+                    MarkRoot(frame->Roots[index].Address, frame->Roots[index].StructScanType);
             while (s_pendingMarks != null)
             {
                 GCAllocation* pending = s_pendingMarks;
@@ -1921,14 +1921,14 @@ namespace System.Runtime
             return collected;
         }
 
-        private static void MarkRoot(Object** address, Type type)
+        private static void MarkRoot(Object** address, Type structScanType)
         {
             if (address == null)
                 return;
-            if (type == null)
+            if (structScanType == null)
                 MarkObject(*address);
             else
-                ScanValue((byte*)address, type);
+                ScanValue((byte*)address, structScanType);
         }
 
         private static void MarkObject(Object* value)
